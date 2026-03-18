@@ -839,47 +839,58 @@ function downloadChart(btn) {
   const canvas = section.querySelector('canvas');
   if (!canvas) { alert('找不到圖表'); return; }
 
-  // 取得標題：先找 id 有 title 的，否則找 h2，最後用 textContent 去掉按鈕文字
-  const header = section.querySelector('.chart-header');
   const h2 = section.querySelector('h2');
-  let title = 'chart';
-  if (h2) {
-    // cloneNode 避免抓到下載按鈕的文字
-    const clone = h2.cloneNode(true);
-    // 移除 ::before 無法移除，但 textContent 不含偽元素，直接用
-    title = h2.textContent.trim();
-  }
+  const title = h2 ? h2.textContent.trim() : 'chart';
   const filename = title + '.jpg';
 
-  const TITLE_H = 52;
-  const PADDING = 24;
+  // 尺寸設定（模擬網頁卡片樣式）
+  const CARD_PAD = 26;
+  const TITLE_H  = 60;   // 標題區高度
+  const SEP_GAP  = 16;   // 分隔線下方間距
+  const BAR_W    = 4;    // 左側豎線寬度
+  const BAR_H    = 22;   // 左側豎線高度
+  const BAR_X    = CARD_PAD;
+  const TEXT_X   = BAR_X + BAR_W + 10;
+
+  const W = canvas.width + CARD_PAD * 2;
+  const H = canvas.height + TITLE_H + SEP_GAP + CARD_PAD;
+
   const tmpCanvas = document.createElement('canvas');
-  tmpCanvas.width  = canvas.width + PADDING * 2;
-  tmpCanvas.height = canvas.height + TITLE_H + PADDING;
+  tmpCanvas.width  = W;
+  tmpCanvas.height = H;
   const ctx = tmpCanvas.getContext('2d');
 
   // 白底
   ctx.fillStyle = '#ffffff';
-  ctx.fillRect(0, 0, tmpCanvas.width, tmpCanvas.height);
+  ctx.fillRect(0, 0, W, H);
 
-  // 頂部漸層標題列
-  const grad = ctx.createLinearGradient(0, 0, tmpCanvas.width, 0);
-  grad.addColorStop(0,   '#8fba2e');
-  grad.addColorStop(0.5, '#2aac8a');
-  grad.addColorStop(1,   '#1a9fbe');
-  ctx.fillStyle = grad;
-  ctx.roundRect(0, 0, tmpCanvas.width, TITLE_H, [6, 6, 0, 0]);
+  // 左側漸層豎線
+  const barGrad = ctx.createLinearGradient(0, (TITLE_H - BAR_H) / 2, 0, (TITLE_H + BAR_H) / 2);
+  barGrad.addColorStop(0,   '#8fba2e');
+  barGrad.addColorStop(0.5, '#2aac8a');
+  barGrad.addColorStop(1,   '#1a9fbe');
+  ctx.fillStyle = barGrad;
+  ctx.beginPath();
+  ctx.roundRect(BAR_X, (TITLE_H - BAR_H) / 2, BAR_W, BAR_H, 2);
   ctx.fill();
 
-  // 標題文字（字型 fallback 加粗）
-  ctx.fillStyle = '#ffffff';
-  ctx.font = 'bold 17px "Microsoft JhengHei", Arial, sans-serif';
+  // 標題文字（黑色，跟網頁一樣）
+  ctx.fillStyle = '#1a2e28';
+  ctx.font = 'bold 24px "Microsoft JhengHei", Arial, sans-serif';
   ctx.textBaseline = 'middle';
   ctx.textAlign = 'left';
-  ctx.fillText(title, PADDING, TITLE_H / 2 + 1);
+  ctx.fillText(title, TEXT_X, TITLE_H / 2);
 
-  // 圖表本體（緊貼標題列下方，左右保留 padding）
-  ctx.drawImage(canvas, PADDING, TITLE_H);
+  // 分隔線
+  ctx.strokeStyle = '#d6ede5';
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.moveTo(CARD_PAD, TITLE_H);
+  ctx.lineTo(W - CARD_PAD, TITLE_H);
+  ctx.stroke();
+
+  // 圖表本體
+  ctx.drawImage(canvas, CARD_PAD, TITLE_H + SEP_GAP);
 
   // 下載
   const link = document.createElement('a');
