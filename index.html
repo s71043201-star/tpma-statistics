@@ -771,8 +771,42 @@ function parseExcel(file){
           typeMapTotal[type].開立數++;if(ex)typeMapTotal[type].執行數++;
           if(!minDate||pd<minDate)minDate=pd;if(!maxDate||pd>maxDate)maxDate=pd;
         });
-        const sw=Object.keys(weekMap).sort();
-        const newWeeklyData=sw.map(wl=>{const e=weekMap[wl].執行數,p=weekMap[wl].開立數;return{week_label:wl,開立數:p,執行數:e,執行率:p>0?parseFloat((e/p*100).toFixed(1)):0};});
+        // ── 填補缺漏週次（有資料的第一週到最後一週之間，全部都要顯示）──
+        const existingWeeks = Object.keys(weekMap).sort();
+        const allWeeks = [];
+        if(existingWeeks.length >= 2){
+          // 從最早週到最晚週，逐週填補
+          let cur = existingWeeks[0];
+          const last = existingWeeks[existingWeeks.length-1];
+          while(cur <= last){
+            allWeeks.push(cur);
+            // 計算下一週
+            const yr = parseInt(cur.slice(0,4));
+            const wk = parseInt(cur.slice(5));
+            // 用日期推算下一週
+            const jan4 = new Date(Date.UTC(yr,0,4));
+            const startOfW1 = new Date(jan4);
+            startOfW1.setUTCDate(jan4.getUTCDate() - ((jan4.getUTCDay()||7)-1));
+            const thisWeekStart = new Date(startOfW1.getTime() + (wk-1)*7*86400*1000);
+            const nextWeekStart = new Date(thisWeekStart.getTime() + 7*86400*1000);
+            const niso = nextWeekStart.toISOString();
+            const nd = new Date(niso);
+            const nday = nd.getUTCDay()||7;
+            nd.setUTCDate(nd.getUTCDate()+4-nday);
+            const nyr = nd.getUTCFullYear();
+            const nyrStart = new Date(Date.UTC(nyr,0,1));
+            const nwk = Math.ceil((((nd-nyrStart)/86400000)+1)/7);
+            cur = `${nyr}W${String(nwk).padStart(2,'0')}`;
+          }
+        } else {
+          allWeeks.push(...existingWeeks);
+        }
+
+        const sw = allWeeks;
+        const newWeeklyData=sw.map(wl=>{
+          const d=weekMap[wl]||{開立數:0,執行數:0};
+          return{week_label:wl,開立數:d.開立數,執行數:d.執行數,執行率:d.開立數>0?parseFloat((d.執行數/d.開立數*100).toFixed(1)):0};
+        });
         const allTypes=Object.keys(typeMapTotal);
         const newTypeStats=allTypes.map(t=>{const p=typeMapTotal[t].開立數,e=typeMapTotal[t].執行數;return{處方類型:t,開立數:p,執行數:e,執行率:p>0?parseFloat((e/p*100).toFixed(1)):0};});
         const newTWRaw=[];
