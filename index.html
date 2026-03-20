@@ -1032,8 +1032,13 @@ function toDate(val){
   if(typeof val==='string'){const d=new Date(val);return isNaN(d)?null:d;}
   return null;
 }
-function detectCol(headers, candidates){
-  for(const c of candidates){const h=headers.find(h=>h&&h.toString().trim().includes(c));if(h!==undefined)return h;}
+function detectCol(headers, candidates, exact=false){
+  for(const c of candidates){
+    const h = exact
+      ? headers.find(x=>x&&x.toString().trim()===c)
+      : headers.find(x=>x&&x.toString().trim().includes(c));
+    if(h!==undefined) return h;
+  }
   return null;
 }
 
@@ -1047,12 +1052,13 @@ function parseExcel(file){
         const rows = XLSX.utils.sheet_to_json(ws,{defval:null});
         if(!rows.length){reject('Excel 檔案內無資料');return;}
         const headers = Object.keys(rows[0]);
-        const colType    = detectCol(headers,['處方類型','類型','type','Type']);
-        const colPresc   = detectCol(headers,['開立日期時間','開立日期','開立時間','prescribe','Prescribe','開立']);
-        const colExecD   = detectCol(headers,['執行日期','執行時間','execute','Execute','執行日']);
-        const colExecS   = detectCol(headers,['執行處方','執行狀態','狀態','status','Status','是否執行']);
-        const colEnroll  = detectCol(headers,['是否選課','選課']);
-        const colClinic  = detectCol(headers,['開立診所','診所名稱','診所','院所名稱','院所','clinic','Clinic','醫療院所','機構名稱']);
+        // 精確比對優先，避免「執行處方」被「執行」模糊匹配吃掉
+        const colType   = detectCol(headers,['處方類型','類型'],true)   || detectCol(headers,['type','Type']);
+        const colPresc  = detectCol(headers,['開立日期時間','開立日期','開立時間'],true) || detectCol(headers,['prescribe','Prescribe']);
+        const colExecD  = detectCol(headers,['執行日期'],true);                        // 有值代表已執行
+        const colExecS  = detectCol(headers,['執行處方'],true)          || detectCol(headers,['執行狀態','是否執行'],true) || detectCol(headers,['status','Status']);
+        const colEnroll = detectCol(headers,['是否選課'],true);
+        const colClinic = detectCol(headers,['開立診所','診所名稱','診所','院所名稱','院所'],true) || detectCol(headers,['clinic','Clinic','醫療院所','機構名稱']);
         if(!colType||!colPresc){reject(`找不到必要欄位。\n偵測到：${headers.join('、')}\n需要：處方類型、開立日期`);return;}
 
         const weekMap={},typeWeekMap={},typeMapTotal={};
@@ -1065,12 +1071,12 @@ function parseExcel(file){
           const wl=isoWeekLabel(pd);if(!wl)return;
           const type   = row[colType]?row[colType].toString().trim():'未分類';
           const clinic = colClinic && row[colClinic] ? row[colClinic].toString().trim() : null;
-          // 執行：執行處方欄有 'V'
+          // 執行：優先看執行日期欄（有日期＝已執行），其次看執行狀態欄的 V/是
           let ex = false;
-          if(colExecD){ ex = !!toDate(row[colExecD]); }
-          else if(colExecS){ const s=row[colExecS]; ex = s&&['是','1','true','已執行','v','V','✓'].includes(s.toString().trim()); }
-          // 選課：是否選課欄有 'V'
-          const enrolled = colEnroll && row[colEnroll] && row[colEnroll].toString().trim().toUpperCase()==='V';
+          if(colExecD && row[colExecD]){ ex = !!toDate(row[colExecD]); }
+          if(!ex && colExecS){ const s=row[colExecS]; ex = !!s&&['是','1','true','已執行','v','V','✓'].includes(s.toString().trim()); }
+          // 選課：是否選課欄 = 'V'
+          const enrolled = !!(colEnroll && row[colEnroll] && row[colEnroll].toString().trim().toUpperCase()==='V');
 
           // weekly
           if(!weekMap[wl])weekMap[wl]={開立數:0,執行數:0};
