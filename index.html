@@ -416,16 +416,15 @@ footer {
     <div class="clinic-sort-bar">
       <span class="ct-label">排序依據：</span>
       <button class="ct-btn active" onclick="setClinicSort('prescribe',this)"><span>📋</span> 開立數↓</button>
-      <button class="ct-btn" onclick="setClinicSort('enroll',this)"><span>🎓</span> 選課人次↓</button>
-      <button class="ct-btn" onclick="setClinicSort('exec',this)"><span>☑️</span> 執行數↓</button>
-      <button class="ct-btn" onclick="setClinicSort('rate',this)"><span>📈</span> 執行率↓</button>
+      <button class="ct-btn" onclick="setClinicSort('enroll',this)"><span>🎓</span> 選課或執行↓</button>
+      <button class="ct-btn" onclick="setClinicSort('rate',this)"><span>📈</span> 比率↓</button>
       <button class="ct-btn" onclick="setClinicSort('name',this)"><span>🔤</span> 名稱↑</button>
     </div>
 
     <!-- ① 選課人次橫條圖 -->
     <div class="chart-section">
       <div class="chart-header">
-        <h2>各診所選課人次</h2>
+        <h2>各診所選課或執行筆數（去重）</h2>
         <button class="dl-btn" onclick="downloadChart(this)">↓ 下載 JPG</button>
       </div>
       <div class="chart-wrap" id="clinicEnrollWrap" style="height:360px">
@@ -436,7 +435,7 @@ footer {
     <!-- ② 開立 vs 執行橫條對比圖 -->
     <div class="chart-section">
       <div class="chart-header">
-        <h2>各診所開立數 vs 執行數</h2>
+        <h2>各診所開立數 vs 選課或執行筆數</h2>
         <button class="dl-btn" onclick="downloadChart(this)">↓ 下載 JPG</button>
       </div>
       <div class="chart-wrap" id="clinicBarWrap" style="height:360px">
@@ -447,7 +446,7 @@ footer {
     <!-- ③ 執行率橫條圖 -->
     <div class="chart-section">
       <div class="chart-header">
-        <h2>各診所執行率（%）</h2>
+        <h2>各診所選課或執行比率（%）</h2>
         <button class="dl-btn" onclick="downloadChart(this)">↓ 下載 JPG</button>
       </div>
       <div class="chart-wrap" id="clinicRateWrap" style="height:360px">
@@ -468,11 +467,9 @@ footer {
               <th style="width:40px;">排名</th>
               <th>診所名稱</th>
               <th class="num">開立筆數</th>
-              <th class="num">選課人次</th>
-              <th class="num">選課率</th>
-              <th class="num">執行筆數</th>
-              <th class="num">執行率</th>
-              <th style="min-width:130px;">執行率視覺</th>
+              <th class="num">選課或執行</th>
+              <th class="num">比率</th>
+              <th style="min-width:130px;">比率視覺</th>
             </tr>
           </thead>
           <tbody id="clinicTableBody"></tbody>
@@ -681,7 +678,7 @@ function updateSummary(){
   const total   = weeklyData.reduce((s,d)=>s+d.開立數,0);
   const exec    = weeklyData.reduce((s,d)=>s+d.執行數,0);
   const rate    = total>0?(exec/total*100).toFixed(1):0;
-  const enroll  = clinicStats.reduce((s,d)=>s+(d.選課人次||0),0);
+  const enroll  = clinicStats.reduce((s,d)=>s+(d.選課或執行||0),0);
   document.getElementById('sumTotal').textContent   = total.toLocaleString();
   document.getElementById('sumExec').textContent    = exec.toLocaleString();
   document.getElementById('sumRate').textContent    = rate+'%';
@@ -838,9 +835,8 @@ function getSortedClinicStats() {
   const data = [...clinicStats];
   switch(currentClinicSort){
     case 'prescribe': return data.sort((a,b)=>b.開立數-a.開立數);
-    case 'enroll':    return data.sort((a,b)=>b.選課人次-a.選課人次);
-    case 'exec':      return data.sort((a,b)=>b.執行數-a.執行數);
-    case 'rate':      return data.sort((a,b)=>b.執行率-a.執行率);
+    case 'enroll':    return data.sort((a,b)=>b.選課或執行-a.選課或執行);
+    case 'rate':      return data.sort((a,b)=>b.比率-a.比率);
     case 'name':      return data.sort((a,b)=>a.診所名稱.localeCompare(b.診所名稱,'zh-TW'));
     default:          return data;
   }
@@ -860,9 +856,8 @@ function buildClinicCharts() {
   const sorted     = getSortedClinicStats();
   const names      = sorted.map(d=>d.診所名稱);
   const presData   = sorted.map(d=>d.開立數);
-  const enrollData = sorted.map(d=>d.選課人次);
-  const execData   = sorted.map(d=>d.執行數);
-  const rateData   = sorted.map(d=>d.執行率);
+  const enrollData = sorted.map(d=>d.選課或執行);
+  const rateData   = sorted.map(d=>d.比率);
 
   // 動態高度（每間診所 36px，至少 320px）
   const dynH = Math.max(320, names.length * 36);
@@ -891,7 +886,7 @@ function buildClinicCharts() {
       layout: { padding: { right: 52 } },
       plugins: {
         legend: { display: false },
-        tooltip: { callbacks: { label: c => ` 選課人次：${c.parsed.x} 筆` } }
+        tooltip: { callbacks: { label: c => ` 選課或執行：${c.parsed.x} 筆` } }
       },
       scales: {
         x: { ticks:{font:defaultFont}, beginAtZero:true, grid:{color:'#e2e8f0'} },
@@ -906,8 +901,8 @@ function buildClinicCharts() {
     data: {
       labels: names,
       datasets: [
-        { label:'開立數', data:presData, backgroundColor:'rgba(42,172,138,0.82)', borderRadius:4 },
-        { label:'執行數', data:execData, backgroundColor:'rgba(26,159,190,0.82)', borderRadius:4 }
+        { label:'開立數',     data:presData,   backgroundColor:'rgba(42,172,138,0.82)', borderRadius:4 },
+        { label:'選課或執行', data:enrollData, backgroundColor:'rgba(124,58,237,0.75)', borderRadius:4 }
       ]
     },
     options: {
@@ -944,7 +939,7 @@ function buildClinicCharts() {
       layout: { padding: { right: 60 } },
       plugins: {
         legend: { display: false },
-        tooltip: { callbacks: { label: c => ` 執行率：${c.parsed.x}%` } }
+        tooltip: { callbacks: { label: c => ` 選課或執行比率：${c.parsed.x}%` } }
       },
       scales: {
         x: { ticks:{font:defaultFont, callback:v=>v+'%'}, max:100, beginAtZero:true, grid:{color:'#e2e8f0'} },
@@ -967,13 +962,11 @@ function buildClinicTable(sorted) {
       <td style="text-align:center;"><span class="rank-badge ${badgeCls}">${rank}</span></td>
       <td style="font-weight:600;">${row.診所名稱}</td>
       <td class="num">${row.開立數.toLocaleString()}</td>
-      <td class="num" style="color:#6d28d9;font-weight:700;">${row.選課人次.toLocaleString()}</td>
-      <td class="num" style="color:#6d28d9;">${row.選課率}%</td>
-      <td class="num">${row.執行數.toLocaleString()}</td>
-      <td class="num">${row.執行率}%</td>
+      <td class="num" style="color:#6d28d9;font-weight:700;">${row.選課或執行.toLocaleString()}</td>
+      <td class="num" style="color:#6d28d9;">${row.比率}%</td>
       <td class="rate-bar-cell">
         <div class="rate-bar-bg">
-          <div class="rate-bar-fill" style="width:${row.執行率}%"></div>
+          <div class="rate-bar-fill" style="width:${row.比率}%"></div>
         </div>
       </td>
     `;
@@ -992,13 +985,13 @@ function setClinicSort(sort, btn) {
 function exportClinicTable() {
   if (!clinicStats.length) { alert('尚無診所資料'); return; }
   const sorted = getSortedClinicStats();
-  const wsData = [['排名','診所名稱','開立筆數','選課人次','選課率(%)','執行筆數','執行率(%)']];
+  const wsData = [['排名','診所名稱','開立筆數','選課或執行筆數','比率(%)']];
   sorted.forEach((row, i) => {
-    wsData.push([i+1, row.診所名稱, row.開立數, row.選課人次, row.選課率, row.執行數, row.執行率]);
+    wsData.push([i+1, row.診所名稱, row.開立數, row.選課或執行, row.比率]);
   });
   const wb = XLSX.utils.book_new();
   const ws = XLSX.utils.aoa_to_sheet(wsData);
-  ws['!cols'] = [{wch:6},{wch:24},{wch:10},{wch:10},{wch:10},{wch:10},{wch:10}];
+  ws['!cols'] = [{wch:6},{wch:24},{wch:10},{wch:14},{wch:10}];
   XLSX.utils.book_append_sheet(wb, ws, '診所統計');
   XLSX.writeFile(wb, '診所統計.xlsx');
 }
@@ -1088,12 +1081,11 @@ function parseExcel(file){
           // type total
           if(!typeMapTotal[type])typeMapTotal[type]={開立數:0,執行數:0};
           typeMapTotal[type].開立數++;if(ex)typeMapTotal[type].執行數++;
-          // ★ clinic
+          // ★ clinic：選課OR執行，去重（兩個都有只算一筆）
           if(clinic){
-            if(!clinicMap[clinic])clinicMap[clinic]={開立數:0,選課人次:0,執行數:0};
+            if(!clinicMap[clinic])clinicMap[clinic]={開立數:0,選課或執行:0};
             clinicMap[clinic].開立數++;
-            if(enrolled) clinicMap[clinic].選課人次++;
-            if(ex)       clinicMap[clinic].執行數++;
+            if(enrolled || ex) clinicMap[clinic].選課或執行++;
           }
           if(!minDate||pd<minDate)minDate=pd;if(!maxDate||pd>maxDate)maxDate=pd;
         });
@@ -1139,14 +1131,12 @@ function parseExcel(file){
           const d=typeWeekMap[t]?.[wl];
           if(d)newTWRaw.push({week_label:wl,處方類型:t,開立數:d.開立數,執行數:d.執行數});
         }));
-        // ★ 診所統計
+        // ★ 診所統計：選課或執行（去重）
         const newClinicStats = Object.entries(clinicMap).map(([name, v]) => ({
-          診所名稱: name,
-          開立數:   v.開立數,
-          選課人次: v.選課人次,
-          選課率:   v.開立數>0 ? parseFloat((v.選課人次/v.開立數*100).toFixed(1)) : 0,
-          執行數:   v.執行數,
-          執行率:   v.開立數>0 ? parseFloat((v.執行數/v.開立數*100).toFixed(1)) : 0
+          診所名稱:   name,
+          開立數:     v.開立數,
+          選課或執行: v.選課或執行,
+          比率:       v.開立數>0 ? parseFloat((v.選課或執行/v.開立數*100).toFixed(1)) : 0
         }));
 
         const fmt=d=>`${d.getFullYear()}/${String(d.getMonth()+1).padStart(2,'0')}/${String(d.getDate()).padStart(2,'0')}`;
