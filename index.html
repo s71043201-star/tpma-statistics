@@ -949,12 +949,25 @@ function buildTypeCharts(mode){
   if(mode==='line'){
     document.getElementById('type-line-view').classList.remove('hidden');
     let cumP=0,cumE=0;
-    const cumPres=weeklyData.map(d=>{cumP+=d.開立數;return cumP;});
-    const cumExec=weeklyData.map(d=>{cumE+=d.執行數;return cumE;});
+    // 累積值：週次有0也繼續沿用上週的累積值，確保整條線都有值
+    const cumPres=weeklyData.map(d=>{cumP+=d.開立數; return cumP;});
+    const cumExec=weeklyData.map(d=>{cumE+=d.執行數; return cumE;});
     const mkLine=(id,data,color,label)=>new Chart(document.getElementById(id).getContext('2d'),{
       type:'line',plugins:[lineLabelPlugin],
-      data:{labels:weeks,datasets:[{label,data,borderColor:color,backgroundColor:color+'22',pointRadius:5,pointBackgroundColor:color,pointBorderColor:'#fff',pointBorderWidth:2,tension:0,fill:true,borderWidth:2.5}]},
-      options:{responsive:true,maintainAspectRatio:false,layout:{padding:{top:24}},plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>` ${label}：${c.parsed.y} 筆`}}},
+      data:{labels:weeks,datasets:[{
+        label,data,
+        borderColor:color,
+        backgroundColor:color+'28',
+        pointRadius:5,pointBackgroundColor:color,pointBorderColor:'#fff',pointBorderWidth:2,
+        tension:0,
+        fill:'origin',   // 明確填到 Y=0 基線
+        borderWidth:2.5,
+        spanGaps:true    // 跨越空值保持連線
+      }]},
+      options:{
+        responsive:true,maintainAspectRatio:false,
+        layout:{padding:{top:24}},
+        plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>` ${label}：${c.parsed.y} 筆`}}},
         scales:{
           x:{ticks:{font:defaultFont},grid:{display:false}},
           y:{ticks:{font:defaultFont},min:0,beginAtZero:true,grid:{color:'#e2e8f0'}}
