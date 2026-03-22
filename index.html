@@ -431,6 +431,16 @@ header p { font-size: 0.86rem; opacity: 0.88; margin-top: 5px; letter-spacing: 0
 .clinic-sort-bar { padding: 14px 36px 0; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .clinic-sort-bar .ct-label { font-size: 0.8rem; font-weight: 700; color: var(--text-muted); }
 
+/* ── 週次說明列 ── */
+#week-note-bar {
+  background: #fffdf0; border-bottom: 1px solid #e8dfa0;
+  padding: 7px 36px; font-size: 0.82rem; color: #7a6a10;
+  display: flex; align-items: center; gap: 8px; font-weight: 500;
+}
+#week-note-bar strong { color: #5a4d08; }
+.week-note-icon { font-size: 1rem; flex-shrink: 0; }
+@media (max-width: 700px) { #week-note-bar { padding: 7px 16px; } }
+
 /* ── Footer ── */
 footer {
   text-align: center; padding: 22px; font-size: 0.77rem;
@@ -495,6 +505,12 @@ footer {
     <span class="pdf-icon">📑</span> 選擇圖表並匯出 PDF
   </button>
   <span style="font-size:0.78rem;color:var(--text-muted);">勾選想要的圖表，每頁自動放 2 張，合併下載</span>
+</div>
+
+<!-- 週次說明列 -->
+<div id="week-note-bar">
+  <span class="week-note-icon">🗓️</span>
+  <span>週次定義：每週<strong>週六</strong>起算至<strong>下週五</strong>結束（例：2026W12 = 03/21～03/27）</span>
 </div>
 
 <!-- 摘要卡片（5 張） -->
@@ -1483,14 +1499,13 @@ function buildPdfChecklist() {
     const sectionEl = document.querySelector(`[data-pdf-id="${chart.id}"]`);
     const isAvailable = sectionEl !== null;
 
-    const item = document.createElement('label');
+    // 用 div 避免 label+checkbox 雙重觸發問題
+    const item = document.createElement('div');
     item.className = 'pdf-check-item' + (isChecked ? ' checked' : '');
     item.style.opacity = isAvailable ? '1' : '0.4';
     item.style.cursor = isAvailable ? 'pointer' : 'default';
-    // 顯示所屬分頁為小字標籤
     const groupName = chart.groupLabel.replace(/^[\S]+\s/, '');
     item.innerHTML = `
-      <input type="checkbox" value="${chart.id}" ${isChecked ? 'checked' : ''} ${!isAvailable ? 'disabled' : ''}>
       <div class="pdf-check-box"></div>
       <div class="pdf-check-text">
         ${chart.label}
@@ -1498,7 +1513,10 @@ function buildPdfChecklist() {
       </div>
     `;
     if (isAvailable) {
-      item.addEventListener('click', () => togglePdfChart(chart.id, item));
+      item.addEventListener('click', (e) => {
+        e.stopPropagation();
+        togglePdfChart(chart.id, item);
+      });
     }
     grid.appendChild(item);
   });
@@ -1566,6 +1584,35 @@ async function startPdfExport() {
   progressBar.style.width = '0%';
 
   try {
+    // ── 暫時顯示所有隱藏頁籤，讓 canvas 有尺寸 ──
+    const tabIds = ['tab-weekly','tab-type','tab-typeweekly','tab-clinic'];
+    const hiddenTabs = [];
+    tabIds.forEach(id => {
+      const el = document.getElementById(id);
+      if (el && el.classList.contains('hidden')) {
+        el.classList.remove('hidden');
+        el.style.visibility = 'hidden'; // 顯示但不可見
+        el.style.position = 'absolute';
+        el.style.pointerEvents = 'none';
+        hiddenTabs.push(el);
+      }
+    });
+    // 同樣處理 type 子 view（line/pie/hbar）
+    const subViews = ['type-line-view','type-pie-view','type-hbar-view','tw-multi-view','tw-hbar-view'];
+    const hiddenSubViews = [];
+    subViews.forEach(id => {
+      const el = document.getElementById(id);
+      if (el && el.classList.contains('hidden')) {
+        el.classList.remove('hidden');
+        el.style.visibility = 'hidden';
+        el.style.position = 'absolute';
+        el.style.pointerEvents = 'none';
+        hiddenSubViews.push(el);
+      }
+    });
+    // 等待 chart.js 重繪
+    await new Promise(r => setTimeout(r, 120));
+
     // 收集所有勾選的 canvas（依順序）
     const selectedSections = [];
     PDF_CHART_GROUPS.forEach(group => {
@@ -1574,15 +1621,29 @@ async function startPdfExport() {
         const sectionEl = document.querySelector(`[data-pdf-id="${chart.id}"]`);
         if (!sectionEl) return;
         const canvas = sectionEl.querySelector('canvas');
-        if (!canvas) return;
+        if (!canvas || canvas.width === 0 || canvas.height === 0) return;
         const titleEl = sectionEl.querySelector('h2');
         const title = titleEl ? titleEl.textContent.trim() : chart.label;
         selectedSections.push({ sectionEl, canvas, title, id: chart.id });
       });
     });
 
+    // 還原隱藏狀態
+    hiddenTabs.forEach(el => {
+      el.classList.add('hidden');
+      el.style.visibility = '';
+      el.style.position = '';
+      el.style.pointerEvents = '';
+    });
+    hiddenSubViews.forEach(el => {
+      el.classList.add('hidden');
+      el.style.visibility = '';
+      el.style.position = '';
+      el.style.pointerEvents = '';
+    });
+
     if (selectedSections.length === 0) {
-      alert('所選圖表目前無資料，請先上傳 Excel 或切換到有圖表的頁籤。');
+      alert('所選圖表目前無資料，請先上傳 Excel 再匯出。');
       progressOverlay.classList.remove('show');
       return;
     }
@@ -1660,6 +1721,10 @@ async function startPdfExport() {
       pdf.text('◈ 健康處方開立統計儀表板', MARGIN, MARGIN + 5);
       const dateStr = new Date().toLocaleDateString('zh-TW');
       pdf.text(`匯出日期：${dateStr}`, PAGE_W - MARGIN, MARGIN + 5, { align: 'right' });
+      // 週次備註
+      pdf.setFontSize(7.5);
+      pdf.setTextColor(120, 150, 140);
+      pdf.text('＊週次定義：每週六起算至下週五結束', MARGIN, MARGIN + 10);
 
       // 頁碼
       const pageNum = Math.floor(i / 2) + 1;
