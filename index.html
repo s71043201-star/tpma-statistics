@@ -954,7 +954,12 @@ function buildTypeCharts(mode){
     const mkLine=(id,data,color,label)=>new Chart(document.getElementById(id).getContext('2d'),{
       type:'line',plugins:[lineLabelPlugin],
       data:{labels:weeks,datasets:[{label,data,borderColor:color,backgroundColor:color+'22',pointRadius:5,pointBackgroundColor:color,pointBorderColor:'#fff',pointBorderWidth:2,tension:0,fill:true,borderWidth:2.5}]},
-      options:{responsive:true,maintainAspectRatio:false,layout:{padding:{top:24}},plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>` ${label}：${c.parsed.y} 筆`}}},scales:xyScales()}
+      options:{responsive:true,maintainAspectRatio:false,layout:{padding:{top:24}},plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>` ${label}：${c.parsed.y} 筆`}}},
+        scales:{
+          x:{ticks:{font:defaultFont},grid:{display:false}},
+          y:{ticks:{font:defaultFont},min:0,beginAtZero:true,grid:{color:'#e2e8f0'}}
+        }
+      }
     });
     chartInstances['cumP']=mkLine('cumPrescribeChart',cumPres,'#3182ce','累積開立數');
     chartInstances['cumE']=mkLine('cumExecChart',     cumExec,'#38a169','累積執行數');
