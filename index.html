@@ -1658,50 +1658,45 @@ async function startPdfExport() {
       progressBar.style.width = ((i / selectedSections.length) * 70) + '%';
       await new Promise(r => setTimeout(r, 20));
 
-      // 把 chartInstances 的圖片載入後合成標題
       await new Promise(resolve => {
         const chartImg = new Image();
         chartImg.onload = () => {
-          const CHART_W = 1200, CHART_H = 600;
-          const TITLE_H = 70, PAD = 20, BAR_W = 5, BAR_H = 20;
-          const cw = CHART_W + PAD * 2;
-          const ch = CHART_H + TITLE_H + PAD;
+          // 以圖表實際尺寸為基準合成標題
+          const TITLE_H = 80, PAD = 24, BAR_W = 6, BAR_H = 22;
+          const cw = chartImg.width + PAD * 2;
+          const ch = chartImg.height + TITLE_H + PAD;
           const tmp = document.createElement('canvas');
           tmp.width = cw; tmp.height = ch;
           const ctx = tmp.getContext('2d');
-          // 背景
+          // 白底
           ctx.fillStyle = '#ffffff';
           ctx.fillRect(0, 0, cw, ch);
-          // 標題裝飾線
-          const barGrad = ctx.createLinearGradient(0, 0, 0, BAR_H);
+          // 標題裝飾線（垂直）
+          const barGrad = ctx.createLinearGradient(0, (TITLE_H-BAR_H)/2, 0, (TITLE_H+BAR_H)/2);
           barGrad.addColorStop(0,'#8fba2e'); barGrad.addColorStop(0.5,'#2aac8a'); barGrad.addColorStop(1,'#1a9fbe');
           ctx.fillStyle = barGrad;
           ctx.beginPath();
-          ctx.roundRect(PAD, (TITLE_H - BAR_H) / 2, BAR_W, BAR_H, 2);
+          ctx.roundRect(PAD, (TITLE_H-BAR_H)/2, BAR_W, BAR_H, 3);
           ctx.fill();
-          // 標題文字
+          // 標題文字（用 sans-serif 確保中文可顯示）
           ctx.fillStyle = '#1a2e28';
-          ctx.font = `bold 32px "Microsoft JhengHei","Noto Sans TC",Arial,sans-serif`;
+          ctx.font = `bold ${Math.round(cw * 0.022)}px sans-serif`;
           ctx.textBaseline = 'middle';
           ctx.textAlign = 'left';
-          ctx.fillText(title, PAD + BAR_W + 10, TITLE_H / 2);
+          ctx.fillText(title, PAD + BAR_W + 12, TITLE_H / 2);
           // 分隔線
           ctx.strokeStyle = '#d6ede5';
-          ctx.lineWidth = 1.5;
+          ctx.lineWidth = 2;
           ctx.beginPath();
           ctx.moveTo(PAD, TITLE_H); ctx.lineTo(cw - PAD, TITLE_H);
           ctx.stroke();
-          // 圖表畫入（等比填滿）
-          const scale = Math.min(CHART_W / chartImg.width, CHART_H / chartImg.height);
-          const dw = chartImg.width * scale, dh = chartImg.height * scale;
-          const dx = PAD + (CHART_W - dw) / 2, dy = TITLE_H + (CHART_H - dh) / 2;
-          ctx.drawImage(chartImg, dx, dy, dw, dh);
+          // 圖表畫入
+          ctx.drawImage(chartImg, PAD, TITLE_H + 8);
           images.push({ dataUrl: tmp.toDataURL('image/jpeg', 0.93), w: cw, h: ch, title });
           resolve();
         };
         chartImg.onerror = () => {
-          // 直接用原圖
-          images.push({ dataUrl: imgDataUrl, w: 1200, h: 600, title });
+          images.push({ dataUrl: imgDataUrl, w: 800, h: 500, title });
           resolve();
         };
         chartImg.src = imgDataUrl;
@@ -1718,30 +1713,32 @@ async function startPdfExport() {
 
     // 用 canvas 繪製頁首（解決 jsPDF 中文亂碼）
     function makeHeaderCanvas(pageNum, totalPages) {
-      const W = 2480, H = 120; // A4 橫向 300dpi 寬度，頁首高度
+      const W = 2480, H = 130;
       const c = document.createElement('canvas');
       c.width = W; c.height = H;
       const cx = c.getContext('2d');
+      cx.fillStyle = '#ffffff';
+      cx.fillRect(0, 0, W, H);
       // 漸層裝飾線
       const grad = cx.createLinearGradient(0, 0, W, 0);
       grad.addColorStop(0, '#8fba2e'); grad.addColorStop(0.5, '#2aac8a'); grad.addColorStop(1, '#1a9fbe');
-      cx.fillStyle = grad; cx.fillRect(0, 0, W, 8);
-      // 標題
-      cx.fillStyle = '#3a6a58';
-      cx.font = `bold 52px "Microsoft JhengHei","Noto Sans TC",sans-serif`;
-      cx.textBaseline = 'middle'; cx.textAlign = 'left';
-      cx.fillText('◈ 健康處方開立統計儀表板', 20, 65);
+      cx.fillStyle = grad; cx.fillRect(0, 0, W, 10);
+      // 標題（用系統字體確保中文正常）
+      cx.fillStyle = '#1a2e28';
+      cx.font = 'bold 54px sans-serif';
+      cx.textBaseline = 'alphabetic'; cx.textAlign = 'left';
+      cx.fillText('健康處方開立統計儀表板', 20, 80);
       // 週次備註
-      cx.fillStyle = '#7aaa94';
-      cx.font = `40px "Microsoft JhengHei","Noto Sans TC",sans-serif`;
-      cx.fillText('＊週次定義：每週六起算至下週五結束', 20, 100);
+      cx.fillStyle = '#5a8a74';
+      cx.font = '36px sans-serif';
+      cx.fillText('週次定義：每週六起算至下週五結束', 20, 118);
       // 右側：匯出日期 + 頁碼
       const dateStr = new Date().toLocaleDateString('zh-TW');
-      cx.fillStyle = '#5a8a74';
-      cx.font = `40px "Microsoft JhengHei","Noto Sans TC",sans-serif`;
+      cx.fillStyle = '#3a6a58';
+      cx.font = '40px sans-serif';
       cx.textAlign = 'right';
-      cx.fillText(`匯出日期：${dateStr}　　第 ${pageNum} 頁 / 共 ${totalPages} 頁`, W - 20, 65);
-      return c.toDataURL('image/jpeg', 0.92);
+      cx.fillText(`匯出日期：${dateStr}   第 ${pageNum} 頁 / 共 ${totalPages} 頁`, W - 20, 80);
+      return c.toDataURL('image/png');
     }
 
     // 最後一頁若只有 1 張：改為置中單張（全版）
