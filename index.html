@@ -1273,7 +1273,10 @@ async function addPrescDayDataset(){
       const colList = headers.join('、');
       alert(`找不到課程欄位。\n\n檔案中的欄位有：\n${colList}\n\n請告知哪一欄是課程名稱。`);
     }
-    prescDayDatasets.push({label, typeStats:newTypeStats, courseStats});
+    const usedIdx = new Set(prescDayDatasets.map(d=>d.colorIdx));
+    let colorIdx = 0;
+    while(usedIdx.has(colorIdx)) colorIdx++;
+    prescDayDatasets.push({label, typeStats:newTypeStats, courseStats, colorIdx});
     document.getElementById('prescDayFile').value='';
     document.getElementById('prescDayLabel').value='';
     renderPrescDayList();
@@ -1301,11 +1304,11 @@ function buildPrescDayCourseCharts(){
     x:{ticks:{font:defaultFont,maxRotation:45,autoSkip:false,maxTicksLimit:999},grid:{display:false}},
     y:{ticks:{font:defaultFont},beginAtZero:true,grid:{color:'#e2e8f0'}}
   };
-  const datasets = src.map((ds,i)=>({
+  const datasets = src.map((ds)=>({
     label:ds.label,
     data:courseSet.map(c=>{const r=ds.courseStats.find(x=>x.課程名稱===c);return r?r.人數:0;}),
-    backgroundColor:DATE_COLORS_A[i%DATE_COLORS_A.length],
-    borderColor:DATE_COLORS[i%DATE_COLORS.length],
+    backgroundColor:DATE_COLORS_A[ds.colorIdx%DATE_COLORS_A.length],
+    borderColor:DATE_COLORS[ds.colorIdx%DATE_COLORS.length],
     borderWidth:1.5, borderRadius:4,
     barPercentage:0.5, categoryPercentage:0.7
   }));
@@ -1317,12 +1320,12 @@ function buildPrescDayCourseCharts(){
         tooltip:{callbacks:{label:c=>` ${c.dataset.label}：${c.parsed.y} 人`}}},
       scales:yScales}
   });
-  const lineDatasets = src.map((ds,i)=>({
+  const lineDatasets = src.map((ds)=>({
     label:ds.label,
     data:courseSet.map(c=>{const r=ds.courseStats.find(x=>x.課程名稱===c);return r?r.人數:0;}),
-    borderColor:DATE_COLORS[i%DATE_COLORS.length],
-    backgroundColor:DATE_COLORS_A[i%DATE_COLORS_A.length].replace('0.72','0.10'),
-    pointRadius:6,pointBackgroundColor:DATE_COLORS[i%DATE_COLORS.length],
+    borderColor:DATE_COLORS[ds.colorIdx%DATE_COLORS.length],
+    backgroundColor:DATE_COLORS_A[ds.colorIdx%DATE_COLORS_A.length].replace('0.72','0.10'),
+    pointRadius:6,pointBackgroundColor:DATE_COLORS[ds.colorIdx%DATE_COLORS.length],
     pointBorderColor:'#fff',pointBorderWidth:2,
     tension:0,fill:false,borderWidth:2
   }));
@@ -1352,7 +1355,7 @@ function renderPrescDayList(){
   }
   el.innerHTML = prescDayDatasets.map((d,i)=>`
     <div style="display:flex;align-items:center;gap:10px;padding:6px 12px;border-radius:8px;background:#f0fbf7;margin-bottom:6px;border:1px solid #b3e8d4">
-      <span style="width:12px;height:12px;border-radius:50%;background:${DATE_COLORS[i%DATE_COLORS.length]};flex-shrink:0"></span>
+      <span style="width:12px;height:12px;border-radius:50%;background:${DATE_COLORS[d.colorIdx%DATE_COLORS.length]};flex-shrink:0"></span>
       <span style="font-size:0.88rem;font-weight:600;flex:1;color:var(--text)">${d.label}</span>
       <button onclick="removePrescDayDataset(${i})" style="border:none;background:#fee2e2;color:#dc2626;border-radius:6px;padding:3px 10px;cursor:pointer;font-size:0.8rem;font-family:inherit">✕ 移除</button>
     </div>
@@ -1385,11 +1388,11 @@ function buildPrescDayCharts(){
     type:'bar', plugins:[barLabelPlugin],
     data:{
       labels:typeSet,
-      datasets:src.map((ds,i)=>({
+      datasets:src.map((ds)=>({
         label:ds.label,
         data:typeSet.map(t=>{ const r=ds.typeStats.find(x=>x.處方類型===t); return r?r.執行數:0; }),
-        backgroundColor:DATE_COLORS_A[i%DATE_COLORS_A.length],
-        borderColor:DATE_COLORS[i%DATE_COLORS.length],
+        backgroundColor:DATE_COLORS_A[ds.colorIdx%DATE_COLORS_A.length],
+        borderColor:DATE_COLORS[ds.colorIdx%DATE_COLORS.length],
         borderWidth:1.5, borderRadius:5,
         barPercentage:0.4, categoryPercentage:0.6
       }))
@@ -1406,12 +1409,12 @@ function buildPrescDayCharts(){
     type:'line', plugins:[lineLabelPlugin],
     data:{
       labels:typeSet,
-      datasets:src.map((ds,i)=>({
+      datasets:src.map((ds)=>({
         label:ds.label,
         data:typeSet.map(t=>{ const r=ds.typeStats.find(x=>x.處方類型===t); return r?r.執行數:0; }),
-        borderColor:DATE_COLORS[i%DATE_COLORS.length],
-        backgroundColor:DATE_COLORS_A[i%DATE_COLORS_A.length].replace('0.72','0.10'),
-        pointRadius:6, pointBackgroundColor:DATE_COLORS[i%DATE_COLORS.length],
+        borderColor:DATE_COLORS[ds.colorIdx%DATE_COLORS.length],
+        backgroundColor:DATE_COLORS_A[ds.colorIdx%DATE_COLORS_A.length].replace('0.72','0.10'),
+        pointRadius:6, pointBackgroundColor:DATE_COLORS[ds.colorIdx%DATE_COLORS.length],
         pointBorderColor:'#fff', pointBorderWidth:2,
         tension:0, fill:false, borderWidth:2
       }))
