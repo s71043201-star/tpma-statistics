@@ -528,7 +528,7 @@ footer {
   <button class="tab-btn" onclick="showTab('type',this)">📊 處方開立分析</button>
   <button class="tab-btn" onclick="showTab('typeweekly',this)">🔎 各類型週趨勢細項</button>
   <button class="tab-btn" onclick="showTab('clinic',this)">🏥 診所分析</button>
-  <button class="tab-btn" onclick="showTab('prescday',this)">📅 處方日執行率</button>
+  <button class="tab-btn" onclick="showTab('prescday',this)">📅 處方日執行數</button>
 </div>
 
 <!-- ═══ TAB 1 ═══ -->
@@ -641,7 +641,7 @@ footer {
   </div>
 </div>
 
-<!-- ═══ TAB 5：處方日執行率 ═══ -->
+<!-- ═══ TAB 5：處方日執行數 ═══ -->
 <div id="tab-prescday" class="hidden">
   <!-- 新增處方日 -->
   <div class="chart-section" style="margin:18px 36px">
@@ -657,12 +657,12 @@ footer {
   </div>
   <!-- 圖表 -->
   <div class="side-by-side">
-    <div class="chart-section" data-pdf-id="prescday-bar" data-pdf-label="各類處方執行率比較（直條圖）">
-      <div class="chart-header"><h2>各類處方執行率（直條圖）</h2><button class="dl-btn" onclick="downloadChart(this)">↓ 下載 JPG</button></div>
+    <div class="chart-section" data-pdf-id="prescday-bar" data-pdf-label="各類處方執行數比較（直條圖）">
+      <div class="chart-header"><h2>各類處方執行數（直條圖）</h2><button class="dl-btn" onclick="downloadChart(this)">↓ 下載 JPG</button></div>
       <div class="chart-wrap"><canvas id="prescDayBarChart"></canvas></div>
     </div>
-    <div class="chart-section" data-pdf-id="prescday-line" data-pdf-label="各類處方執行率比較（折線圖）">
-      <div class="chart-header"><h2>各類處方執行率（折線圖）</h2><button class="dl-btn" onclick="downloadChart(this)">↓ 下載 JPG</button></div>
+    <div class="chart-section" data-pdf-id="prescday-line" data-pdf-label="各類處方執行數比較（折線圖）">
+      <div class="chart-header"><h2>各類處方執行數（折線圖）</h2><button class="dl-btn" onclick="downloadChart(this)">↓ 下載 JPG</button></div>
       <div class="chart-wrap"><canvas id="prescDayLineChart"></canvas></div>
     </div>
   </div>
@@ -687,7 +687,7 @@ footer {
         <button class="pdf-tab-btn" onclick="setPdfFilter('type',this)">📊 開立分析</button>
         <button class="pdf-tab-btn" onclick="setPdfFilter('typeweekly',this)">🔎 週趨勢細項</button>
         <button class="pdf-tab-btn" onclick="setPdfFilter('clinic',this)">🏥 診所分析</button>
-        <button class="pdf-tab-btn" onclick="setPdfFilter('prescday',this)">📅 處方日執行率</button>
+        <button class="pdf-tab-btn" onclick="setPdfFilter('prescday',this)">📅 處方日執行數</button>
       </div>
       <!-- 全選 / 全不選（針對目前篩選範圍） -->
       <div class="pdf-select-all-row">
@@ -1269,7 +1269,7 @@ function buildPrescDayCharts(){
   const multi = src.length > 1;
   const yScales = {
     x:{ticks:{font:defaultFont},grid:{display:false}},
-    y:{ticks:{font:defaultFont,callback:v=>v+'%'},min:0,max:100,beginAtZero:true,grid:{color:'#e2e8f0'}}
+    y:{ticks:{font:defaultFont},beginAtZero:true,grid:{color:'#e2e8f0'}}
   };
   // ── 直條圖（grouped）
   chartInstances['prescDayBar'] = new Chart(document.getElementById('prescDayBarChart').getContext('2d'),{
@@ -1278,7 +1278,7 @@ function buildPrescDayCharts(){
       labels:typeSet,
       datasets:src.map((ds,i)=>({
         label:ds.label,
-        data:typeSet.map(t=>{ const r=ds.typeStats.find(x=>x.處方類型===t); return r?r.執行率:0; }),
+        data:typeSet.map(t=>{ const r=ds.typeStats.find(x=>x.處方類型===t); return r?r.執行數:0; }),
         backgroundColor:DATE_COLORS_A[i%DATE_COLORS_A.length],
         borderColor:DATE_COLORS[i%DATE_COLORS.length],
         borderWidth:1.5, borderRadius:5
@@ -1287,7 +1287,7 @@ function buildPrescDayCharts(){
     options:{
       responsive:true, maintainAspectRatio:false, layout:{padding:{top:28}},
       plugins:{legend:{display:multi,position:'top',labels:{font:defaultFont,padding:12,boxWidth:14}},
-        tooltip:{callbacks:{label:c=>` ${c.dataset.label}：${c.parsed.y}%`}}},
+        tooltip:{callbacks:{label:c=>` ${c.dataset.label}：${c.parsed.y} 筆`}}},
       scales:yScales
     }
   });
@@ -1298,7 +1298,7 @@ function buildPrescDayCharts(){
       labels:typeSet,
       datasets:src.map((ds,i)=>({
         label:ds.label,
-        data:typeSet.map(t=>{ const r=ds.typeStats.find(x=>x.處方類型===t); return r?r.執行率:0; }),
+        data:typeSet.map(t=>{ const r=ds.typeStats.find(x=>x.處方類型===t); return r?r.執行數:0; }),
         borderColor:DATE_COLORS[i%DATE_COLORS.length],
         backgroundColor:DATE_COLORS_A[i%DATE_COLORS_A.length].replace('0.72','0.10'),
         pointRadius:6, pointBackgroundColor:DATE_COLORS[i%DATE_COLORS.length],
@@ -1309,7 +1309,7 @@ function buildPrescDayCharts(){
     options:{
       responsive:true, maintainAspectRatio:false, layout:{padding:{top:28}},
       plugins:{legend:{display:multi,position:'top',labels:{font:defaultFont,padding:12,boxWidth:14}},
-        tooltip:{callbacks:{label:c=>` ${c.dataset.label}：${c.parsed.y}%`}}},
+        tooltip:{callbacks:{label:c=>` ${c.dataset.label}：${c.parsed.y} 筆`}}},
       scales:yScales
     }
   });
