@@ -643,12 +643,25 @@ footer {
 
 <!-- ═══ TAB 5：處方日執行率 ═══ -->
 <div id="tab-prescday" class="hidden">
+  <!-- 新增處方日 -->
+  <div class="chart-section" style="margin:18px 36px">
+    <div class="chart-header"><h2>新增處方日資料</h2></div>
+    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:12px">
+      <input id="prescDayLabel" type="text" placeholder="標籤（例：2026-03-01）" style="flex:1;min-width:160px;padding:7px 12px;border-radius:8px;border:1.5px solid var(--border);font-family:inherit;font-size:0.88rem;color:var(--text);background:var(--surface);outline:none">
+      <label style="display:flex;align-items:center;gap:7px;padding:7px 18px;border-radius:8px;background:linear-gradient(135deg,#2aac8a,#1a9fbe);color:#fff;font-size:0.88rem;font-weight:700;cursor:pointer;white-space:nowrap">
+        ＋ 選擇 Excel 加入
+        <input type="file" id="prescDayFile" accept=".xlsx,.xls" style="display:none" onchange="addPrescDayDataset()">
+      </label>
+    </div>
+    <div id="prescDayList" style="font-size:0.85rem;color:var(--text-muted)">尚未加入任何處方日資料</div>
+  </div>
+  <!-- 圖表 -->
   <div class="side-by-side">
-    <div class="chart-section" data-pdf-id="prescday-bar" data-pdf-label="各類處方執行率（直條圖）">
+    <div class="chart-section" data-pdf-id="prescday-bar" data-pdf-label="各類處方執行率比較（直條圖）">
       <div class="chart-header"><h2>各類處方執行率（直條圖）</h2><button class="dl-btn" onclick="downloadChart(this)">↓ 下載 JPG</button></div>
       <div class="chart-wrap"><canvas id="prescDayBarChart"></canvas></div>
     </div>
-    <div class="chart-section" data-pdf-id="prescday-line" data-pdf-label="各類處方執行率（折線圖）">
+    <div class="chart-section" data-pdf-id="prescday-line" data-pdf-label="各類處方執行率比較（折線圖）">
       <div class="chart-header"><h2>各類處方執行率（折線圖）</h2><button class="dl-btn" onclick="downloadChart(this)">↓ 下載 JPG</button></div>
       <div class="chart-wrap"><canvas id="prescDayLineChart"></canvas></div>
     </div>
@@ -734,10 +747,13 @@ const TYPE_COLORS   = ['#8fba2e','#2aac8a','#1a9fbe','#1a7ea0'];
 const TYPE_COLORS_A = ['rgba(143,186,46,0.75)','rgba(42,172,138,0.75)','rgba(26,159,190,0.75)','rgba(26,126,160,0.75)'];
 const PIE_COLORS    = ['#8fba2e','#2aac8a','#1a9fbe','#1a7ea0'];
 const CLINIC_COLORS = ['#2aac8a','#1a9fbe','#8fba2e','#1a7ea0','#e8930a','#7c3aed','#db2777','#0891b2','#65a30d','#b45309','#6366f1','#14b8a6','#f59e0b','#ef4444','#84cc16','#06b6d4','#8b5cf6','#f97316','#10b981','#3b82f6'];
+const DATE_COLORS   = ['#2aac8a','#e8930a','#7c3aed','#db2777','#0891b2','#65a30d','#b45309','#6366f1','#1a9fbe','#8fba2e'];
+const DATE_COLORS_A = ['rgba(42,172,138,0.72)','rgba(232,147,10,0.72)','rgba(124,58,237,0.72)','rgba(219,39,119,0.72)','rgba(8,145,178,0.72)','rgba(101,163,13,0.72)','rgba(180,83,9,0.72)','rgba(99,102,241,0.72)','rgba(26,159,190,0.72)','rgba(143,186,46,0.72)'];
 const defaultFont = {family:"'Microsoft JhengHei','Noto Sans TC',sans-serif", size:12};
 const chartInstances = {};
 const currentChartType = {weekly:'bar', type:'line', typeweekly:'line'};
 let currentClinicSort = 'prescribe';
+let prescDayDatasets = []; // [{label, typeStats:[{處方類型,執行率,...}]}]
 
 // ══════════════════════════════════════════════
 //  資料狀態
@@ -1202,43 +1218,99 @@ function setChartType(tab, mode, btn){
   if(tab==='typeweekly') buildTypeWeeklyCharts(mode);
 }
 
+// ══════════════════════════════════════════════
+//  處方日資料管理
+// ══════════════════════════════════════════════
+async function addPrescDayDataset(){
+  const file = document.getElementById('prescDayFile').files[0];
+  if(!file) return;
+  const label = document.getElementById('prescDayLabel').value.trim() || file.name.replace(/\.[^.]+$/,'');
+  try{
+    const {newTypeStats} = await parseExcel(file);
+    prescDayDatasets.push({label, typeStats:newTypeStats});
+    document.getElementById('prescDayFile').value='';
+    document.getElementById('prescDayLabel').value='';
+    renderPrescDayList();
+    buildPrescDayCharts();
+  }catch(e){ alert('解析失敗：'+e); }
+}
+
+function removePrescDayDataset(i){
+  prescDayDatasets.splice(i,1);
+  renderPrescDayList();
+  buildPrescDayCharts();
+}
+
+function renderPrescDayList(){
+  const el = document.getElementById('prescDayList');
+  if(!el) return;
+  if(!prescDayDatasets.length){
+    el.innerHTML='<span style="color:var(--text-muted);font-size:0.85rem">尚未加入任何處方日資料</span>';
+    return;
+  }
+  el.innerHTML = prescDayDatasets.map((d,i)=>`
+    <div style="display:flex;align-items:center;gap:10px;padding:6px 12px;border-radius:8px;background:#f0fbf7;margin-bottom:6px;border:1px solid #b3e8d4">
+      <span style="width:12px;height:12px;border-radius:50%;background:${DATE_COLORS[i%DATE_COLORS.length]};flex-shrink:0"></span>
+      <span style="font-size:0.88rem;font-weight:600;flex:1;color:var(--text)">${d.label}</span>
+      <button onclick="removePrescDayDataset(${i})" style="border:none;background:#fee2e2;color:#dc2626;border-radius:6px;padding:3px 10px;cursor:pointer;font-size:0.8rem;font-family:inherit">✕ 移除</button>
+    </div>
+  `).join('');
+}
+
 function buildPrescDayCharts(){
   ['prescDayBar','prescDayLine'].forEach(k=>destroyChart(k));
-  if(!typeStats.length) return;
-  const types = typeStats.map(d=>d.處方類型);
-  const rates = typeStats.map(d=>d.執行率);
-  // 直條圖
+  // 決定資料來源：優先用手動加入的多筆；否則 fallback 到主資料的 typeStats
+  const src = prescDayDatasets.length ? prescDayDatasets
+    : (typeStats.length ? [{label:'目前資料', typeStats}] : []);
+  if(!src.length) return;
+  // 取全部處方類型聯集（保持順序）
+  const typeSet = [];
+  src.forEach(ds=>ds.typeStats.forEach(r=>{ if(!typeSet.includes(r.處方類型)) typeSet.push(r.處方類型); }));
+  const multi = src.length > 1;
+  const yScales = {
+    x:{ticks:{font:defaultFont},grid:{display:false}},
+    y:{ticks:{font:defaultFont,callback:v=>v+'%'},min:0,max:100,beginAtZero:true,grid:{color:'#e2e8f0'}}
+  };
+  // ── 直條圖（grouped）
   chartInstances['prescDayBar'] = new Chart(document.getElementById('prescDayBarChart').getContext('2d'),{
     type:'bar', plugins:[barLabelPlugin],
-    data:{labels:types,datasets:[{
-      label:'執行率%', data:rates,
-      backgroundColor:TYPE_COLORS_A, borderColor:TYPE_COLORS, borderWidth:1.5, borderRadius:6
-    }]},
+    data:{
+      labels:typeSet,
+      datasets:src.map((ds,i)=>({
+        label:ds.label,
+        data:typeSet.map(t=>{ const r=ds.typeStats.find(x=>x.處方類型===t); return r?r.執行率:0; }),
+        backgroundColor:DATE_COLORS_A[i%DATE_COLORS_A.length],
+        borderColor:DATE_COLORS[i%DATE_COLORS.length],
+        borderWidth:1.5, borderRadius:5
+      }))
+    },
     options:{
       responsive:true, maintainAspectRatio:false, layout:{padding:{top:28}},
-      plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>` 執行率：${c.parsed.y}%`}}},
-      scales:{
-        x:{ticks:{font:defaultFont},grid:{display:false}},
-        y:{ticks:{font:defaultFont,callback:v=>v+'%'},min:0,max:100,beginAtZero:true,grid:{color:'#e2e8f0'}}
-      }
+      plugins:{legend:{display:multi,position:'top',labels:{font:defaultFont,padding:12,boxWidth:14}},
+        tooltip:{callbacks:{label:c=>` ${c.dataset.label}：${c.parsed.y}%`}}},
+      scales:yScales
     }
   });
-  // 折線圖
+  // ── 折線圖（multi-line）
   chartInstances['prescDayLine'] = new Chart(document.getElementById('prescDayLineChart').getContext('2d'),{
     type:'line', plugins:[lineLabelPlugin],
-    data:{labels:types,datasets:[{
-      label:'執行率%', data:rates,
-      borderColor:'#2aac8a', backgroundColor:'rgba(42,172,138,0.12)',
-      pointRadius:7, pointBackgroundColor:TYPE_COLORS, pointBorderColor:'#fff', pointBorderWidth:2,
-      tension:0.3, fill:true, borderWidth:2.5
-    }]},
+    data:{
+      labels:typeSet,
+      datasets:src.map((ds,i)=>({
+        label:ds.label,
+        data:typeSet.map(t=>{ const r=ds.typeStats.find(x=>x.處方類型===t); return r?r.執行率:0; }),
+        borderColor:DATE_COLORS[i%DATE_COLORS.length],
+        backgroundColor:DATE_COLORS_A[i%DATE_COLORS_A.length].replace('0.72','0.10'),
+        pointRadius:6, pointBackgroundColor:DATE_COLORS[i%DATE_COLORS.length],
+        pointBorderColor:'#fff', pointBorderWidth:2,
+        tension:0.3, fill:false, borderWidth:2.5
+      }))
+    },
     options:{
       responsive:true, maintainAspectRatio:false, layout:{padding:{top:28}},
-      plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>` 執行率：${c.parsed.y}%`}}},
-      scales:{
-        x:{ticks:{font:defaultFont},grid:{display:false}},
-        y:{ticks:{font:defaultFont,callback:v=>v+'%'},min:0,max:100,beginAtZero:true,grid:{color:'#e2e8f0'}}
-      }
+      plugins:{legend:{display:multi,position:'top',labels:{font:defaultFont,padding:12,boxWidth:14}},
+        tooltip:{callbacks:{label:c=>` ${c.dataset.label}：${c.parsed.y}%`}}},
+      scales:yScales
     }
   });
 }
