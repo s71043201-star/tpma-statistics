@@ -955,7 +955,7 @@ function buildWeeklyCharts(mode){
   if(isLn){
     const mkLine=(id,data,color,label)=>new Chart(document.getElementById(id).getContext('2d'),{
       type:'line',plugins:[lineLabelPlugin],
-      data:{labels:weeks,datasets:[{label,data,borderColor:color,backgroundColor:color+'28',pointRadius:5,pointBackgroundColor:color,pointBorderColor:'#fff',pointBorderWidth:2,tension:0.3,fill:isFill,borderWidth:2.5}]},
+      data:{labels:weeks,datasets:[{label,data,borderColor:color,backgroundColor:color+'28',pointRadius:5,pointBackgroundColor:color,pointBorderColor:'#fff',pointBorderWidth:2,tension:0,fill:isFill,borderWidth:2.5}]},
       options:{responsive:true,maintainAspectRatio:false,layout:{padding:{top:24}},plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>` ${label}：${c.parsed.y} 筆`}}},scales:xyScales()}
     });
     chartInstances['weeklyBar']  = mkLine('weeklyBarChart',  presData,'#2aac8a','開立數');
@@ -1103,8 +1103,8 @@ function buildTypeWeeklyCharts(mode){
       chartInstances['tw'+i]=new Chart(document.getElementById(canvasId).getContext('2d'),{
         type:'line',plugins:[lineLabelPlugin],
         data:{labels:weeks,datasets:[
-          {label:'開立數',data:presData,borderColor:'#2aac8a',backgroundColor:'rgba(42,172,138,0.10)',pointRadius:4,pointBackgroundColor:'#2aac8a',pointBorderColor:'#fff',pointBorderWidth:2,tension:0.3,borderWidth:2,fill:isFill},
-          {label:'執行數',data:execData,borderColor:'#e8930a',backgroundColor:'rgba(232,147,10,0.10)',pointRadius:4,pointBackgroundColor:'#e8930a',pointBorderColor:'#fff',pointBorderWidth:2,tension:0.3,borderWidth:2,fill:isFill}
+          {label:'開立數',data:presData,borderColor:'#2aac8a',backgroundColor:'rgba(42,172,138,0.10)',pointRadius:4,pointBackgroundColor:'#2aac8a',pointBorderColor:'#fff',pointBorderWidth:2,tension:0,borderWidth:2,fill:isFill},
+          {label:'執行數',data:execData,borderColor:'#e8930a',backgroundColor:'rgba(232,147,10,0.10)',pointRadius:4,pointBackgroundColor:'#e8930a',pointBorderColor:'#fff',pointBorderWidth:2,tension:0,borderWidth:2,fill:isFill}
         ]},
         options:{responsive:true,maintainAspectRatio:false,layout:{padding:{top:24}},plugins:{legend:{position:'top',labels:{font:smFont,boxWidth:12,padding:8}},tooltip:{callbacks:{label:c=>` ${c.dataset.label}：${c.parsed.y} 筆`}}},scales:{x:{ticks:{font:smFont,maxRotation:45,autoSkip:false,maxTicksLimit:999},grid:{display:false}},y:{ticks:{font:smFont},beginAtZero:true,grid:{color:'#e2e8f0'}}}}
       });
