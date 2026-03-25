@@ -655,7 +655,7 @@ footer {
     </div>
     <div id="prescDayList" style="font-size:0.85rem;color:var(--text-muted)">尚未加入任何處方日資料</div>
   </div>
-  <!-- 圖表 -->
+  <!-- 處方類型執行數圖表 -->
   <div class="side-by-side">
     <div class="chart-section" data-pdf-id="prescday-bar" data-pdf-label="各類處方執行數比較（直條圖）">
       <div class="chart-header"><h2 id="prescday-bar-title">各類處方執行數（直條圖）</h2><button class="dl-btn" onclick="downloadChart(this)">↓ 下載 JPG</button></div>
@@ -664,6 +664,17 @@ footer {
     <div class="chart-section" data-pdf-id="prescday-line" data-pdf-label="各類處方執行數比較（折線圖）">
       <div class="chart-header"><h2 id="prescday-line-title">各類處方執行數（折線圖）</h2><button class="dl-btn" onclick="downloadChart(this)">↓ 下載 JPG</button></div>
       <div class="chart-wrap"><canvas id="prescDayLineChart"></canvas></div>
+    </div>
+  </div>
+  <!-- 課程人數圖表 -->
+  <div class="side-by-side">
+    <div class="chart-section" data-pdf-id="prescday-course-bar" data-pdf-label="各課程參與人數（直條圖）">
+      <div class="chart-header"><h2 id="prescday-course-bar-title">各課程參與人數（直條圖）</h2><button class="dl-btn" onclick="downloadChart(this)">↓ 下載 JPG</button></div>
+      <div class="chart-wrap"><canvas id="prescDayCourseBarChart"></canvas></div>
+    </div>
+    <div class="chart-section" data-pdf-id="prescday-course-line" data-pdf-label="各課程參與人數（折線圖）">
+      <div class="chart-header"><h2 id="prescday-course-line-title">各課程參與人數（折線圖）</h2><button class="dl-btn" onclick="downloadChart(this)">↓ 下載 JPG</button></div>
+      <div class="chart-wrap"><canvas id="prescDayCourseLineChart"></canvas></div>
     </div>
   </div>
 </div>
@@ -1221,24 +1232,107 @@ function setChartType(tab, mode, btn){
 // ══════════════════════════════════════════════
 //  處方日資料管理
 // ══════════════════════════════════════════════
+function extractCourseStats(file){
+  return new Promise((resolve)=>{
+    const reader = new FileReader();
+    reader.onload = e=>{
+      try{
+        const wb = XLSX.read(e.target.result,{type:'array',cellDates:true});
+        const ws = wb.Sheets[wb.SheetNames[0]];
+        const rows = XLSX.utils.sheet_to_json(ws,{defval:null});
+        if(!rows.length){resolve([]);return;}
+        const headers = Object.keys(rows[0]);
+        const colCourse = detectCol(headers,['課程名稱','課程','活動名稱','活動','堂次','班別','班次','課程類別','課程內容'],true)
+                       || detectCol(headers,['course','Course','class','Class','活動']);
+        if(!colCourse){resolve([]);return;}
+        const countMap={};
+        rows.forEach(row=>{
+          const name = row[colCourse]?row[colCourse].toString().trim():null;
+          if(!name)return;
+          countMap[name]=(countMap[name]||0)+1;
+        });
+        resolve(Object.entries(countMap).map(([課程名稱,人數])=>({課程名稱,人數})).sort((a,b)=>b.人數-a.人數));
+      }catch(e){resolve([]);}
+    };
+    reader.onerror=()=>resolve([]);
+    reader.readAsArrayBuffer(file);
+  });
+}
+
 async function addPrescDayDataset(){
   const file = document.getElementById('prescDayFile').files[0];
   if(!file) return;
   const label = document.getElementById('prescDayLabel').value.trim() || file.name.replace(/\.[^.]+$/,'');
   try{
-    const {newTypeStats} = await parseExcel(file);
-    prescDayDatasets.push({label, typeStats:newTypeStats});
+    const [{newTypeStats}, courseStats] = await Promise.all([parseExcel(file), extractCourseStats(file)]);
+    prescDayDatasets.push({label, typeStats:newTypeStats, courseStats});
     document.getElementById('prescDayFile').value='';
     document.getElementById('prescDayLabel').value='';
     renderPrescDayList();
     buildPrescDayCharts();
+    buildPrescDayCourseCharts();
   }catch(e){ alert('解析失敗：'+e); }
+}
+
+function buildPrescDayCourseCharts(){
+  ['prescDayCourseBar','prescDayCourseLine'].forEach(k=>destroyChart(k));
+  const src = prescDayDatasets.filter(ds=>ds.courseStats&&ds.courseStats.length);
+  if(!src.length){
+    document.getElementById('prescday-course-bar-title').textContent  = '各課程參與人數（直條圖）';
+    document.getElementById('prescday-course-line-title').textContent = '各課程參與人數（折線圖）';
+    return;
+  }
+  const fileNames = src.map(ds=>ds.label).join('、');
+  document.getElementById('prescday-course-bar-title').textContent  = `各課程參與人數（直條圖）— ${fileNames}`;
+  document.getElementById('prescday-course-line-title').textContent = `各課程參與人數（折線圖）— ${fileNames}`;
+  // 取全部課程名稱聯集（各資料集各自排序後依序合併去重）
+  const courseSet=[];
+  src.forEach(ds=>ds.courseStats.forEach(r=>{if(!courseSet.includes(r.課程名稱))courseSet.push(r.課程名稱);}));
+  const multi = src.length>1;
+  const yScales={
+    x:{ticks:{font:defaultFont,maxRotation:45,autoSkip:false,maxTicksLimit:999},grid:{display:false}},
+    y:{ticks:{font:defaultFont},beginAtZero:true,grid:{color:'#e2e8f0'}}
+  };
+  const datasets = src.map((ds,i)=>({
+    label:ds.label,
+    data:courseSet.map(c=>{const r=ds.courseStats.find(x=>x.課程名稱===c);return r?r.人數:0;}),
+    backgroundColor:DATE_COLORS_A[i%DATE_COLORS_A.length],
+    borderColor:DATE_COLORS[i%DATE_COLORS.length],
+    borderWidth:1.5, borderRadius:4,
+    barPercentage:0.5, categoryPercentage:0.7
+  }));
+  chartInstances['prescDayCourseBar']=new Chart(document.getElementById('prescDayCourseBarChart').getContext('2d'),{
+    type:'bar',plugins:[barLabelPlugin],
+    data:{labels:courseSet,datasets},
+    options:{responsive:true,maintainAspectRatio:false,layout:{padding:{top:28}},
+      plugins:{legend:{display:multi,position:'top',labels:{font:defaultFont,padding:12,boxWidth:14}},
+        tooltip:{callbacks:{label:c=>` ${c.dataset.label}：${c.parsed.y} 人`}}},
+      scales:yScales}
+  });
+  const lineDatasets = src.map((ds,i)=>({
+    label:ds.label,
+    data:courseSet.map(c=>{const r=ds.courseStats.find(x=>x.課程名稱===c);return r?r.人數:0;}),
+    borderColor:DATE_COLORS[i%DATE_COLORS.length],
+    backgroundColor:DATE_COLORS_A[i%DATE_COLORS_A.length].replace('0.72','0.10'),
+    pointRadius:6,pointBackgroundColor:DATE_COLORS[i%DATE_COLORS.length],
+    pointBorderColor:'#fff',pointBorderWidth:2,
+    tension:0,fill:false,borderWidth:2
+  }));
+  chartInstances['prescDayCourseLine']=new Chart(document.getElementById('prescDayCourseLineChart').getContext('2d'),{
+    type:'line',plugins:[lineLabelPlugin],
+    data:{labels:courseSet,datasets:lineDatasets},
+    options:{responsive:true,maintainAspectRatio:false,layout:{padding:{top:28}},
+      plugins:{legend:{display:multi,position:'top',labels:{font:defaultFont,padding:12,boxWidth:14}},
+        tooltip:{callbacks:{label:c=>` ${c.dataset.label}：${c.parsed.y} 人`}}},
+      scales:yScales}
+  });
 }
 
 function removePrescDayDataset(i){
   prescDayDatasets.splice(i,1);
   renderPrescDayList();
   buildPrescDayCharts();
+  buildPrescDayCourseCharts();
 }
 
 function renderPrescDayList(){
@@ -1616,8 +1710,10 @@ const PDF_CHART_GROUPS = [
     groupLabel: '📅 處方日執行數',
     tabId: 'tab-prescday',
     charts: [
-      { id: 'prescday-bar',  label: '各類處方執行數（直條圖）' },
-      { id: 'prescday-line', label: '各類處方執行數（折線圖）' },
+      { id: 'prescday-bar',         label: '各類處方執行數（直條圖）' },
+      { id: 'prescday-line',        label: '各類處方執行數（折線圖）' },
+      { id: 'prescday-course-bar',  label: '各課程參與人數（直條圖）' },
+      { id: 'prescday-course-line', label: '各課程參與人數（折線圖）' },
     ]
   }
 ];
@@ -1643,8 +1739,10 @@ const PDF_CHART_INSTANCE_MAP = {
   'clinic-enroll': 'clinicEnroll',
   'clinic-bar':    'clinicBar',
   'clinic-rate':   'clinicRate',
-  'prescday-bar':  'prescDayBar',
-  'prescday-line': 'prescDayLine',
+  'prescday-bar':         'prescDayBar',
+  'prescday-line':        'prescDayLine',
+  'prescday-course-bar':  'prescDayCourseBar',
+  'prescday-course-line': 'prescDayCourseLine',
 };
 
 let pdfChecked = new Set();
