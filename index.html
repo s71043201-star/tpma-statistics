@@ -1281,7 +1281,8 @@ function buildPrescDayCharts(){
         data:typeSet.map(t=>{ const r=ds.typeStats.find(x=>x.處方類型===t); return r?r.執行數:0; }),
         backgroundColor:DATE_COLORS_A[i%DATE_COLORS_A.length],
         borderColor:DATE_COLORS[i%DATE_COLORS.length],
-        borderWidth:1.5, borderRadius:5
+        borderWidth:1.5, borderRadius:5,
+        barPercentage:0.4, categoryPercentage:0.6
       }))
     },
     options:{
@@ -1303,7 +1304,7 @@ function buildPrescDayCharts(){
         backgroundColor:DATE_COLORS_A[i%DATE_COLORS_A.length].replace('0.72','0.10'),
         pointRadius:6, pointBackgroundColor:DATE_COLORS[i%DATE_COLORS.length],
         pointBorderColor:'#fff', pointBorderWidth:2,
-        tension:0.3, fill:false, borderWidth:2.5
+        tension:0, fill:false, borderWidth:2
       }))
     },
     options:{
