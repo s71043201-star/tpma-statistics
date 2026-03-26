@@ -531,6 +531,19 @@ footer {
   <button class="tab-btn" onclick="showTab('prescday',this)">📅 處方日執行數</button>
 </div>
 
+<!-- 日期篩選列 -->
+<div id="dateFilterBar" style="display:none;margin:12px 36px;padding:10px 16px;background:var(--card);border-radius:10px;border:1px solid var(--border);display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+  <span style="font-size:0.88rem;font-weight:700;color:var(--teal);white-space:nowrap">📅 篩選開立日期：</span>
+  <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+    <input type="date" id="filterFrom" style="padding:5px 10px;border-radius:7px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:0.85rem;font-family:inherit">
+    <span style="color:var(--muted);font-size:0.85rem">至</span>
+    <input type="date" id="filterTo" style="padding:5px 10px;border-radius:7px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:0.85rem;font-family:inherit">
+  </div>
+  <button onclick="applyDateFilter()" style="padding:5px 16px;border-radius:7px;border:none;background:var(--teal);color:#fff;font-size:0.85rem;font-weight:700;cursor:pointer;font-family:inherit">套用</button>
+  <button onclick="clearDateFilter()" style="padding:5px 14px;border-radius:7px;border:1px solid var(--border);background:transparent;color:var(--muted);font-size:0.85rem;cursor:pointer;font-family:inherit">清除</button>
+  <span id="filterStatus" style="font-size:0.82rem;color:var(--muted)"></span>
+</div>
+
 <!-- ═══ TAB 1 ═══ -->
 <div id="tab-weekly">
   <div class="chart-type-bar">
@@ -780,6 +793,7 @@ let prescDayTypeSelected   = new Set(); // 勾選顯示的處方類型資料集 
 //  資料狀態
 // ══════════════════════════════════════════════
 let weeklyData = [], typeStats = [], typeWeeklyRaw = [], clinicStats = [];
+let rawRows = []; // 原始 row 資料，供日期篩選用
 
 // ══════════════════════════════════════════════
 //  雲端狀態列
@@ -1525,6 +1539,63 @@ function detectCol(headers, candidates, exact=false){
   return null;
 }
 
+function aggregateRawRows(rows){
+  const weekMap={},typeWeekMap={},typeMapTotal={},clinicMap={};
+  let minDate=null,maxDate=null;
+  rows.forEach(r=>{
+    const pd=new Date(r.prescDate);
+    const wl=isoWeekLabel(pd);if(!wl)return;
+    const exWlBase = r.execDate ? isoWeekLabel(new Date(r.execDate)) : null;
+    const exWl = r.ex ? (exWlBase||wl) : null;
+    if(!weekMap[wl])weekMap[wl]={開立數:0,執行數:0};
+    weekMap[wl].開立數++;
+    if(r.ex && exWl){
+      if(!weekMap[exWl])weekMap[exWl]={開立數:0,執行數:0};
+      weekMap[exWl].執行數++;
+    }
+    if(!typeWeekMap[r.type])typeWeekMap[r.type]={};
+    if(!typeWeekMap[r.type][wl])typeWeekMap[r.type][wl]={開立數:0,執行數:0};
+    typeWeekMap[r.type][wl].開立數++;
+    if(r.ex && exWl){
+      if(!typeWeekMap[r.type][exWl])typeWeekMap[r.type][exWl]={開立數:0,執行數:0};
+      typeWeekMap[r.type][exWl].執行數++;
+    }
+    if(!typeMapTotal[r.type])typeMapTotal[r.type]={開立數:0,執行數:0};
+    typeMapTotal[r.type].開立數++;if(r.ex)typeMapTotal[r.type].執行數++;
+    if(r.clinic){
+      if(!clinicMap[r.clinic])clinicMap[r.clinic]={開立數:0,選課或執行:0};
+      clinicMap[r.clinic].開立數++;
+      if(r.enrolled||r.ex)clinicMap[r.clinic].選課或執行++;
+    }
+    if(!minDate||pd<minDate)minDate=pd;if(!maxDate||pd>maxDate)maxDate=pd;
+  });
+  const existingWeeks=Object.keys(weekMap).sort();
+  const allWeeks=[];
+  if(existingWeeks.length>=2){
+    function nextWeekLabel(wl){
+      const yr=parseInt(wl.slice(0,4)),wk=parseInt(wl.slice(5));
+      const jan1=new Date(Date.UTC(yr,0,1));
+      const jan1dow=jan1.getUTCDay();
+      const daysToFirstSat=(jan1dow===6)?0:(6-jan1dow);
+      const firstSat=new Date(jan1.getTime()+daysToFirstSat*86400000);
+      const thisWeekSat=new Date(firstSat.getTime()+(wk-1)*7*86400000);
+      return isoWeekLabel(new Date(thisWeekSat.getTime()+7*86400000));
+    }
+    let cur=existingWeeks[0],last=existingWeeks[existingWeeks.length-1],safety=0;
+    while(cur<=last&&safety++<200){allWeeks.push(cur);cur=nextWeekLabel(cur);}
+  } else { allWeeks.push(...existingWeeks); }
+  const sw=allWeeks;
+  const newWeeklyData=sw.map(wl=>{const d=weekMap[wl]||{開立數:0,執行數:0};return{week_label:wl,開立數:d.開立數,執行數:d.執行數,執行率:d.開立數>0?parseFloat((d.執行數/d.開立數*100).toFixed(1)):0};});
+  const allTypes=Object.keys(typeMapTotal);
+  const newTypeStats=allTypes.map(t=>{const p=typeMapTotal[t].開立數,e=typeMapTotal[t].執行數;return{處方類型:t,開立數:p,執行數:e,執行率:p>0?parseFloat((e/p*100).toFixed(1)):0};});
+  const newTWRaw=[];
+  allTypes.forEach(t=>sw.forEach(wl=>{const d=typeWeekMap[t]&&typeWeekMap[t][wl];if(d)newTWRaw.push({week_label:wl,處方類型:t,開立數:d.開立數,執行數:d.執行數});}));
+  const newClinicStats=Object.entries(clinicMap).map(([name,v])=>({診所名稱:name,開立數:v.開立數,選課或執行:v.選課或執行,比率:v.開立數>0?parseFloat((v.選課或執行/v.開立數*100).toFixed(1)):0}));
+  const fmt=d=>`${d.getFullYear()}/${String(d.getMonth()+1).padStart(2,'0')}/${String(d.getDate()).padStart(2,'0')}`;
+  const dr=minDate&&maxDate?`${fmt(minDate)} – ${fmt(maxDate)}`:'—';
+  return{newWeeklyData,newTypeStats,newTWRaw,newClinicStats,dateRange:dr};
+}
+
 function parseExcel(file){
   return new Promise((resolve,reject)=>{
     const reader = new FileReader();
@@ -1538,102 +1609,25 @@ function parseExcel(file){
         const colType   = detectCol(headers,['處方類型','類型'],true)   || detectCol(headers,['type','Type']);
         const colPresc  = detectCol(headers,['開立日期時間','開立日期','開立時間'],true) || detectCol(headers,['prescribe','Prescribe']);
         const colExecD  = detectCol(headers,['執行日期'],true);
-        const colExecS  = detectCol(headers,['執行處方'],true)          || detectCol(headers,['執行狀態','是否執行'],true) || detectCol(headers,['status','Status']);
+        const colExecS  = detectCol(headers,['執行處方'],true) || detectCol(headers,['執行狀態','是否執行'],true) || detectCol(headers,['status','Status']);
         const colEnroll = detectCol(headers,['是否選課'],true);
         const colClinic = detectCol(headers,['開立診所','診所名稱','診所','院所名稱','院所'],true) || detectCol(headers,['clinic','Clinic','醫療院所','機構名稱']);
         if(!colType||!colPresc){reject(`找不到必要欄位。\n偵測到：${headers.join('、')}\n需要：處方類型、開立日期`);return;}
-        const weekMap={},typeWeekMap={},typeMapTotal={};
-        const clinicMap = {};
-        let minDate=null,maxDate=null;
+        // 轉成統一格式的 rawRows
+        const parsed=[];
         rows.forEach(row=>{
           const pd=toDate(row[colPresc]);if(!pd)return;
-          const wl=isoWeekLabel(pd);if(!wl)return;
-          const type   = row[colType]?row[colType].toString().trim():'未分類';
-          const clinic = colClinic && row[colClinic] ? row[colClinic].toString().trim() : null;
-          // 執行狀態判斷
-          let ex = false;
-          let exWl = null; // 執行數歸屬的週次（依執行日期）
-          if(colExecD && row[colExecD]){
-            const ed = toDate(row[colExecD]);
-            if(ed){ ex = true; exWl = isoWeekLabel(ed); }
-          }
-          if(!ex && colExecS){ const s=row[colExecS]; ex = !!s&&['是','1','true','已執行','v','V','✓'].includes(s.toString().trim()); }
-          // 若執行日期無效或用狀態欄判斷，執行週次 fallback 到開立週次
-          if(ex && !exWl) exWl = wl;
-          const enrolled = !!(colEnroll && row[colEnroll] && row[colEnroll].toString().trim().toUpperCase()==='V');
-
-          // 開立數：依開立日期週次
-          if(!weekMap[wl])weekMap[wl]={開立數:0,執行數:0};
-          weekMap[wl].開立數++;
-          // 執行數：依執行日期週次
-          if(ex && exWl){
-            if(!weekMap[exWl])weekMap[exWl]={開立數:0,執行數:0};
-            weekMap[exWl].執行數++;
-          }
-
-          if(!typeWeekMap[type])typeWeekMap[type]={};
-          if(!typeWeekMap[type][wl])typeWeekMap[type][wl]={開立數:0,執行數:0};
-          typeWeekMap[type][wl].開立數++;
-          if(ex && exWl){
-            if(!typeWeekMap[type][exWl])typeWeekMap[type][exWl]={開立數:0,執行數:0};
-            typeWeekMap[type][exWl].執行數++;
-          }
-
-          if(!typeMapTotal[type])typeMapTotal[type]={開立數:0,執行數:0};
-          typeMapTotal[type].開立數++;if(ex)typeMapTotal[type].執行數++;
-
-          if(clinic){
-            if(!clinicMap[clinic])clinicMap[clinic]={開立數:0,選課或執行:0};
-            clinicMap[clinic].開立數++;
-            if(enrolled || ex) clinicMap[clinic].選課或執行++;
-          }
-          if(!minDate||pd<minDate)minDate=pd;if(!maxDate||pd>maxDate)maxDate=pd;
+          const type=row[colType]?row[colType].toString().trim():'未分類';
+          const clinic=colClinic&&row[colClinic]?row[colClinic].toString().trim():null;
+          let ex=false,edDate=null;
+          if(colExecD&&row[colExecD]){const ed=toDate(row[colExecD]);if(ed){ex=true;edDate=ed;}}
+          if(!ex&&colExecS){const s=row[colExecS];ex=!!s&&['是','1','true','已執行','v','V','✓'].includes(s.toString().trim());}
+          const enrolled=!!(colEnroll&&row[colEnroll]&&row[colEnroll].toString().trim().toUpperCase()==='V');
+          parsed.push({prescDate:pd.toISOString().slice(0,10),execDate:edDate?edDate.toISOString().slice(0,10):null,type,clinic,ex,enrolled});
         });
-        const existingWeeks=Object.keys(weekMap).sort();
-        const allWeeks=[];
-        if(existingWeeks.length>=2){
-          // 用 isoWeekLabel 推算下一週，與週六起始定義完全一致
-          function nextWeekLabel(wl){
-            const yr=parseInt(wl.slice(0,4)),wk=parseInt(wl.slice(5));
-            const jan1=new Date(Date.UTC(yr,0,1));
-            const jan1dow=jan1.getUTCDay();
-            const daysToFirstSat=(jan1dow===6)?0:(6-jan1dow);
-            const firstSat=new Date(jan1.getTime()+daysToFirstSat*86400000);
-            // 這週的週六 + 7天 = 下週週六
-            const thisWeekSat=new Date(firstSat.getTime()+(wk-1)*7*86400000);
-            const nextWeekSat=new Date(thisWeekSat.getTime()+7*86400000);
-            return isoWeekLabel(nextWeekSat);
-          }
-          let cur=existingWeeks[0];
-          const last=existingWeeks[existingWeeks.length-1];
-          let safety=0;
-          while(cur<=last && safety++<200){
-            allWeeks.push(cur);
-            cur=nextWeekLabel(cur);
-          }
-        } else { allWeeks.push(...existingWeeks); }
-        const sw=allWeeks;
-        const newWeeklyData=sw.map(wl=>{
-          const d=weekMap[wl]||{開立數:0,執行數:0};
-          return{week_label:wl,開立數:d.開立數,執行數:d.執行數,執行率:d.開立數>0?parseFloat((d.執行數/d.開立數*100).toFixed(1)):0};
-        });
-        const allTypes=Object.keys(typeMapTotal);
-        const newTypeStats=allTypes.map(t=>{
-          const p=typeMapTotal[t].開立數,e=typeMapTotal[t].執行數;
-          return{處方類型:t,開立數:p,執行數:e,執行率:p>0?parseFloat((e/p*100).toFixed(1)):0};
-        });
-        const newTWRaw=[];
-        allTypes.forEach(t=>sw.forEach(wl=>{
-          const d=typeWeekMap[t] && typeWeekMap[t][wl];
-          if(d)newTWRaw.push({week_label:wl,處方類型:t,開立數:d.開立數,執行數:d.執行數});
-        }));
-        const newClinicStats = Object.entries(clinicMap).map(([name, v]) => ({
-          診所名稱:   name, 開立數: v.開立數, 選課或執行: v.選課或執行,
-          比率: v.開立數>0 ? parseFloat((v.選課或執行/v.開立數*100).toFixed(1)) : 0
-        }));
-        const fmt=d=>`${d.getFullYear()}/${String(d.getMonth()+1).padStart(2,'0')}/${String(d.getDate()).padStart(2,'0')}`;
-        const dr=minDate&&maxDate?`${fmt(minDate)} – ${fmt(maxDate)}`:'—';
-        resolve({newWeeklyData, newTypeStats, newTWRaw, newClinicStats, dateRange:dr});
+        rawRows=parsed;
+        updateDateFilterRange();
+        resolve(aggregateRawRows(parsed));
       }catch(err){reject('解析失敗：'+err.message);}
     };
     reader.onerror=()=>reject('檔案讀取失敗');
@@ -1644,6 +1638,40 @@ function parseExcel(file){
 // ══════════════════════════════════════════════
 //  上傳處理
 // ══════════════════════════════════════════════
+function updateDateFilterRange(){
+  if(!rawRows.length) return;
+  const dates = rawRows.map(r=>r.prescDate).sort();
+  document.getElementById('filterFrom').min = dates[0];
+  document.getElementById('filterTo').max   = dates[dates.length-1];
+  document.getElementById('dateFilterBar').style.display = 'flex';
+}
+
+function applyDateFilter(){
+  const from = document.getElementById('filterFrom').value;
+  const to   = document.getElementById('filterTo').value;
+  if(!from && !to){ clearDateFilter(); return; }
+  let filtered = rawRows;
+  if(from) filtered = filtered.filter(r=>r.prescDate >= from);
+  if(to)   filtered = filtered.filter(r=>r.prescDate <= to);
+  const result = aggregateRawRows(filtered);
+  weeklyData=result.newWeeklyData; typeStats=result.newTypeStats;
+  typeWeeklyRaw=result.newTWRaw; clinicStats=result.newClinicStats;
+  buildAllCharts(); updateSummary();
+  document.getElementById('filterStatus').textContent =
+    `已篩選 ${filtered.length.toLocaleString()} / ${rawRows.length.toLocaleString()} 筆　區間：${result.dateRange}`;
+}
+
+function clearDateFilter(){
+  document.getElementById('filterFrom').value='';
+  document.getElementById('filterTo').value='';
+  document.getElementById('filterStatus').textContent='';
+  if(!rawRows.length) return;
+  const result = aggregateRawRows(rawRows);
+  weeklyData=result.newWeeklyData; typeStats=result.newTypeStats;
+  typeWeeklyRaw=result.newTWRaw; clinicStats=result.newClinicStats;
+  buildAllCharts(); updateSummary();
+}
+
 function setStatus(msg, isError=false){
   const el=document.getElementById('uploadStatus');
   el.textContent=msg;el.className='upload-status'+(isError?' error':'');el.classList.remove('hidden');
@@ -1686,6 +1714,9 @@ function showTab(name, btn){
   document.getElementById('tab-'+name).classList.remove('hidden');
   document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
   if(btn) btn.classList.add('active');
+  // 篩選列只在有資料且非 prescday 時顯示
+  const bar = document.getElementById('dateFilterBar');
+  if(bar) bar.style.display = (name!=='prescday' && rawRows.length) ? 'flex' : 'none';
   if(name==='clinic') setTimeout(()=>buildClinicCharts(), 50);
   if(name==='prescday') setTimeout(()=>buildPrescDayCharts(), 50);
 }
