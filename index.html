@@ -1643,7 +1643,6 @@ function updateDateFilterRange(){
   const dates = rawRows.map(r=>r.prescDate).sort();
   document.getElementById('filterFrom').min = dates[0];
   document.getElementById('filterTo').max   = dates[dates.length-1];
-  document.getElementById('dateFilterBar').style.display = 'flex';
 }
 
 function applyDateFilter(){
@@ -1718,9 +1717,8 @@ function showTab(name, btn){
   document.getElementById('tab-'+name).classList.remove('hidden');
   document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
   if(btn) btn.classList.add('active');
-  // 篩選列只在有資料且非 prescday 時顯示
   const bar = document.getElementById('dateFilterBar');
-  if(bar) bar.style.display = (name!=='prescday' && rawRows.length) ? 'flex' : 'none';
+  if(bar) bar.style.display = name!=='prescday' ? 'flex' : 'none';
   if(name==='clinic') setTimeout(()=>buildClinicCharts(), 50);
   if(name==='prescday') setTimeout(()=>buildPrescDayCharts(), 50);
 }
@@ -2235,6 +2233,7 @@ async function startPdfExport() {
 // ── 初始化 ──
 loadFromCloud();
 incrementViewCount();
+document.getElementById('dateFilterBar').style.display = 'flex';
 if(prescDayDatasets.length){ renderPrescDayList(); buildPrescDayCharts(); buildPrescDayCourseCharts(); }
 </script>
 </body>
