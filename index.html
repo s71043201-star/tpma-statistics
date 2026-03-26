@@ -764,7 +764,7 @@ const defaultFont = {family:"'Microsoft JhengHei','Noto Sans TC',sans-serif", si
 const chartInstances = {};
 const currentChartType = {weekly:'bar', type:'line', typeweekly:'line'};
 let currentClinicSort = 'prescribe';
-let prescDayDatasets = []; // [{label, typeStats:[{處方類型,執行率,...}]}]
+let prescDayDatasets = (()=>{try{return JSON.parse(localStorage.getItem('prescDayDatasets')||'[]');}catch{return[];}})(); // [{label, typeStats, courseStats, colorIdx}]
 
 // ══════════════════════════════════════════════
 //  資料狀態
@@ -1277,6 +1277,7 @@ async function addPrescDayDataset(){
     let colorIdx = 0;
     while(usedIdx.has(colorIdx)) colorIdx++;
     prescDayDatasets.push({label, typeStats:newTypeStats, courseStats, colorIdx});
+    localStorage.setItem('prescDayDatasets', JSON.stringify(prescDayDatasets));
     document.getElementById('prescDayFile').value='';
     document.getElementById('prescDayLabel').value='';
     renderPrescDayList();
@@ -1341,6 +1342,7 @@ function buildPrescDayCourseCharts(){
 
 function removePrescDayDataset(i){
   prescDayDatasets.splice(i,1);
+  localStorage.setItem('prescDayDatasets', JSON.stringify(prescDayDatasets));
   renderPrescDayList();
   buildPrescDayCharts();
   buildPrescDayCourseCharts();
@@ -1353,10 +1355,11 @@ function renderPrescDayList(){
     el.innerHTML='<span style="color:var(--text-muted);font-size:0.85rem">尚未加入任何處方日資料</span>';
     return;
   }
-  el.innerHTML = prescDayDatasets.map((d)=>`
+  el.innerHTML = prescDayDatasets.map((d,i)=>`
     <div style="display:flex;align-items:center;gap:10px;padding:6px 12px;border-radius:8px;background:#f0fbf7;margin-bottom:6px;border:1px solid #b3e8d4">
       <span style="width:12px;height:12px;border-radius:50%;background:${DATE_COLORS[d.colorIdx%DATE_COLORS.length]};flex-shrink:0"></span>
       <span style="font-size:0.88rem;font-weight:600;flex:1;color:var(--text)">${d.label}</span>
+      <button onclick="removePrescDayDataset(${i})" style="border:none;background:#fee2e2;color:#dc2626;border-radius:6px;padding:3px 10px;cursor:pointer;font-size:0.8rem;font-family:inherit">✕ 移除</button>
     </div>
   `).join('');
 }
@@ -2144,6 +2147,7 @@ async function startPdfExport() {
 // ── 初始化 ──
 loadFromCloud();
 incrementViewCount();
+if(prescDayDatasets.length){ renderPrescDayList(); buildPrescDayCharts(); buildPrescDayCourseCharts(); }
 </script>
 </body>
 </html>
