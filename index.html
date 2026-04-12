@@ -726,6 +726,7 @@ footer {
         <button class="pdf-sel-btn" onclick="pdfSelectFiltered(true)">✅ 全選（此分類）</button>
         <button class="pdf-sel-btn" onclick="pdfSelectFiltered(false)">☐ 全不選（此分類）</button>
         <button class="pdf-sel-btn" onclick="pdfSelectAll(false)">🗑 清空所有</button>
+        <button class="pdf-sel-btn" onclick="pdfLoadLastSelection()">🔁 帶入前次選擇</button>
       </div>
       <div id="pdf-checklist"></div>
     </div>
@@ -781,7 +782,7 @@ const PIE_COLORS    = ['#8fba2e','#2aac8a','#1a9fbe','#1a7ea0'];
 const CLINIC_COLORS = ['#2aac8a','#1a9fbe','#8fba2e','#1a7ea0','#e8930a','#7c3aed','#db2777','#0891b2','#65a30d','#b45309','#6366f1','#14b8a6','#f59e0b','#ef4444','#84cc16','#06b6d4','#8b5cf6','#f97316','#10b981','#3b82f6'];
 const DATE_COLORS   = ['#2aac8a','#e8930a','#7c3aed','#db2777','#0891b2','#65a30d','#b45309','#6366f1','#1a9fbe','#8fba2e'];
 const DATE_COLORS_A = ['rgba(42,172,138,0.72)','rgba(232,147,10,0.72)','rgba(124,58,237,0.72)','rgba(219,39,119,0.72)','rgba(8,145,178,0.72)','rgba(101,163,13,0.72)','rgba(180,83,9,0.72)','rgba(99,102,241,0.72)','rgba(26,159,190,0.72)','rgba(143,186,46,0.72)'];
-const defaultFont = {family:"'Microsoft JhengHei','Noto Sans TC',sans-serif", size:12};
+const defaultFont = {family:"'Microsoft JhengHei','Noto Sans TC',sans-serif", size:14};
 const chartInstances = {};
 const currentChartType = {weekly:'bar', type:'line', typeweekly:'line'};
 let currentClinicSort = 'prescribe';
@@ -920,7 +921,7 @@ const barLabelPlugin = {
       meta.data.forEach((bar,i) => {
         const val = ds.data[i]; if(!val) return;
         ctx.save();
-        ctx.font = `600 10px 'Microsoft JhengHei',sans-serif`;
+        ctx.font = `600 13px 'Microsoft JhengHei',sans-serif`;
         ctx.fillStyle = '#4a5568';
         const isH = chart.options.indexAxis === 'y';
         if(isH){ ctx.textAlign='left'; ctx.textBaseline='middle'; ctx.fillText(val, bar.x+4, bar.y); }
@@ -940,7 +941,7 @@ const lineLabelPlugin = {
       meta.data.forEach((pt,i) => {
         const val = ds.data[i]; if(!val) return;
         ctx.save();
-        ctx.font = `600 10px 'Microsoft JhengHei',sans-serif`;
+        ctx.font = `600 13px 'Microsoft JhengHei',sans-serif`;
         ctx.fillStyle = ds.borderColor || '#4a5568';
         ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
         ctx.fillText(val, pt.x, pt.y-7);
@@ -1187,18 +1188,18 @@ function buildClinicCharts() {
   chartInstances['clinicEnroll'] = new Chart(document.getElementById('clinicEnrollChart').getContext('2d'), {
     type: 'bar', plugins: [barLabelPlugin],
     data: { labels: names, datasets: [{ label: '選課人次', data: enrollData, backgroundColor: enrollColors, borderColor: '#7c3aed', borderWidth: 1, borderRadius: 4 }] },
-    options: { responsive: true, maintainAspectRatio: false, layout: { padding: { top: 30 } }, plugins: { legend: { display: false }, tooltip: { callbacks: { label: c => ` 選課或執行：${c.parsed.y} 筆` } } }, scales: { y: { ticks:{font:defaultFont}, beginAtZero:true, grid:{color:'#e2e8f0'} }, x: { ticks:{font:Object.assign({}, defaultFont, {size:10}), autoSkip:false, maxRotation:45, minRotation:45}, grid:{display:false} } } }
+    options: { responsive: true, maintainAspectRatio: false, layout: { padding: { top: 30 } }, plugins: { legend: { display: false }, tooltip: { callbacks: { label: c => ` 選課或執行：${c.parsed.y} 筆` } } }, scales: { y: { ticks:{font:defaultFont}, beginAtZero:true, grid:{color:'#e2e8f0'} }, x: { ticks:{font:Object.assign({}, defaultFont, {size:12}), autoSkip:false, maxRotation:45, minRotation:45}, grid:{display:false} } } }
   });
   chartInstances['clinicBar'] = new Chart(document.getElementById('clinicBarChart').getContext('2d'), {
     type: 'bar', plugins: [barLabelPlugin],
     data: { labels: names, datasets: [ { label:'開立數', data:presData, backgroundColor:'rgba(42,172,138,0.82)', borderRadius:4 }, { label:'選課或執行', data:enrollData, backgroundColor:'rgba(124,58,237,0.75)', borderRadius:4 } ] },
-    options: { responsive: true, maintainAspectRatio: false, layout: { padding: { top: 30 } }, plugins: { legend: { position:'top', labels:{font:defaultFont} }, tooltip: { callbacks: { label: c => ` ${c.dataset.label}：${c.parsed.y} 筆` } } }, scales: { y: { ticks:{font:defaultFont}, beginAtZero:true, grid:{color:'#e2e8f0'} }, x: { ticks:{font:Object.assign({}, defaultFont, {size:10}), autoSkip:false, maxRotation:45, minRotation:45}, grid:{display:false} } } }
+    options: { responsive: true, maintainAspectRatio: false, layout: { padding: { top: 30 } }, plugins: { legend: { position:'top', labels:{font:defaultFont} }, tooltip: { callbacks: { label: c => ` ${c.dataset.label}：${c.parsed.y} 筆` } } }, scales: { y: { ticks:{font:defaultFont}, beginAtZero:true, grid:{color:'#e2e8f0'} }, x: { ticks:{font:Object.assign({}, defaultFont, {size:12}), autoSkip:false, maxRotation:45, minRotation:45}, grid:{display:false} } } }
   });
   const bgColors = rateData.map(r => { const alpha = 0.35 + (r / 100) * 0.55; return `rgba(42,172,138,${alpha.toFixed(2)})`; });
   chartInstances['clinicRate'] = new Chart(document.getElementById('clinicRateChart').getContext('2d'), {
     type: 'bar', plugins: [barLabelPlugin],
     data: { labels: names, datasets: [{ label: '執行率%', data: rateData, backgroundColor: bgColors, borderColor: '#2aac8a', borderWidth: 1, borderRadius: 4 }] },
-    options: { responsive: true, maintainAspectRatio: false, layout: { padding: { top: 30 } }, plugins: { legend: { display: false }, tooltip: { callbacks: { label: c => ` 選課或執行比率：${c.parsed.y}%` } } }, scales: { y: { ticks:{font:defaultFont, callback:v=>v+'%'}, max:100, beginAtZero:true, grid:{color:'#e2e8f0'} }, x: { ticks:{font:Object.assign({}, defaultFont, {size:10}), autoSkip:false, maxRotation:45, minRotation:45}, grid:{display:false} } } }
+    options: { responsive: true, maintainAspectRatio: false, layout: { padding: { top: 30 } }, plugins: { legend: { display: false }, tooltip: { callbacks: { label: c => ` 選課或執行比率：${c.parsed.y}%` } } }, scales: { y: { ticks:{font:defaultFont, callback:v=>v+'%'}, max:100, beginAtZero:true, grid:{color:'#e2e8f0'} }, x: { ticks:{font:Object.assign({}, defaultFont, {size:12}), autoSkip:false, maxRotation:45, minRotation:45}, grid:{display:false} } } }
   });
   buildClinicTable(sorted);
 }
@@ -1971,9 +1972,24 @@ function pdfSelectAll(checked) {
   updatePdfCount();
 }
 
+// ── 帶入前次選擇 ──
+function pdfLoadLastSelection() {
+  const saved = localStorage.getItem('pdfLastChecked');
+  if (!saved) { alert('尚無前次匯出紀錄'); return; }
+  try {
+    const ids = JSON.parse(saved);
+    pdfChecked.clear();
+    ids.forEach(id => pdfChecked.add(id));
+    buildPdfChecklist();
+    updatePdfCount();
+  } catch(e) { alert('讀取前次選擇失敗'); }
+}
+
 // ── 核心 PDF 匯出 ──
 async function startPdfExport() {
   if (pdfChecked.size === 0) return;
+  // 儲存本次選擇到 localStorage
+  localStorage.setItem('pdfLastChecked', JSON.stringify([...pdfChecked]));
 
   closePdfModal();
 
@@ -2107,7 +2123,7 @@ async function startPdfExport() {
         const chartImg = new Image();
         chartImg.onload = () => {
           // 以圖表實際尺寸為基準合成標題
-          const TITLE_H = 80, PAD = 24, BAR_W = 6, BAR_H = 22;
+          const TITLE_H = 100, PAD = 24, BAR_W = 6, BAR_H = 28;
           const cw = chartImg.width + PAD * 2;
           const ch = chartImg.height + TITLE_H + PAD;
           const tmp = document.createElement('canvas');
@@ -2123,7 +2139,7 @@ async function startPdfExport() {
           ctx.fillRect(PAD, (TITLE_H-BAR_H)/2, BAR_W, BAR_H);
           // 標題文字（用 sans-serif 確保中文可顯示）
           ctx.fillStyle = '#1a2e28';
-          ctx.font = `bold ${Math.round(cw * 0.022)}px sans-serif`;
+          ctx.font = `bold ${Math.round(cw * 0.028)}px sans-serif`;
           ctx.textBaseline = 'middle';
           ctx.textAlign = 'left';
           ctx.fillText(title, PAD + BAR_W + 12, TITLE_H / 2);
