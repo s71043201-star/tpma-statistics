@@ -1181,10 +1181,10 @@ function buildClinicCharts() {
   const presData   = sorted.map(d=>d.開立數);
   const enrollData = sorted.map(d=>d.選課或執行);
   const rateData   = sorted.map(d=>d.比率);
-  const dynH = Math.max(320, names.length * 36);
+  const dynH = Math.max(360, 400);
   document.getElementById('clinicEnrollWrap').style.height = dynH + 'px';
   document.getElementById('clinicBarWrap').style.height    = dynH + 'px';
-  document.getElementById('clinicRateWrap').style.height   = Math.max(280, names.length * 32) + 'px';
+  document.getElementById('clinicRateWrap').style.height   = dynH + 'px';
   const enrollColors = enrollData.map(v => {
     const max = Math.max(...enrollData, 1);
     const alpha = 0.4 + (v / max) * 0.5;
@@ -1193,18 +1193,18 @@ function buildClinicCharts() {
   chartInstances['clinicEnroll'] = new Chart(document.getElementById('clinicEnrollChart').getContext('2d'), {
     type: 'bar', plugins: [barLabelPlugin],
     data: { labels: names, datasets: [{ label: '選課人次', data: enrollData, backgroundColor: enrollColors, borderColor: '#7c3aed', borderWidth: 1, borderRadius: 4 }] },
-    options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false, layout: { padding: { right: 52 } }, plugins: { legend: { display: false }, tooltip: { callbacks: { label: c => ` 選課或執行：${c.parsed.x} 筆` } } }, scales: { x: { ticks:{font:defaultFont}, beginAtZero:true, grid:{color:'#e2e8f0'} }, y: { ticks:{font:Object.assign({}, defaultFont, {size:11}),autoSkip:false,maxTicksLimit:999}, grid:{display:false} } } }
+    options: { responsive: true, maintainAspectRatio: false, layout: { padding: { top: 30 } }, plugins: { legend: { display: false }, tooltip: { callbacks: { label: c => ` 選課或執行：${c.parsed.y} 筆` } } }, scales: { y: { ticks:{font:defaultFont}, beginAtZero:true, grid:{color:'#e2e8f0'} }, x: { ticks:{font:Object.assign({}, defaultFont, {size:10}), autoSkip:false, maxRotation:45, minRotation:45}, grid:{display:false} } } }
   });
   chartInstances['clinicBar'] = new Chart(document.getElementById('clinicBarChart').getContext('2d'), {
     type: 'bar', plugins: [barLabelPlugin],
     data: { labels: names, datasets: [ { label:'開立數', data:presData, backgroundColor:'rgba(42,172,138,0.82)', borderRadius:4 }, { label:'選課或執行', data:enrollData, backgroundColor:'rgba(124,58,237,0.75)', borderRadius:4 } ] },
-    options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false, layout: { padding: { right: 52 } }, plugins: { legend: { position:'top', labels:{font:defaultFont} }, tooltip: { callbacks: { label: c => ` ${c.dataset.label}：${c.parsed.x} 筆` } } }, scales: { x: { ticks:{font:defaultFont}, beginAtZero:true, grid:{color:'#e2e8f0'} }, y: { ticks:{font:Object.assign({}, defaultFont, {size:11}),autoSkip:false,maxTicksLimit:999}, grid:{display:false} } } }
+    options: { responsive: true, maintainAspectRatio: false, layout: { padding: { top: 30 } }, plugins: { legend: { position:'top', labels:{font:defaultFont} }, tooltip: { callbacks: { label: c => ` ${c.dataset.label}：${c.parsed.y} 筆` } } }, scales: { y: { ticks:{font:defaultFont}, beginAtZero:true, grid:{color:'#e2e8f0'} }, x: { ticks:{font:Object.assign({}, defaultFont, {size:10}), autoSkip:false, maxRotation:45, minRotation:45}, grid:{display:false} } } }
   });
   const bgColors = rateData.map(r => { const alpha = 0.35 + (r / 100) * 0.55; return `rgba(42,172,138,${alpha.toFixed(2)})`; });
   chartInstances['clinicRate'] = new Chart(document.getElementById('clinicRateChart').getContext('2d'), {
     type: 'bar', plugins: [barLabelPlugin],
     data: { labels: names, datasets: [{ label: '執行率%', data: rateData, backgroundColor: bgColors, borderColor: '#2aac8a', borderWidth: 1, borderRadius: 4 }] },
-    options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false, layout: { padding: { right: 60 } }, plugins: { legend: { display: false }, tooltip: { callbacks: { label: c => ` 選課或執行比率：${c.parsed.x}%` } } }, scales: { x: { ticks:{font:defaultFont, callback:v=>v+'%'}, max:100, beginAtZero:true, grid:{color:'#e2e8f0'} }, y: { ticks:{font:Object.assign({}, defaultFont, {size:11}),autoSkip:false,maxTicksLimit:999}, grid:{display:false} } } }
+    options: { responsive: true, maintainAspectRatio: false, layout: { padding: { top: 30 } }, plugins: { legend: { display: false }, tooltip: { callbacks: { label: c => ` 選課或執行比率：${c.parsed.y}%` } } }, scales: { y: { ticks:{font:defaultFont, callback:v=>v+'%'}, max:100, beginAtZero:true, grid:{color:'#e2e8f0'} }, x: { ticks:{font:Object.assign({}, defaultFont, {size:10}), autoSkip:false, maxRotation:45, minRotation:45}, grid:{display:false} } } }
   });
   buildClinicTable(sorted);
 }
