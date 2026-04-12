@@ -376,6 +376,10 @@ header p { font-size: 0.86rem; opacity: 0.88; margin-top: 5px; letter-spacing: 0
 .type-grid .chart-section { margin: 0; }
 .side-by-side { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; margin: 18px 36px; }
 .side-by-side .chart-section { margin: 0; }
+.clinic-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 18px; margin: 0 36px 18px; }
+.clinic-grid .chart-section { margin: 0; }
+.clinic-grid .chart-header h2 { font-size: 0.85rem; }
+.clinic-grid .chart-header { flex-wrap: wrap; gap: 6px; }
 
 /* ── 圖表標題 + 下載 ── */
 .chart-header {
@@ -449,10 +453,10 @@ footer {
 
 /* ── RWD ── */
 @media (max-width: 700px) {
-  .type-grid, .side-by-side { grid-template-columns: 1fr; }
+  .type-grid, .side-by-side, .clinic-grid { grid-template-columns: 1fr; }
   .summary-grid { padding: 16px; }
   .chart-section { margin: 12px; }
-  .type-grid, .side-by-side { margin: 0 12px 12px; }
+  .type-grid, .side-by-side, .clinic-grid { margin: 0 12px 12px; }
   .tabs { padding: 12px 12px 0; margin: 0 12px; }
   .upload-bar, .chart-type-bar { padding: 12px 16px; }
   header { padding: 20px; }
@@ -624,17 +628,19 @@ footer {
       <button class="ct-btn" onclick="setClinicSort('rate',this)"><span>📈</span> 比率↓</button>
       <button class="ct-btn" onclick="setClinicSort('name',this)"><span>🔤</span> 名稱↑</button>
     </div>
-    <div class="chart-section" data-pdf-id="clinic-enroll" data-pdf-label="各診所選課或執行筆數">
-      <div class="chart-header"><h2>各診所選課或執行筆數（去重）</h2><button class="dl-btn" onclick="downloadChart(this)">↓ 下載 JPG</button></div>
-      <div class="chart-wrap" id="clinicEnrollWrap" style="height:360px"><canvas id="clinicEnrollChart"></canvas></div>
-    </div>
-    <div class="chart-section" data-pdf-id="clinic-bar" data-pdf-label="各診所開立數 vs 執行筆數">
-      <div class="chart-header"><h2>各診所開立數 vs 選課或執行筆數</h2><button class="dl-btn" onclick="downloadChart(this)">↓ 下載 JPG</button></div>
-      <div class="chart-wrap" id="clinicBarWrap" style="height:360px"><canvas id="clinicBarChart"></canvas></div>
-    </div>
-    <div class="chart-section" data-pdf-id="clinic-rate" data-pdf-label="各診所選課或執行比率（%）">
-      <div class="chart-header"><h2>各診所選課或執行比率（%）</h2><button class="dl-btn" onclick="downloadChart(this)">↓ 下載 JPG</button></div>
-      <div class="chart-wrap" id="clinicRateWrap" style="height:360px"><canvas id="clinicRateChart"></canvas></div>
+    <div class="clinic-grid">
+      <div class="chart-section" data-pdf-id="clinic-enroll" data-pdf-label="各診所選課或執行筆數">
+        <div class="chart-header"><h2>各診所選課或執行筆數（去重）</h2><button class="dl-btn" onclick="downloadChart(this)">↓ 下載 JPG</button></div>
+        <div class="chart-wrap" id="clinicEnrollWrap" style="height:360px"><canvas id="clinicEnrollChart"></canvas></div>
+      </div>
+      <div class="chart-section" data-pdf-id="clinic-bar" data-pdf-label="各診所開立數 vs 執行筆數">
+        <div class="chart-header"><h2>各診所開立數 vs 選課或執行筆數</h2><button class="dl-btn" onclick="downloadChart(this)">↓ 下載 JPG</button></div>
+        <div class="chart-wrap" id="clinicBarWrap" style="height:360px"><canvas id="clinicBarChart"></canvas></div>
+      </div>
+      <div class="chart-section" data-pdf-id="clinic-rate" data-pdf-label="各診所選課或執行比率（%）">
+        <div class="chart-header"><h2>各診所選課或執行比率（%）</h2><button class="dl-btn" onclick="downloadChart(this)">↓ 下載 JPG</button></div>
+        <div class="chart-wrap" id="clinicRateWrap" style="height:360px"><canvas id="clinicRateChart"></canvas></div>
+      </div>
     </div>
     <div class="chart-section">
       <div class="chart-header"><h2>各診所詳細統計表</h2><button class="dl-btn" onclick="exportClinicTable()">↓ 匯出 Excel</button></div>
