@@ -520,10 +520,16 @@ footer {
     <span class="pdf-icon">📑</span> 選擇圖表並匯出 PDF
   </button>
   <span style="font-size:0.78rem;color:var(--text-muted);">勾選想要的圖表，每張圖表獨立一頁，合併下載</span>
-  <span style="flex:1"></span>
-  <button id="region-setup-btn" onclick="openRegionModal()" style="display:flex;align-items:center;gap:7px;padding:8px 16px;border-radius:var(--radius-sm);background:linear-gradient(135deg,#8fba2e,#2aac8a);color:#fff;font-size:0.85rem;font-family:inherit;font-weight:700;border:none;cursor:pointer;box-shadow:0 2px 8px rgba(42,172,138,0.25);white-space:nowrap">
-    📍 設定診所分區 <span id="region-setup-badge" style="font-size:0.76rem;font-weight:500;opacity:0.9;margin-left:4px">尚未設定</span>
+</div>
+
+<!-- 診所分區設定列 -->
+<div id="region-setup-bar" style="background:#f0fbf7;border-bottom:2px solid #b3e8d4;padding:10px 36px;display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+  <span style="font-size:0.85rem;font-weight:700;color:var(--teal);white-space:nowrap">📍 診所分區：</span>
+  <button id="region-setup-btn" type="button" onclick="openRegionModal()" style="display:inline-flex;align-items:center;gap:7px;padding:7px 16px;border-radius:var(--radius-sm);background:linear-gradient(135deg,#8fba2e,#2aac8a);color:#fff;font-size:0.85rem;font-family:inherit;font-weight:700;border:none;cursor:pointer;box-shadow:0 2px 8px rgba(42,172,138,0.25);white-space:nowrap">
+    設定診所分區
   </button>
+  <span id="region-setup-badge" style="font-size:0.82rem;color:var(--text-muted);font-weight:600">尚未設定</span>
+  <span style="font-size:0.76rem;color:var(--text-muted)">上傳含「北投／士林／中山」三工作表的 Excel 即可建立對照表</span>
 </div>
 
 <!-- 週次說明列 -->
