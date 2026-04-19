@@ -476,7 +476,21 @@ footer {
 .region-btn:hover:not(.active) { border-color: #7dd4b8; background: #e8f8f2; color: var(--teal); }
 
 /* ── 區域 Modal ── */
+#region-modal-overlay {
+  position: fixed; inset: 0; background: rgba(10,30,24,0.55);
+  z-index: 9000; display: flex; align-items: center; justify-content: center;
+  backdrop-filter: blur(3px);
+  opacity: 0; pointer-events: none; transition: opacity 0.2s;
+}
 #region-modal-overlay.open { opacity: 1; pointer-events: all; }
+#region-modal {
+  background: var(--surface); border-radius: var(--radius);
+  box-shadow: 0 20px 60px rgba(10,30,24,0.35);
+  width: 720px; max-width: calc(100vw - 32px);
+  max-height: calc(100vh - 60px); overflow: hidden;
+  display: flex; flex-direction: column;
+  transform: translateY(16px) scale(0.98); transition: transform 0.2s;
+}
 #region-modal-overlay.open #region-modal { transform: translateY(0) scale(1); }
 </style>
 </head>
@@ -776,8 +790,8 @@ footer {
 <!-- ══════════════════════════════════
      ★ 診所分區 Modal
 ══════════════════════════════════ -->
-<div id="region-modal-overlay" onclick="closeRegionModalOutside(event)" style="position:fixed;inset:0;background:rgba(10,30,24,0.55);z-index:9000;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(3px);opacity:0;pointer-events:none;transition:opacity 0.2s">
-  <div id="region-modal" style="background:var(--surface);border-radius:var(--radius);box-shadow:0 20px 60px rgba(10,30,24,0.35);width:720px;max-width:calc(100vw - 32px);max-height:calc(100vh - 60px);overflow:hidden;display:flex;flex-direction:column;transform:translateY(16px) scale(0.98);transition:transform 0.2s">
+<div id="region-modal-overlay" onclick="closeRegionModalOutside(event)">
+  <div id="region-modal">
     <div style="padding:20px 24px 16px;border-bottom:1.5px solid var(--border);display:flex;align-items:center;justify-content:space-between;background:linear-gradient(135deg,#f0fbf7,#e8f6fd)">
       <h3 style="font-size:1.05rem;font-weight:800;color:var(--text);display:flex;align-items:center;gap:8px">📍 設定診所分區</h3>
       <button onclick="closeRegionModal()" style="width:30px;height:30px;border-radius:50%;border:1.5px solid var(--border);background:var(--surface);color:var(--text-muted);font-size:1.1rem;cursor:pointer">✕</button>
