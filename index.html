@@ -463,6 +463,21 @@ footer {
 }
 
 .hidden { display: none; }
+
+/* ── 區域篩選按鈕 ── */
+.region-btn {
+  padding: 5px 16px; border-radius: 20px;
+  border: 1.5px solid var(--border); background: var(--surface);
+  color: var(--text-muted); font-size: 0.82rem;
+  font-family: inherit; cursor: pointer; transition: all 0.15s; font-weight: 600;
+  white-space: nowrap;
+}
+.region-btn.active { background: linear-gradient(135deg,#2aac8a,#1a9fbe); border-color: var(--teal); color: #fff; box-shadow:0 2px 8px rgba(42,172,138,0.25); }
+.region-btn:hover:not(.active) { border-color: #7dd4b8; background: #e8f8f2; color: var(--teal); }
+
+/* ── 區域 Modal ── */
+#region-modal-overlay.open { opacity: 1; pointer-events: all; }
+#region-modal-overlay.open #region-modal { transform: translateY(0) scale(1); }
 </style>
 </head>
 <body>
@@ -505,6 +520,10 @@ footer {
     <span class="pdf-icon">📑</span> 選擇圖表並匯出 PDF
   </button>
   <span style="font-size:0.78rem;color:var(--text-muted);">勾選想要的圖表，每張圖表獨立一頁，合併下載</span>
+  <span style="flex:1"></span>
+  <button id="region-setup-btn" onclick="openRegionModal()" style="display:flex;align-items:center;gap:7px;padding:8px 16px;border-radius:var(--radius-sm);background:linear-gradient(135deg,#8fba2e,#2aac8a);color:#fff;font-size:0.85rem;font-family:inherit;font-weight:700;border:none;cursor:pointer;box-shadow:0 2px 8px rgba(42,172,138,0.25);white-space:nowrap">
+    📍 設定診所分區 <span id="region-setup-badge" style="font-size:0.76rem;font-weight:500;opacity:0.9;margin-left:4px">尚未設定</span>
+  </button>
 </div>
 
 <!-- 週次說明列 -->
@@ -529,6 +548,15 @@ footer {
   <button class="tab-btn" onclick="showTab('typeweekly',this)">🔎 各類型週趨勢細項</button>
   <button class="tab-btn" onclick="showTab('clinic',this)">🏥 診所分析</button>
   <button class="tab-btn" onclick="showTab('prescday',this)">📅 處方日執行數</button>
+</div>
+
+<!-- 區域篩選列 -->
+<div id="region-filter-bar" style="margin:12px 36px 0;padding:10px 16px;background:#f0fbf7;border-radius:10px;border:1px solid #b3e8d4;display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+  <span style="font-size:0.88rem;font-weight:700;color:var(--teal);white-space:nowrap">🏘️ 區域篩選：</span>
+  <button class="region-btn active" onclick="setRegionFilter('all',this)">全部</button>
+  <button class="region-btn" onclick="setRegionFilter('北投區',this)">北投區</button>
+  <button class="region-btn" onclick="setRegionFilter('士林區',this)">士林區</button>
+  <button class="region-btn" onclick="setRegionFilter('中山區',this)">中山區</button>
 </div>
 
 <!-- 日期篩選列 -->
@@ -739,6 +767,23 @@ footer {
   </div>
 </div>
 
+<!-- ══════════════════════════════════
+     ★ 診所分區 Modal
+══════════════════════════════════ -->
+<div id="region-modal-overlay" onclick="closeRegionModalOutside(event)" style="position:fixed;inset:0;background:rgba(10,30,24,0.55);z-index:9000;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(3px);opacity:0;pointer-events:none;transition:opacity 0.2s">
+  <div id="region-modal" style="background:var(--surface);border-radius:var(--radius);box-shadow:0 20px 60px rgba(10,30,24,0.35);width:720px;max-width:calc(100vw - 32px);max-height:calc(100vh - 60px);overflow:hidden;display:flex;flex-direction:column;transform:translateY(16px) scale(0.98);transition:transform 0.2s">
+    <div style="padding:20px 24px 16px;border-bottom:1.5px solid var(--border);display:flex;align-items:center;justify-content:space-between;background:linear-gradient(135deg,#f0fbf7,#e8f6fd)">
+      <h3 style="font-size:1.05rem;font-weight:800;color:var(--text);display:flex;align-items:center;gap:8px">📍 設定診所分區</h3>
+      <button onclick="closeRegionModal()" style="width:30px;height:30px;border-radius:50%;border:1.5px solid var(--border);background:var(--surface);color:var(--text-muted);font-size:1.1rem;cursor:pointer">✕</button>
+    </div>
+    <div id="region-modal-body" style="padding:18px 24px;overflow-y:auto;flex:1"></div>
+    <div style="padding:14px 24px;border-top:1.5px solid var(--border);display:flex;align-items:center;justify-content:space-between;gap:12px;background:#f8fffe">
+      <button onclick="clearRegionMap()" style="padding:8px 16px;border-radius:var(--radius-sm);border:1.5px solid #fca5a5;background:#fff;color:#dc2626;font-size:0.85rem;font-family:inherit;font-weight:700;cursor:pointer">🗑 清除對照表</button>
+      <button onclick="closeRegionModal()" style="padding:8px 22px;border-radius:var(--radius-sm);background:linear-gradient(135deg,#2aac8a,#1a9fbe);color:#fff;font-size:0.88rem;font-family:inherit;font-weight:700;border:none;cursor:pointer">完成</button>
+    </div>
+  </div>
+</div>
+
 <!-- PDF 進度遮罩 -->
 <div id="pdf-progress-overlay">
   <div class="pdf-progress-box">
@@ -791,6 +836,13 @@ let prescDayCourseSelected = new Set(); // 勾選顯示的課程資料集 colorI
 let prescDayTypeSelected   = new Set(); // 勾選顯示的處方類型資料集 colorIdx，空=全部
 
 // ══════════════════════════════════════════════
+//  診所分區（北投／士林／中山）
+// ══════════════════════════════════════════════
+const REGION_NAMES = ['北投區','士林區','中山區'];
+let clinicRegionMap = {}; // {診所名稱: '北投區'|'士林區'|'中山區'}
+let currentRegion   = 'all'; // 'all'|'北投區'|'士林區'|'中山區'
+
+// ══════════════════════════════════════════════
 //  資料狀態
 // ══════════════════════════════════════════════
 let weeklyData = [], typeStats = [], typeWeeklyRaw = [], clinicStats = [];
@@ -825,6 +877,8 @@ async function loadFromCloud() {
     typeStats     = data.type_stats      || [];
     typeWeeklyRaw = data.type_weekly_raw || [];
     clinicStats   = data.clinic_stats    || [];
+    rawRows       = data.raw_rows        || [];
+    if(rawRows.length) updateDateFilterRange();
     const dr = data.date_range || '—';
     const fn = data.file_name  || '—';
     const at = data.uploaded_at ? new Date(data.uploaded_at).toLocaleString('zh-TW') : '—';
@@ -843,7 +897,7 @@ async function loadFromCloud() {
 // ══════════════════════════════════════════════
 async function saveToCloud(payload) {
   if (!sbClient) return false;
-  const { error } = await sbClient.from('prescription_data').upsert({
+  const row = {
     id:              'main',
     weekly_data:     payload.weeklyData,
     type_stats:      payload.typeStats,
@@ -852,7 +906,10 @@ async function saveToCloud(payload) {
     date_range:      payload.dateRange,
     file_name:       payload.fileName,
     uploaded_at:     new Date().toISOString()
-  });
+  };
+  if (payload.rawRows) row.raw_rows = payload.rawRows;
+  const { error } = await sbClient.from('prescription_data').upsert(row);
+  if (error) console.warn('saveToCloud error:', error);
   return !error;
 }
 
@@ -959,6 +1016,11 @@ function xyScales(isH=false){
   return isH
     ? {x:{ticks:{font:defaultFont},beginAtZero:true,grid:{color:'#e2e8f0'}}, y:{ticks:{font:defaultFont},grid:{display:false}}}
     : {x:{ticks:{font:defaultFont},grid:{display:false}}, y:{ticks:{font:defaultFont},beginAtZero:true,grid:{color:'#e2e8f0'}}};
+}
+function getRegionOfClinic(name){
+  if(!name) return '未分區';
+  const key = name.toString().trim();
+  return clinicRegionMap[key] || '未分區';
 }
 
 // ══════════════════════════════════════════════
@@ -1507,6 +1569,233 @@ function buildAllCharts(){
 }
 
 // ══════════════════════════════════════════════
+//  診所分區 — 對照表管理
+// ══════════════════════════════════════════════
+function loadRegionMap(){
+  try{
+    const saved = localStorage.getItem('clinicRegionMap');
+    clinicRegionMap = saved ? JSON.parse(saved) : {};
+  }catch(e){ clinicRegionMap = {}; }
+  updateRegionSummaryBadge();
+}
+function saveRegionMap(){
+  localStorage.setItem('clinicRegionMap', JSON.stringify(clinicRegionMap));
+  updateRegionSummaryBadge();
+}
+function countRegion(r){
+  return Object.values(clinicRegionMap).filter(x=>x===r).length;
+}
+function updateRegionSummaryBadge(){
+  const el = document.getElementById('region-setup-badge');
+  if(!el) return;
+  const total = Object.keys(clinicRegionMap).length;
+  if(total===0){ el.textContent = '尚未設定'; el.style.color='#a55'; return; }
+  el.style.color = '';
+  el.textContent = `北投 ${countRegion('北投區')} / 士林 ${countRegion('士林區')} / 中山 ${countRegion('中山區')}`;
+}
+
+// 解析分區 Excel：3 sheets（北投/士林/中山），每 sheet 第 1 欄為診所名稱
+function parseRegionExcel(file){
+  return new Promise((resolve,reject)=>{
+    const reader = new FileReader();
+    reader.onload = e=>{
+      try{
+        const wb = XLSX.read(e.target.result,{type:'array'});
+        const map = {};
+        const sheetToRegion = {'北投':'北投區','士林':'士林區','中山':'中山區'};
+        let foundSheets = 0;
+        wb.SheetNames.forEach(sn=>{
+          const trimmedSn = sn.toString().trim();
+          // 支援 "北投" 或 "北投區" 兩種命名
+          let region = sheetToRegion[trimmedSn];
+          if(!region){
+            const base = trimmedSn.replace(/區$/,'');
+            region = sheetToRegion[base];
+          }
+          if(!region) return;
+          foundSheets++;
+          const ws = wb.Sheets[sn];
+          const rows = XLSX.utils.sheet_to_json(ws,{header:1,defval:null});
+          rows.forEach((row,i)=>{
+            if(i===0) return; // 跳過標題列
+            const name = row && row[0] ? row[0].toString().trim() : '';
+            if(name) map[name] = region;
+          });
+        });
+        if(foundSheets===0){ reject('找不到「北投」「士林」「中山」工作表'); return; }
+        resolve(map);
+      }catch(err){ reject('解析失敗：'+err.message); }
+    };
+    reader.onerror = ()=>reject('檔案讀取失敗');
+    reader.readAsArrayBuffer(file);
+  });
+}
+
+async function handleRegionFile(file){
+  if(!file) return;
+  if(!/\.(xlsx|xls)$/i.test(file.name)){ alert('請上傳 .xlsx 或 .xls 格式'); return; }
+  try{
+    const map = await parseRegionExcel(file);
+    clinicRegionMap = map;
+    saveRegionMap();
+    renderRegionModalContent();
+    // 若有資料立即重新套用篩選
+    if(rawRows.length || clinicStats.length) rebuildFromFilters();
+  }catch(e){ alert('❌ '+e); }
+}
+
+// 列出目前資料中但未在對照表的診所
+function getUnassignedClinics(){
+  const source = clinicStats.length ? clinicStats.map(c=>c.診所名稱) : [];
+  const set = new Set();
+  source.forEach(n=>{ const k=(n||'').toString().trim(); if(k && !clinicRegionMap[k]) set.add(k); });
+  return [...set];
+}
+
+function openRegionModal(){
+  renderRegionModalContent();
+  document.getElementById('region-modal-overlay').classList.add('open');
+  document.body.style.overflow = 'hidden';
+}
+function closeRegionModal(){
+  document.getElementById('region-modal-overlay').classList.remove('open');
+  document.body.style.overflow = '';
+}
+function closeRegionModalOutside(e){
+  if(e.target === document.getElementById('region-modal-overlay')) closeRegionModal();
+}
+function clearRegionMap(){
+  if(!confirm('確定要清除目前的診所分區對照表？')) return;
+  clinicRegionMap = {};
+  saveRegionMap();
+  renderRegionModalContent();
+  if(rawRows.length || clinicStats.length) rebuildFromFilters();
+}
+
+function renderRegionModalContent(){
+  const body = document.getElementById('region-modal-body');
+  if(!body) return;
+  const total = Object.keys(clinicRegionMap).length;
+  const unassigned = getUnassignedClinics();
+  const counts = {
+    '北投區': countRegion('北投區'),
+    '士林區': countRegion('士林區'),
+    '中山區': countRegion('中山區')
+  };
+  // 依區列清單
+  const byRegion = {'北投區':[], '士林區':[], '中山區':[]};
+  Object.entries(clinicRegionMap).forEach(([name,region])=>{
+    if(byRegion[region]) byRegion[region].push(name);
+  });
+  Object.values(byRegion).forEach(arr=>arr.sort((a,b)=>a.localeCompare(b,'zh-TW')));
+  body.innerHTML = `
+    <div style="margin-bottom:16px">
+      <div class="upload-drop" id="regionDropZone" style="padding:18px">
+        <input type="file" id="regionFileInput" accept=".xlsx,.xls" />
+        📁 點此選擇或拖曳分區 Excel（需含 3 個工作表：北投、士林、中山）
+      </div>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:14px">
+      ${REGION_NAMES.map(r=>`
+        <div style="border:1.5px solid var(--border);border-radius:10px;padding:10px;background:#f8fffe">
+          <div style="font-weight:700;color:var(--teal);font-size:0.9rem;margin-bottom:6px">${r}</div>
+          <div style="font-size:1.4rem;font-weight:800;color:var(--text);margin-bottom:4px">${counts[r]}<span style="font-size:0.75rem;font-weight:500;color:var(--text-muted)"> 間</span></div>
+          <div style="font-size:0.75rem;color:var(--text-muted);max-height:120px;overflow-y:auto;line-height:1.6">
+            ${byRegion[r].length ? byRegion[r].map(n=>`・${n}`).join('<br>') : '（尚無）'}
+          </div>
+        </div>
+      `).join('')}
+    </div>
+    ${unassigned.length ? `
+      <div style="border:1.5px solid #f0c96e;background:#fffbeb;border-radius:10px;padding:10px 12px;margin-bottom:14px">
+        <div style="font-weight:700;color:#7d6608;font-size:0.88rem;margin-bottom:6px">⚠️ 未分區診所（共 ${unassigned.length} 間）</div>
+        <div style="font-size:0.78rem;color:#7d6608;line-height:1.6">${unassigned.map(n=>`・${n}`).join('<br>')}</div>
+        <div style="font-size:0.75rem;color:#9a7d0a;margin-top:6px">請到分區 Excel 增加這些診所，然後重新上傳。</div>
+      </div>
+    ` : ''}
+    <div style="font-size:0.78rem;color:var(--text-muted);text-align:center">
+      目前對照表儲存於本機（localStorage），共 ${total} 間診所
+    </div>
+  `;
+  // 綁定上傳
+  const input = document.getElementById('regionFileInput');
+  if(input){
+    input.onchange = e=>handleRegionFile(e.target.files[0]);
+  }
+  const dz = document.getElementById('regionDropZone');
+  if(dz){
+    dz.ondragover = e=>{e.preventDefault();dz.classList.add('drag-over');};
+    dz.ondragleave = ()=>dz.classList.remove('drag-over');
+    dz.ondrop = e=>{e.preventDefault();dz.classList.remove('drag-over');handleRegionFile(e.dataTransfer.files[0]);};
+  }
+}
+
+// ══════════════════════════════════════════════
+//  區域 + 日期 綜合篩選
+// ══════════════════════════════════════════════
+function setRegionFilter(region, btn){
+  currentRegion = region;
+  if(btn){
+    btn.closest('#region-filter-bar').querySelectorAll('.region-btn').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+  }
+  rebuildFromFilters();
+}
+
+function rebuildFromFilters(){
+  const from = document.getElementById('filterFrom')?.value || '';
+  const to   = document.getElementById('filterTo')?.value   || '';
+
+  if(!rawRows.length){
+    // 只有雲端聚合資料，無 raw；只能對 clinicStats 做區域過濾
+    if(currentRegion !== 'all'){
+      // 重建 clinicStats 子集
+      const filtered = (window._origClinicStats || clinicStats).filter(c=>getRegionOfClinic(c.診所名稱)===currentRegion);
+      if(!window._origClinicStats) window._origClinicStats = clinicStats.slice();
+      clinicStats = filtered;
+    } else if(window._origClinicStats){
+      clinicStats = window._origClinicStats.slice();
+      window._origClinicStats = null;
+    }
+    buildClinicCharts(); updateSummary();
+    updateFilterStatus(from, to, true);
+    return;
+  }
+
+  let filtered = rawRows;
+  if(currentRegion !== 'all'){
+    filtered = filtered.filter(r=>r.clinic && getRegionOfClinic(r.clinic)===currentRegion);
+  }
+  if(from || to){
+    filtered = filtered.filter(r=>{
+      if(from && r.prescDate < from) return false;
+      if(to   && r.prescDate > to)   return false;
+      return true;
+    });
+  }
+  const result = aggregateRawRows(filtered);
+  weeklyData    = result.newWeeklyData;
+  typeStats     = result.newTypeStats;
+  typeWeeklyRaw = result.newTWRaw;
+  clinicStats   = result.newClinicStats;
+  buildAllCharts(); updateSummary();
+  updateFilterStatus(from, to, false, filtered.length);
+}
+
+function updateFilterStatus(from, to, cloudOnly, filteredCount){
+  const el = document.getElementById('filterStatus');
+  if(!el) return;
+  const parts = [];
+  if(currentRegion !== 'all') parts.push(`區域：${currentRegion}`);
+  if(from || to) parts.push(`日期：${from||'起始'}～${to||'結束'}`);
+  if(cloudOnly && currentRegion !== 'all') parts.push('(僅診所分析套用分區，其他 Tab 請重新上傳 Excel)');
+  if(!cloudOnly && filteredCount != null && (currentRegion !== 'all' || from || to)){
+    parts.push(`共 ${filteredCount.toLocaleString()} / ${rawRows.length.toLocaleString()} 筆`);
+  }
+  el.textContent = parts.join('　｜　');
+}
+
+// ══════════════════════════════════════════════
 //  Excel 解析
 // ══════════════════════════════════════════════
 function toDate(val){
@@ -1650,30 +1939,14 @@ function applyDateFilter(){
   if(!rawRows.length){ alert('請先上傳 Excel 檔案才能使用篩選'); return; }
   const from = document.getElementById('filterFrom').value;
   const to   = document.getElementById('filterTo').value;
-  if(!from && !to){ clearDateFilter(); return; }
-  let filtered = rawRows.filter(r=>{
-    if(from && r.prescDate < from) return false;
-    if(to   && r.prescDate > to)   return false;
-    return true;
-  });
-  if(!filtered.length){ alert(`所選區間（${from||'起始'}～${to||'結束'}）沒有資料`); return; }
-  const result = aggregateRawRows(filtered);
-  weeklyData=result.newWeeklyData; typeStats=result.newTypeStats;
-  typeWeeklyRaw=result.newTWRaw; clinicStats=result.newClinicStats;
-  buildAllCharts(); updateSummary();
-  document.getElementById('filterStatus').textContent =
-    `已篩選 ${filtered.length.toLocaleString()} / ${rawRows.length.toLocaleString()} 筆`;
+  if(!from && !to && currentRegion === 'all'){ clearDateFilter(); return; }
+  rebuildFromFilters();
 }
 
 function clearDateFilter(){
   document.getElementById('filterFrom').value='';
   document.getElementById('filterTo').value='';
-  document.getElementById('filterStatus').textContent='';
-  if(!rawRows.length) return;
-  const result = aggregateRawRows(rawRows);
-  weeklyData=result.newWeeklyData; typeStats=result.newTypeStats;
-  typeWeeklyRaw=result.newTWRaw; clinicStats=result.newClinicStats;
-  buildAllCharts(); updateSummary();
+  rebuildFromFilters();
 }
 
 function setStatus(msg, isError=false){
@@ -1693,7 +1966,8 @@ async function handleFile(file){
     setStatus('⏳ 正在儲存到雲端…');
     const ok = await saveToCloud({
       weeklyData:newWeeklyData, typeStats:newTypeStats, typeWeeklyRaw:newTWRaw,
-      clinicStats:newClinicStats, dateRange, fileName:file.name
+      clinicStats:newClinicStats, dateRange, fileName:file.name,
+      rawRows: rawRows
     });
     if(ok){
       setStatus(`✅ 已儲存「${file.name}」到雲端，所有人重新整理後即可看到最新資料`);
@@ -2247,6 +2521,7 @@ async function startPdfExport() {
 }
 
 // ── 初始化 ──
+loadRegionMap();
 loadFromCloud();
 incrementViewCount();
 document.getElementById('dateFilterBar').style.display = 'flex';
