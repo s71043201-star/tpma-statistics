@@ -760,6 +760,15 @@ footer {
       <button class="pdf-modal-close" onclick="closePdfModal()">✕</button>
     </div>
     <div class="pdf-modal-body">
+      <!-- 區域選擇（多選）-->
+      <div id="pdf-region-filter" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px;padding-bottom:12px;border-bottom:1.5px solid var(--border);align-items:center">
+        <span style="font-size:0.82rem;font-weight:700;color:var(--teal);margin-right:4px;white-space:nowrap">🏘️ 包含區域：</span>
+        <button type="button" class="pdf-tab-btn active" data-region="all" onclick="togglePdfRegion('all',this)">全部</button>
+        <button type="button" class="pdf-tab-btn" data-region="北投區" onclick="togglePdfRegion('北投區',this)">北投區</button>
+        <button type="button" class="pdf-tab-btn" data-region="士林區" onclick="togglePdfRegion('士林區',this)">士林區</button>
+        <button type="button" class="pdf-tab-btn" data-region="中山區" onclick="togglePdfRegion('中山區',this)">中山區</button>
+        <span style="font-size:0.72rem;color:var(--text-muted);margin-left:6px">可多選，每個區域各產生一份圖表</span>
+      </div>
       <!-- 頁籤篩選列 -->
       <div class="pdf-tab-filter" id="pdf-tab-filter">
         <button class="pdf-tab-btn active" onclick="setPdfFilter('all',this)">全部</button>
@@ -2142,6 +2151,32 @@ const PDF_CHART_INSTANCE_MAP = {
 let pdfChecked = new Set();
 let currentActiveTab = 'weekly';
 let currentPdfFilter = 'all';
+let pdfExportRegions = new Set(['all']); // PDF 匯出時要包含的區域，可多選
+
+function togglePdfRegion(region, btn){
+  if(pdfExportRegions.has(region)){
+    pdfExportRegions.delete(region);
+    btn.classList.remove('active');
+  } else {
+    pdfExportRegions.add(region);
+    btn.classList.add('active');
+  }
+  // 至少保留一個（避免空選）
+  if(pdfExportRegions.size === 0){
+    pdfExportRegions.add(region);
+    btn.classList.add('active');
+  }
+}
+
+function syncRegionFilterBar(){
+  const bar = document.getElementById('region-filter-bar');
+  if(!bar) return;
+  bar.querySelectorAll('.region-btn').forEach(b=>{
+    const onclick = b.getAttribute('onclick') || '';
+    const m = onclick.match(/setRegionFilter\('([^']+)'/);
+    if(m) b.classList.toggle('active', m[1] === currentRegion);
+  });
+}
 
 // 記錄目前 tab
 document.querySelectorAll('.tab-btn').forEach((btn, i) => {
@@ -2294,7 +2329,10 @@ async function startPdfExport() {
 
   progressOverlay.classList.add('show');
   progressMsg.textContent = '正在準備圖表…';
-  progressSub.textContent = `共選取 ${pdfChecked.size} 張圖表`;
+  const _regCnt = pdfExportRegions.size || 1;
+  progressSub.textContent = _regCnt > 1
+    ? `共 ${pdfChecked.size} 張圖表 × ${_regCnt} 個區域 = ${pdfChecked.size * _regCnt} 頁`
+    : `共選取 ${pdfChecked.size} 張圖表`;
   progressBar.style.width = '0%';
 
   try {
@@ -2329,62 +2367,72 @@ async function startPdfExport() {
     // 依序處理每張勾選的圖表
     const allChartIds = PDF_CHART_GROUPS.flatMap(g => g.charts.map(c => c.id)).filter(id => pdfChecked.has(id));
 
-    let lastTab = null, lastCtxKey = null;
-    for (const chartId of allChartIds) {
-      const ctx = CHART_CONTEXT[chartId];
-      if (!ctx) continue;
-      const ctxKey = ctx.tab + (ctx.subViews && ctx.subViews[0] || '');
+    // 取得要匯出的區域清單
+    const exportRegions = pdfExportRegions.size ? [...pdfExportRegions] : ['all'];
+    const origRegion = currentRegion;
+    const multiRegion = exportRegions.length > 1;
 
-      // 只在需要切換時才切換，避免重複 rebuild
-      if (ctxKey !== lastCtxKey) {
-        // 隱藏所有 tab
-        tabNames.forEach(function(t){var el=document.getElementById('tab-'+t);if(el)el.classList.add('hidden')});
-        // 顯示目標 tab
-        (function(el){if(el)el.classList.remove('hidden')})(document.getElementById(ctx.tab));
-        // 處理子 view
-        if (ctx.subViews) {
-          (ctx.hideSubViews||[]).forEach(function(v){var el=document.getElementById(v);if(el)el.classList.add('hidden')});
-          ctx.subViews.forEach(function(v){var el=document.getElementById(v);if(el)el.classList.remove('hidden')});
+    for (const region of exportRegions) {
+      // 切換到該區域、重新計算資料
+      currentRegion = region;
+      rebuildFromFilters();
+      // 等資料與初次圖表建立完成
+      await new Promise(r => setTimeout(r, 350));
+
+      const regionLabel = region === 'all' ? '全部' : region;
+      progressMsg.textContent = `處理區域：${regionLabel}…`;
+
+      let lastCtxKey = null;
+      for (const chartId of allChartIds) {
+        const ctx = CHART_CONTEXT[chartId];
+        if (!ctx) continue;
+        const ctxKey = ctx.tab + (ctx.subViews && ctx.subViews[0] || '');
+
+        if (ctxKey !== lastCtxKey) {
+          tabNames.forEach(function(t){var el=document.getElementById('tab-'+t);if(el)el.classList.add('hidden')});
+          (function(el){if(el)el.classList.remove('hidden')})(document.getElementById(ctx.tab));
+          if (ctx.subViews) {
+            (ctx.hideSubViews||[]).forEach(function(v){var el=document.getElementById(v);if(el)el.classList.add('hidden')});
+            ctx.subViews.forEach(function(v){var el=document.getElementById(v);if(el)el.classList.remove('hidden')});
+          }
+          if (ctx.clinicContent) {
+            (function(el){if(el)el.classList.add('hidden')})(document.getElementById('clinic-no-data'));
+            (function(el){if(el)el.classList.remove('hidden')})(document.getElementById('clinic-content'));
+          }
+          if (ctx.rebuildFn) ctx.rebuildFn();
+          Object.values(chartInstances).forEach(c => {
+            try { c.update('none'); } catch(e) {}
+          });
+          await new Promise(r => setTimeout(r, 400));
+          lastCtxKey = ctxKey;
         }
-        // 診所分析需要顯示 clinic-content
-        if (ctx.clinicContent) {
-          (function(el){if(el)el.classList.add('hidden')})(document.getElementById('clinic-no-data'));
-          (function(el){if(el)el.classList.remove('hidden')})(document.getElementById('clinic-content'));
+
+        const sectionEl = document.querySelector(`[data-pdf-id="${chartId}"]`);
+        if (!sectionEl) continue;
+        const canvas = sectionEl.querySelector('canvas');
+        if (!canvas || canvas.width === 0 || canvas.height === 0) continue;
+        const titleEl = sectionEl.querySelector('h2');
+        const baseTitle = titleEl ? titleEl.textContent.trim() : chartId;
+        // 多區域匯出時在標題前加區域名
+        const title = multiRegion ? `[${regionLabel}] ${baseTitle}` : baseTitle;
+
+        const instanceKey = PDF_CHART_INSTANCE_MAP[chartId];
+        const chartInst = instanceKey ? chartInstances[instanceKey] : null;
+        if (chartInst) {
+          try { chartInst.update('none'); } catch(e) {}
         }
-        // 強制重建圖表（確保 canvas 有正確尺寸）
-        if (ctx.rebuildFn) ctx.rebuildFn();
-        // 強制所有圖表立即完成動畫（不等待動畫結束）
-        Object.values(chartInstances).forEach(c => {
-          try { c.update('none'); } catch(e) {}
-        });
-        // 等待 DOM 更新
-        await new Promise(r => setTimeout(r, 400));
-        lastCtxKey = ctxKey;
+
+        selectedSections.push({ imgDataUrl: canvas.toDataURL('image/png'), title, id: chartId, region });
       }
-
-      const sectionEl = document.querySelector(`[data-pdf-id="${chartId}"]`);
-      if (!sectionEl) continue;
-      const canvas = sectionEl.querySelector('canvas');
-      if (!canvas || canvas.width === 0 || canvas.height === 0) continue;
-      const titleEl = sectionEl.querySelector('h2');
-      const title = titleEl ? titleEl.textContent.trim() : chartId;
-
-      // 強制當前圖表立即完成動畫
-      const instanceKey = PDF_CHART_INSTANCE_MAP[chartId];
-      const chartInst = instanceKey ? chartInstances[instanceKey] : null;
-      if (chartInst) {
-        try { chartInst.update('none'); } catch(e) {}
-      }
-
-      // 直接用原始 canvas 截圖，不做任何 resize（避免圖表布局跑掉）
-      selectedSections.push({ imgDataUrl: canvas.toDataURL('image/png'), title, id: chartId });
     }
 
-    // 還原原本的 tab
+    // 還原原本的區域與 tab
+    currentRegion = origRegion;
+    rebuildFromFilters();
+    syncRegionFilterBar();
     tabNames.forEach(function(t){var el=document.getElementById('tab-'+t);if(el)el.classList.add('hidden')});
     const origTabId = 'tab-' + (tabNames[activeTabIdx] || 'weekly');
     (function(el){if(el)el.classList.remove('hidden')})(document.getElementById(origTabId));
-    // 還原子 view 狀態
     buildTypeCharts(currentChartType['type']);
     buildTypeWeeklyCharts(currentChartType['typeweekly']);
 
