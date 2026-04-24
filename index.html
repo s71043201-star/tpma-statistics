@@ -363,6 +363,40 @@ header p { font-size: 0.86rem; opacity: 0.88; margin-top: 5px; letter-spacing: 0
 .ct-btn.active { background: #e0f7ef; border-color: var(--teal); color: var(--teal); }
 .ct-btn:hover:not(.active) { border-color: #7dd4b8; background: #f0fbf7; }
 
+/* ── 統計單位切換 ── */
+.period-bar {
+  display: flex; align-items: center; gap: 8px;
+  padding: 6px 36px 0; flex-wrap: wrap;
+}
+.period-bar .ct-label { font-size: 0.8rem; font-weight: 700; color: var(--text-muted); margin-right: 4px; white-space: nowrap; }
+.period-btn {
+  display: flex; align-items: center; gap: 5px;
+  padding: 5px 14px; border-radius: 20px; border: 1.5px solid var(--border);
+  background: var(--surface); color: var(--text-muted); font-size: 0.8rem;
+  font-family: inherit; cursor: pointer; transition: all 0.15s; font-weight: 600;
+}
+.period-btn.active { background: #e6f5fa; border-color: var(--cyan); color: var(--cyan); }
+.period-btn:hover:not(.active) { border-color: #7dc7dd; background: #f0fbfd; }
+
+/* ── 鑽取(drill-down)區 ── */
+.drill-box {
+  background: #f8fdfb; border: 1.5px dashed var(--teal); border-radius: var(--radius-sm);
+  margin-top: 14px; padding: 14px 16px;
+}
+.drill-box.hidden { display: none; }
+.drill-header {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 10px; gap: 8px; flex-wrap: wrap;
+}
+.drill-header h3 { font-size: 0.95rem; color: var(--teal); font-weight: 700; }
+.drill-close {
+  border: 1.5px solid var(--border); background: var(--surface);
+  border-radius: 16px; padding: 3px 12px; font-size: 0.78rem; cursor: pointer;
+  color: var(--text-muted); font-family: inherit; font-weight: 600;
+}
+.drill-close:hover { border-color: #e57373; color: #c0392b; }
+.drill-wrap { position: relative; height: 240px; }
+
 /* ── 圖表卡片 ── */
 .chart-section {
   background: var(--surface); border-radius: var(--radius); margin: 18px 36px;
@@ -594,6 +628,12 @@ footer {
 
 <!-- ═══ TAB 1 ═══ -->
 <div id="tab-weekly">
+  <div class="period-bar">
+    <span class="ct-label">統計單位：</span>
+    <button class="period-btn active" onclick="setPeriod('weekly','week',this)"><span>🗓️</span> 週</button>
+    <button class="period-btn" onclick="setPeriod('weekly','month',this)"><span>📆</span> 月</button>
+    <span id="weekly-drill-hint" style="font-size:0.75rem;color:var(--text-muted);margin-left:8px;display:none">💡 點擊月份可展開該月週統計</span>
+  </div>
   <div class="chart-type-bar">
     <span class="ct-label">圖表類型：</span>
     <button class="ct-btn active" onclick="setChartType('weekly','bar',this)"><span>📊</span> 直條圖</button>
@@ -601,12 +641,26 @@ footer {
     <button class="ct-btn" onclick="setChartType('weekly','line',this)"><span>📈</span> 折線圖</button>
     <button class="ct-btn" onclick="setChartType('weekly','area',this)"><span>🏔️</span> 面積圖</button>
   </div>
-  <div class="chart-section" data-pdf-id="weekly-pres" data-pdf-label="每週處方開立數"><div class="chart-header"><h2 id="w1-title">每週處方開立數</h2><button class="dl-btn" onclick="downloadChart(this)">↓ 下載 JPG</button></div><div class="chart-wrap"><canvas id="weeklyBarChart"></canvas></div></div>
-  <div class="chart-section" data-pdf-id="weekly-exec" data-pdf-label="每週處方執行數"><div class="chart-header"><h2 id="w2-title">每週處方執行數</h2><button class="dl-btn" onclick="downloadChart(this)">↓ 下載 JPG</button></div><div class="chart-wrap"><canvas id="weeklyExecChart"></canvas></div></div>
+  <div class="chart-section" data-pdf-id="weekly-pres" data-pdf-label="每週處方開立數">
+    <div class="chart-header"><h2 id="w1-title">每週處方開立數</h2><button class="dl-btn" onclick="downloadChart(this)">↓ 下載 JPG</button></div>
+    <div class="chart-wrap"><canvas id="weeklyBarChart"></canvas></div>
+    <div id="weekly-drill-pres" class="drill-box hidden"><div class="drill-header"><h3 id="weekly-drill-pres-title">該月週統計</h3><button class="drill-close" onclick="closeDrill('weekly','pres')">✕ 關閉</button></div><div class="drill-wrap"><canvas id="weeklyDrillPresChart"></canvas></div></div>
+  </div>
+  <div class="chart-section" data-pdf-id="weekly-exec" data-pdf-label="每週處方執行數">
+    <div class="chart-header"><h2 id="w2-title">每週處方執行數</h2><button class="dl-btn" onclick="downloadChart(this)">↓ 下載 JPG</button></div>
+    <div class="chart-wrap"><canvas id="weeklyExecChart"></canvas></div>
+    <div id="weekly-drill-exec" class="drill-box hidden"><div class="drill-header"><h3 id="weekly-drill-exec-title">該月週統計</h3><button class="drill-close" onclick="closeDrill('weekly','exec')">✕ 關閉</button></div><div class="drill-wrap"><canvas id="weeklyDrillExecChart"></canvas></div></div>
+  </div>
 </div>
 
 <!-- ═══ TAB 2 ═══ -->
 <div id="tab-type" class="hidden">
+  <div class="period-bar">
+    <span class="ct-label">統計單位：</span>
+    <button class="period-btn active" onclick="setPeriod('type','week',this)"><span>🗓️</span> 週</button>
+    <button class="period-btn" onclick="setPeriod('type','month',this)"><span>📆</span> 月</button>
+    <span style="font-size:0.72rem;color:var(--text-muted);margin-left:8px">（僅影響「折線累積」圖）</span>
+  </div>
   <div class="chart-type-bar">
     <span class="ct-label">圖表類型：</span>
     <button class="ct-btn active" onclick="setChartType('type','line',this)"><span>📈</span> 折線（累積）</button>
@@ -615,8 +669,8 @@ footer {
     <button class="ct-btn" onclick="setChartType('type','hbar',this)"><span>📉</span> 橫條對比</button>
   </div>
   <div id="type-line-view">
-    <div class="chart-section" data-pdf-id="cum-pres" data-pdf-label="處方開立數累積趨勢"><div class="chart-header"><h2>處方開立數累積趨勢（依週）</h2><button class="dl-btn" onclick="downloadChart(this)">↓ 下載 JPG</button></div><div class="chart-wrap"><canvas id="cumPrescribeChart"></canvas></div></div>
-    <div class="chart-section" data-pdf-id="cum-exec" data-pdf-label="執行數累積趨勢"><div class="chart-header"><h2>執行數累積趨勢（依週）</h2><button class="dl-btn" onclick="downloadChart(this)">↓ 下載 JPG</button></div><div class="chart-wrap"><canvas id="cumExecChart"></canvas></div></div>
+    <div class="chart-section" data-pdf-id="cum-pres" data-pdf-label="處方開立數累積趨勢"><div class="chart-header"><h2 id="cum-pres-title">處方開立數累積趨勢（依週）</h2><button class="dl-btn" onclick="downloadChart(this)">↓ 下載 JPG</button></div><div class="chart-wrap"><canvas id="cumPrescribeChart"></canvas></div></div>
+    <div class="chart-section" data-pdf-id="cum-exec" data-pdf-label="執行數累積趨勢"><div class="chart-header"><h2 id="cum-exec-title">執行數累積趨勢（依週）</h2><button class="dl-btn" onclick="downloadChart(this)">↓ 下載 JPG</button></div><div class="chart-wrap"><canvas id="cumExecChart"></canvas></div></div>
   </div>
   <div id="type-pie-view" class="hidden">
     <div class="side-by-side">
@@ -632,6 +686,12 @@ footer {
 
 <!-- ═══ TAB 3 ═══ -->
 <div id="tab-typeweekly" class="hidden">
+  <div class="period-bar">
+    <span class="ct-label">統計單位：</span>
+    <button class="period-btn active" onclick="setPeriod('typeweekly','week',this)"><span>🗓️</span> 週</button>
+    <button class="period-btn" onclick="setPeriod('typeweekly','month',this)"><span>📆</span> 月</button>
+    <span id="typeweekly-drill-hint" style="font-size:0.75rem;color:var(--text-muted);margin-left:8px;display:none">💡 點擊月份可展開該月週統計</span>
+  </div>
   <div class="chart-type-bar">
     <span class="ct-label">圖表類型：</span>
     <button class="ct-btn active" onclick="setChartType('typeweekly','line',this)"><span>📈</span> 折線圖</button>
@@ -641,10 +701,10 @@ footer {
   </div>
   <div id="tw-multi-view">
     <div class="type-grid">
-      <div class="chart-section" data-pdf-id="tw-0" data-pdf-label="情緒調適處方週趨勢"><div class="chart-header"><h2>情緒調適處方</h2><button class="dl-btn" onclick="downloadChart(this)">↓ 下載 JPG</button></div><div class="chart-wrap" style="height:260px"><canvas id="twDetail0"></canvas></div></div>
-      <div class="chart-section" data-pdf-id="tw-1" data-pdf-label="營養處方週趨勢"><div class="chart-header"><h2>營養處方</h2><button class="dl-btn" onclick="downloadChart(this)">↓ 下載 JPG</button></div><div class="chart-wrap" style="height:260px"><canvas id="twDetail1"></canvas></div></div>
-      <div class="chart-section" data-pdf-id="tw-2" data-pdf-label="社會處方週趨勢"><div class="chart-header"><h2>社會處方</h2><button class="dl-btn" onclick="downloadChart(this)">↓ 下載 JPG</button></div><div class="chart-wrap" style="height:260px"><canvas id="twDetail2"></canvas></div></div>
-      <div class="chart-section" data-pdf-id="tw-3" data-pdf-label="運動處方週趨勢"><div class="chart-header"><h2>運動處方</h2><button class="dl-btn" onclick="downloadChart(this)">↓ 下載 JPG</button></div><div class="chart-wrap" style="height:260px"><canvas id="twDetail3"></canvas></div></div>
+      <div class="chart-section" data-pdf-id="tw-0" data-pdf-label="情緒調適處方週趨勢"><div class="chart-header"><h2 id="tw-title-0">情緒調適處方</h2><button class="dl-btn" onclick="downloadChart(this)">↓ 下載 JPG</button></div><div class="chart-wrap" style="height:260px"><canvas id="twDetail0"></canvas></div><div id="tw-drill-0" class="drill-box hidden"><div class="drill-header"><h3 id="tw-drill-title-0">該月週統計</h3><button class="drill-close" onclick="closeDrill('typeweekly',0)">✕ 關閉</button></div><div class="drill-wrap"><canvas id="twDrill0"></canvas></div></div></div>
+      <div class="chart-section" data-pdf-id="tw-1" data-pdf-label="營養處方週趨勢"><div class="chart-header"><h2 id="tw-title-1">營養處方</h2><button class="dl-btn" onclick="downloadChart(this)">↓ 下載 JPG</button></div><div class="chart-wrap" style="height:260px"><canvas id="twDetail1"></canvas></div><div id="tw-drill-1" class="drill-box hidden"><div class="drill-header"><h3 id="tw-drill-title-1">該月週統計</h3><button class="drill-close" onclick="closeDrill('typeweekly',1)">✕ 關閉</button></div><div class="drill-wrap"><canvas id="twDrill1"></canvas></div></div></div>
+      <div class="chart-section" data-pdf-id="tw-2" data-pdf-label="社會處方週趨勢"><div class="chart-header"><h2 id="tw-title-2">社會處方</h2><button class="dl-btn" onclick="downloadChart(this)">↓ 下載 JPG</button></div><div class="chart-wrap" style="height:260px"><canvas id="twDetail2"></canvas></div><div id="tw-drill-2" class="drill-box hidden"><div class="drill-header"><h3 id="tw-drill-title-2">該月週統計</h3><button class="drill-close" onclick="closeDrill('typeweekly',2)">✕ 關閉</button></div><div class="drill-wrap"><canvas id="twDrill2"></canvas></div></div></div>
+      <div class="chart-section" data-pdf-id="tw-3" data-pdf-label="運動處方週趨勢"><div class="chart-header"><h2 id="tw-title-3">運動處方</h2><button class="dl-btn" onclick="downloadChart(this)">↓ 下載 JPG</button></div><div class="chart-wrap" style="height:260px"><canvas id="twDetail3"></canvas></div><div id="tw-drill-3" class="drill-box hidden"><div class="drill-header"><h3 id="tw-drill-title-3">該月週統計</h3><button class="drill-close" onclick="closeDrill('typeweekly',3)">✕ 關閉</button></div><div class="drill-wrap"><canvas id="twDrill3"></canvas></div></div></div>
     </div>
   </div>
   <div id="tw-hbar-view" class="hidden">
@@ -859,6 +919,9 @@ const DATE_COLORS_A = ['rgba(42,172,138,0.72)','rgba(232,147,10,0.72)','rgba(124
 const defaultFont = {family:"'Microsoft JhengHei','Noto Sans TC',sans-serif", size:14};
 const chartInstances = {};
 const currentChartType = {weekly:'bar', type:'line', typeweekly:'line'};
+const currentPeriod    = {weekly:'week', type:'week', typeweekly:'week'};
+// 鑽取狀態：drillMonth.weekly=當前展開的月份標籤 'YYYY-MM'；typeweekly 為陣列對應四個類型
+const drillMonth = { weekly: null, typeweekly: [null,null,null,null] };
 let currentClinicSort = 'prescribe';
 let prescDayDatasets = (()=>{try{return JSON.parse(localStorage.getItem('prescDayDatasets')||'[]');}catch{return[];}})(); // [{label, typeStats, courseStats, colorIdx}]
 let prescDayCourseSelected = new Set(); // 勾選顯示的課程資料集 colorIdx，空=全部
@@ -875,6 +938,7 @@ let currentRegion   = 'all'; // 'all'|'北投區'|'士林區'|'中山區'
 //  資料狀態
 // ══════════════════════════════════════════════
 let weeklyData = [], typeStats = [], typeWeeklyRaw = [], clinicStats = [];
+let monthlyData = [], typeMonthlyRaw = [];
 let rawRows = []; // 原始 row 資料，供日期篩選用
 
 // ══════════════════════════════════════════════
@@ -907,7 +971,15 @@ async function loadFromCloud() {
     typeWeeklyRaw = data.type_weekly_raw || [];
     clinicStats   = data.clinic_stats    || [];
     rawRows       = data.raw_rows        || [];
-    if(rawRows.length) updateDateFilterRange();
+    // 從原始資料重新產出月份聚合,雲端資料表可能尚未有欄位
+    if(rawRows.length){
+      const agg = aggregateRawRows(rawRows);
+      monthlyData    = agg.newMonthlyData;
+      typeMonthlyRaw = agg.newTMRaw;
+      updateDateFilterRange();
+    } else {
+      monthlyData = []; typeMonthlyRaw = [];
+    }
     const dr = data.date_range || '—';
     const fn = data.file_name  || '—';
     const at = data.uploaded_at ? new Date(data.uploaded_at).toLocaleString('zh-TW') : '—';
@@ -1063,7 +1135,15 @@ function updateSummary(){
   document.getElementById('sumTotal').textContent   = total.toLocaleString();
   document.getElementById('sumExec').textContent    = exec.toLocaleString();
   document.getElementById('sumRate').textContent    = rate+'%';
-  document.getElementById('sumWeeks').textContent   = weeklyData.length+' 週';
+  // 統計週/月數：依當前分頁選擇的單位顯示;非時間相關分頁維持週
+  const activePeriod = (currentActiveTab && currentPeriod[currentActiveTab]) || 'week';
+  const useMonth = activePeriod === 'month';
+  const countCard = document.getElementById('sumWeeks');
+  if(countCard){
+    countCard.textContent = useMonth ? (monthlyData.length+' 個月') : (weeklyData.length+' 週');
+    const lbl = countCard.parentElement && countCard.parentElement.querySelector('.lbl');
+    if(lbl) lbl.textContent = useMonth ? '統計月數' : '統計週數';
+  }
   document.getElementById('sumEnroll').textContent  = enroll > 0 ? enroll.toLocaleString() : '—';
 }
 
@@ -1072,33 +1152,50 @@ function updateSummary(){
 // ══════════════════════════════════════════════
 function buildWeeklyCharts(mode){
   ['weeklyBar','weeklyExec'].forEach(k=>destroyChart(k));
-  if(!weeklyData.length) return;
-  const weeks    = weeklyData.map(d=>d.week_label);
-  const presData = weeklyData.map(d=>d.開立數);
-  const execData = weeklyData.map(d=>d.執行數);
+  const isMonth = currentPeriod.weekly === 'month';
+  const srcArr  = isMonth ? monthlyData : weeklyData;
+  const labelKey = isMonth ? 'month_label' : 'week_label';
+  // 月模式下給「點擊展開」提示
+  const hint = document.getElementById('weekly-drill-hint');
+  if(hint) hint.style.display = isMonth ? 'inline' : 'none';
+  // 非月模式時隱藏鑽取區
+  if(!isMonth){ closeDrill('weekly','pres',true); closeDrill('weekly','exec',true); }
+  if(!srcArr.length) return;
+  const labels   = srcArr.map(d=>d[labelKey]);
+  const presData = srcArr.map(d=>d.開立數);
+  const execData = srcArr.map(d=>d.執行數);
+  const unit = isMonth ? '每月' : '每週';
   const isH=mode==='horizontalBar', isLn=mode==='line'||mode==='area', isFill=mode==='area';
-  document.getElementById('w1-title').textContent = isH?'每週處方開立數（橫條）':isLn?'每週處方開立數（折線）':'每週處方開立數';
-  document.getElementById('w2-title').textContent = isH?'每週處方執行數（橫條）':isLn?'每週處方執行數（折線）':'每週處方執行數';
+  document.getElementById('w1-title').textContent = isH?`${unit}處方開立數（橫條）`:isLn?`${unit}處方開立數（折線）`:`${unit}處方開立數`;
+  document.getElementById('w2-title').textContent = isH?`${unit}處方執行數（橫條）`:isLn?`${unit}處方執行數（折線）`:`${unit}處方執行數`;
+  // 點擊處理：月模式下,取得被點擊的月份開啟鑽取
+  const makeClickHandler = (chartLabels, which, orientation) => (evt, elements, chart) => {
+    if(!isMonth) return;
+    const el = elements && elements[0];
+    if(!el) return;
+    const ml = chartLabels[el.index];
+    if(ml) openWeeklyDrill(which, ml);
+  };
   if(isLn){
-    const mkLine=(id,data,color,label)=>new Chart(document.getElementById(id).getContext('2d'),{
+    const mkLine=(id,data,color,label,which)=>new Chart(document.getElementById(id).getContext('2d'),{
       type:'line',plugins:[lineLabelPlugin],
-      data:{labels:weeks,datasets:[{label,data,borderColor:color,backgroundColor:color+'28',pointRadius:5,pointBackgroundColor:color,pointBorderColor:'#fff',pointBorderWidth:2,tension:0,fill:isFill,borderWidth:2.5}]},
-      options:{responsive:true,maintainAspectRatio:false,layout:{padding:{top:24}},plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>` ${label}：${c.parsed.y} 筆`}}},scales:xyScales()}
+      data:{labels:labels,datasets:[{label,data,borderColor:color,backgroundColor:color+'28',pointRadius:5,pointBackgroundColor:color,pointBorderColor:'#fff',pointBorderWidth:2,tension:0,fill:isFill,borderWidth:2.5}]},
+      options:{responsive:true,maintainAspectRatio:false,layout:{padding:{top:24}},plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>` ${label}：${c.parsed.y} 筆`}}},scales:xyScales(),onClick:makeClickHandler(labels,which,'v')}
     });
-    chartInstances['weeklyBar']  = mkLine('weeklyBarChart',  presData,'#2aac8a','開立數');
-    chartInstances['weeklyExec'] = mkLine('weeklyExecChart', execData,'#e8930a','執行數');
+    chartInstances['weeklyBar']  = mkLine('weeklyBarChart',  presData,'#2aac8a','開立數','pres');
+    chartInstances['weeklyExec'] = mkLine('weeklyExecChart', execData,'#e8930a','執行數','exec');
     return;
   }
-  const mkBar=(id,data,bg,border,label)=>{
-    const lbls=isH?[...weeks].reverse():weeks, dat=isH?[...data].reverse():data;
+  const mkBar=(id,data,bg,border,label,which)=>{
+    const lbls=isH?[...labels].reverse():labels, dat=isH?[...data].reverse():data;
     return new Chart(document.getElementById(id).getContext('2d'),{
       type:'bar',plugins:[barLabelPlugin],
       data:{labels:lbls,datasets:[{label,data:dat,backgroundColor:bg,borderColor:border,borderWidth:1.5,borderRadius:isH?4:6}]},
-      options:{indexAxis:isH?'y':'x',responsive:true,maintainAspectRatio:false,layout:{padding:isH?{right:40}:{top:20}},plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>` ${label}：${c.parsed[isH?'x':'y']} 筆`}}},scales:xyScales(isH)}
+      options:{indexAxis:isH?'y':'x',responsive:true,maintainAspectRatio:false,layout:{padding:isH?{right:40}:{top:20}},plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>` ${label}：${c.parsed[isH?'x':'y']} 筆`}}},scales:xyScales(isH),onClick:makeClickHandler(lbls,which,isH?'h':'v')}
     });
   };
-  chartInstances['weeklyBar']  = mkBar('weeklyBarChart',  presData,'rgba(42,172,138,0.75)','#2aac8a','開立數');
-  chartInstances['weeklyExec'] = mkBar('weeklyExecChart', execData,'rgba(232,147,10,0.80)','#e8930a','執行數');
+  chartInstances['weeklyBar']  = mkBar('weeklyBarChart',  presData,'rgba(42,172,138,0.75)','#2aac8a','開立數','pres');
+  chartInstances['weeklyExec'] = mkBar('weeklyExecChart', execData,'rgba(232,147,10,0.80)','#e8930a','執行數','exec');
 }
 
 // ══════════════════════════════════════════════
@@ -1108,20 +1205,27 @@ function buildTypeCharts(mode){
   ['cumP','cumE','pieP','pieE','hbarType','hbarRate'].forEach(k=>destroyChart(k));
   ['type-line-view','type-pie-view','type-hbar-view'].forEach(id=>document.getElementById(id).classList.add('hidden'));
   if(!weeklyData.length||!typeStats.length) return;
-  const weeks=weeklyData.map(d=>d.week_label);
+  // 累積趨勢：依 currentPeriod.type 選擇週或月資料
+  const isMonth = currentPeriod.type === 'month';
+  const srcArr  = isMonth ? monthlyData : weeklyData;
+  const labelKey= isMonth ? 'month_label' : 'week_label';
+  const weeks   = srcArr.map(d=>d[labelKey]);
+  const unit    = isMonth ? '依月' : '依週';
+  const cpTitleEl = document.getElementById('cum-pres-title'); if(cpTitleEl) cpTitleEl.textContent = `處方開立數累積趨勢（${unit}）`;
+  const ceTitleEl = document.getElementById('cum-exec-title'); if(ceTitleEl) ceTitleEl.textContent = `執行數累積趨勢（${unit}）`;
   const types=typeStats.map(d=>d.處方類型);
   if(mode==='line'){
     document.getElementById('type-line-view').classList.remove('hidden');
-    // 累積值：逐週累加
+    // 累積值：逐期累加
     const cumPres=[], cumExec=[];
     let runP=0, runE=0;
-    weeklyData.forEach(d=>{
+    srcArr.forEach(d=>{
       runP += d.開立數;
       runE += d.執行數;
       cumPres.push(runP);
       cumExec.push(runE);
     });
-    // X 軸標籤（weeks）可能比 weeklyData 多（填補週次），補齊長度
+    // X 軸標籤長度對齊
     const finalRunP = cumPres[cumPres.length-1] || 0;
     const finalRunE = cumExec[cumExec.length-1] || 0;
     while(cumPres.length < weeks.length) cumPres.push(finalRunP);
@@ -1194,21 +1298,39 @@ function buildTypeCharts(mode){
 function buildTypeWeeklyCharts(mode){
   [0,1,2,3].forEach(i=>{destroyChart('tw'+i);destroyChart('twHbar'+i);});
   ['tw-multi-view','tw-hbar-view'].forEach(id=>document.getElementById(id).classList.add('hidden'));
-  if(!weeklyData.length) return;
-  const weeks=weeklyData.map(d=>d.week_label);
+  const isMonth = currentPeriod.typeweekly === 'month';
+  const srcSeries = isMonth ? monthlyData : weeklyData;
+  const srcRaw    = isMonth ? typeMonthlyRaw : typeWeeklyRaw;
+  const labelKey  = isMonth ? 'month_label' : 'week_label';
+  const hint = document.getElementById('typeweekly-drill-hint');
+  if(hint) hint.style.display = isMonth ? 'inline' : 'none';
+  // 非月模式下關閉四個類型的鑽取區
+  if(!isMonth) { [0,1,2,3].forEach(i=>closeDrill('typeweekly', i, true)); }
+  if(!srcSeries.length) return;
+  const weeks=srcSeries.map(d=>d[labelKey]);
   const types=typeStats.length?typeStats.map(d=>d.處方類型):['情緒調適處方','營養處方','社會處方','運動處方'];
   const smFont={size:10};
+  // 更新每張小圖的標題(可點擊提示)
+  types.forEach((t,i)=>{const el=document.getElementById('tw-title-'+i); if(el) el.textContent = t + (isMonth?'（月）':'');});
+  const makeClickHandler = (labelsArr, typeIdx) => (evt, elements) => {
+    if(!isMonth) return;
+    const el = elements && elements[0];
+    if(!el) return;
+    const ml = labelsArr[el.index];
+    if(ml) openTypeWeeklyDrill(typeIdx, types[typeIdx], ml);
+  };
   if(mode==='hbar'){
     document.getElementById('tw-hbar-view').classList.remove('hidden');
     types.forEach((t,i)=>{
-      const rows=typeWeeklyRaw.filter(d=>d.處方類型===t);
-      const presData=weeks.map(w=>{const r=rows.find(d=>d.week_label===w);return r?r.開立數:0;});
-      const execData=weeks.map(w=>{const r=rows.find(d=>d.week_label===w);return r?r.執行數:0;});
+      const rows=srcRaw.filter(d=>d.處方類型===t);
+      const presData=weeks.map(w=>{const r=rows.find(d=>d[labelKey]===w);return r?r.開立數:0;});
+      const execData=weeks.map(w=>{const r=rows.find(d=>d[labelKey]===w);return r?r.執行數:0;});
       const canvasId='twHbar'+i;if(!document.getElementById(canvasId))return;
+      const revLabels=[...weeks].reverse();
       chartInstances['twHbar'+i]=new Chart(document.getElementById(canvasId).getContext('2d'),{
         type:'bar',plugins:[barLabelPlugin],
-        data:{labels:[...weeks].reverse(),datasets:[{label:'開立數',data:[...presData].reverse(),backgroundColor:'rgba(42,172,138,0.85)',borderRadius:4},{label:'執行數',data:[...execData].reverse(),backgroundColor:'rgba(232,147,10,0.85)',borderRadius:4}]},
-        options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,layout:{padding:{right:48}},plugins:{legend:{position:'top',labels:{font:smFont,boxWidth:12,padding:8}},tooltip:{callbacks:{label:c=>` ${c.dataset.label}：${c.parsed.x} 筆`}}},scales:{x:{ticks:{font:smFont},beginAtZero:true,grid:{color:'#e2e8f0'}},y:{ticks:{font:smFont,autoSkip:false,maxTicksLimit:999},grid:{display:false}}}}
+        data:{labels:revLabels,datasets:[{label:'開立數',data:[...presData].reverse(),backgroundColor:'rgba(42,172,138,0.85)',borderRadius:4},{label:'執行數',data:[...execData].reverse(),backgroundColor:'rgba(232,147,10,0.85)',borderRadius:4}]},
+        options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,layout:{padding:{right:48}},plugins:{legend:{position:'top',labels:{font:smFont,boxWidth:12,padding:8}},tooltip:{callbacks:{label:c=>` ${c.dataset.label}：${c.parsed.x} 筆`}}},scales:{x:{ticks:{font:smFont},beginAtZero:true,grid:{color:'#e2e8f0'}},y:{ticks:{font:smFont,autoSkip:false,maxTicksLimit:999},grid:{display:false}}},onClick:makeClickHandler(revLabels,i)}
       });
     });
     return;
@@ -1216,15 +1338,15 @@ function buildTypeWeeklyCharts(mode){
   document.getElementById('tw-multi-view').classList.remove('hidden');
   const isBar=mode==='bar',isFill=mode==='area';
   types.forEach((t,i)=>{
-    const rows=typeWeeklyRaw.filter(d=>d.處方類型===t);
-    const presData=weeks.map(w=>{const r=rows.find(d=>d.week_label===w);return r?r.開立數:0;});
-    const execData=weeks.map(w=>{const r=rows.find(d=>d.week_label===w);return r?r.執行數:0;});
+    const rows=srcRaw.filter(d=>d.處方類型===t);
+    const presData=weeks.map(w=>{const r=rows.find(d=>d[labelKey]===w);return r?r.開立數:0;});
+    const execData=weeks.map(w=>{const r=rows.find(d=>d[labelKey]===w);return r?r.執行數:0;});
     const canvasId='twDetail'+i;if(!document.getElementById(canvasId))return;
     if(isBar){
       chartInstances['tw'+i]=new Chart(document.getElementById(canvasId).getContext('2d'),{
         type:'bar',plugins:[barLabelPlugin],
         data:{labels:weeks,datasets:[{label:'開立數',data:presData,backgroundColor:'rgba(42,172,138,0.85)',borderRadius:4},{label:'執行數',data:execData,backgroundColor:'rgba(232,147,10,0.85)',borderRadius:4}]},
-        options:{responsive:true,maintainAspectRatio:false,layout:{padding:{top:20}},plugins:{legend:{position:'top',labels:{font:smFont,boxWidth:12,padding:8}},tooltip:{callbacks:{label:c=>` ${c.dataset.label}：${c.parsed.y} 筆`}}},scales:{x:{ticks:{font:smFont,maxRotation:45,autoSkip:false,maxTicksLimit:999},grid:{display:false}},y:{ticks:{font:smFont},beginAtZero:true,grid:{color:'#e2e8f0'}}}}
+        options:{responsive:true,maintainAspectRatio:false,layout:{padding:{top:20}},plugins:{legend:{position:'top',labels:{font:smFont,boxWidth:12,padding:8}},tooltip:{callbacks:{label:c=>` ${c.dataset.label}：${c.parsed.y} 筆`}}},scales:{x:{ticks:{font:smFont,maxRotation:45,autoSkip:false,maxTicksLimit:999},grid:{display:false}},y:{ticks:{font:smFont},beginAtZero:true,grid:{color:'#e2e8f0'}}},onClick:makeClickHandler(weeks,i)}
       });
     } else {
       chartInstances['tw'+i]=new Chart(document.getElementById(canvasId).getContext('2d'),{
@@ -1233,7 +1355,7 @@ function buildTypeWeeklyCharts(mode){
           {label:'開立數',data:presData,borderColor:'#2aac8a',backgroundColor:'rgba(42,172,138,0.10)',pointRadius:4,pointBackgroundColor:'#2aac8a',pointBorderColor:'#fff',pointBorderWidth:2,tension:0,borderWidth:2,fill:isFill},
           {label:'執行數',data:execData,borderColor:'#e8930a',backgroundColor:'rgba(232,147,10,0.10)',pointRadius:4,pointBackgroundColor:'#e8930a',pointBorderColor:'#fff',pointBorderWidth:2,tension:0,borderWidth:2,fill:isFill}
         ]},
-        options:{responsive:true,maintainAspectRatio:false,layout:{padding:{top:24}},plugins:{legend:{position:'top',labels:{font:smFont,boxWidth:12,padding:8}},tooltip:{callbacks:{label:c=>` ${c.dataset.label}：${c.parsed.y} 筆`}}},scales:{x:{ticks:{font:smFont,maxRotation:45,autoSkip:false,maxTicksLimit:999},grid:{display:false}},y:{ticks:{font:smFont},beginAtZero:true,grid:{color:'#e2e8f0'}}}}
+        options:{responsive:true,maintainAspectRatio:false,layout:{padding:{top:24}},plugins:{legend:{position:'top',labels:{font:smFont,boxWidth:12,padding:8}},tooltip:{callbacks:{label:c=>` ${c.dataset.label}：${c.parsed.y} 筆`}}},scales:{x:{ticks:{font:smFont,maxRotation:45,autoSkip:false,maxTicksLimit:999},grid:{display:false}},y:{ticks:{font:smFont},beginAtZero:true,grid:{color:'#e2e8f0'}}},onClick:makeClickHandler(weeks,i)}
       });
     }
   });
@@ -1343,6 +1465,139 @@ function setChartType(tab, mode, btn){
   if(tab==='weekly')     buildWeeklyCharts(mode);
   if(tab==='type')       buildTypeCharts(mode);
   if(tab==='typeweekly') buildTypeWeeklyCharts(mode);
+}
+
+// ══════════════════════════════════════════════
+//  週/月 統計單位切換
+// ══════════════════════════════════════════════
+function setPeriod(tab, period, btn){
+  if(!['week','month'].includes(period)) return;
+  currentPeriod[tab] = period;
+  btn.closest('.period-bar').querySelectorAll('.period-btn').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  // 切回週模式時關閉對應鑽取
+  if(period==='week'){
+    if(tab==='weekly'){ closeDrill('weekly','pres',true); closeDrill('weekly','exec',true); }
+    if(tab==='typeweekly'){ [0,1,2,3].forEach(i=>closeDrill('typeweekly',i,true)); }
+  }
+  if(tab==='weekly')     buildWeeklyCharts(currentChartType.weekly);
+  if(tab==='type')       buildTypeCharts(currentChartType.type);
+  if(tab==='typeweekly') buildTypeWeeklyCharts(currentChartType.typeweekly);
+  updateSummary();
+}
+
+// ══════════════════════════════════════════════
+//  鑽取：點擊月份展開週統計
+// ══════════════════════════════════════════════
+function computeMonthWeeks(monthLbl, typeFilter){
+  // 從 rawRows 抽出該月份的資料,套用當前區域/日期篩選,再按 isoWeekLabel 分組
+  if(!rawRows || !rawRows.length) return [];
+  const from = document.getElementById('filterFrom')?.value || '';
+  const to   = document.getElementById('filterTo')?.value   || '';
+  const rows = rawRows.filter(r=>{
+    if(!r.prescDate || !r.prescDate.startsWith(monthLbl)) return false;
+    if(typeFilter && r.type !== typeFilter) return false;
+    if(currentRegion !== 'all'){
+      if(!r.clinic || getRegionOfClinic(r.clinic) !== currentRegion) return false;
+    }
+    if(from && r.prescDate < from) return false;
+    if(to   && r.prescDate > to)   return false;
+    return true;
+  });
+  const wkMap={};
+  rows.forEach(r=>{
+    const pd=new Date(r.prescDate);
+    const wl=isoWeekLabel(pd); if(!wl) return;
+    if(!wkMap[wl]) wkMap[wl]={開立數:0,執行數:0};
+    wkMap[wl].開立數++;
+    if(r.ex){
+      const exWl = r.execDate ? (isoWeekLabel(new Date(r.execDate))||wl) : wl;
+      if(!wkMap[exWl]) wkMap[exWl]={開立數:0,執行數:0};
+      wkMap[exWl].執行數++;
+    }
+  });
+  const sortedWks = Object.keys(wkMap).sort();
+  return sortedWks.map(w=>({week_label:w, 開立數:wkMap[w].開立數, 執行數:wkMap[w].執行數}));
+}
+
+function openWeeklyDrill(which, monthLbl){
+  if(!rawRows.length){ alert('需要原始資料才能鑽取,請先上傳 Excel'); return; }
+  // 再次點同一個月 → 收起
+  if(drillMonth.weekly === monthLbl){
+    closeDrill('weekly','pres',true); closeDrill('weekly','exec',true);
+    return;
+  }
+  drillMonth.weekly = monthLbl;
+  const weekly = computeMonthWeeks(monthLbl, null);
+  // 兩張圖都一起展開
+  ['pres','exec'].forEach(w=>{
+    const box = document.getElementById('weekly-drill-'+w);
+    const titleEl = document.getElementById('weekly-drill-'+w+'-title');
+    if(titleEl) titleEl.textContent = `${monthLbl} 週統計（${w==='pres'?'開立數':'執行數'}）`;
+    if(box) box.classList.remove('hidden');
+  });
+  const labels = weekly.map(d=>d.week_label);
+  const presData = weekly.map(d=>d.開立數);
+  const execData = weekly.map(d=>d.執行數);
+  destroyChart('weeklyDrillPres'); destroyChart('weeklyDrillExec');
+  if(!labels.length) return;
+  chartInstances['weeklyDrillPres'] = new Chart(document.getElementById('weeklyDrillPresChart').getContext('2d'),{
+    type:'bar', plugins:[barLabelPlugin],
+    data:{labels,datasets:[{label:'開立數',data:presData,backgroundColor:'rgba(42,172,138,0.75)',borderColor:'#2aac8a',borderWidth:1.5,borderRadius:5}]},
+    options:{responsive:true,maintainAspectRatio:false,layout:{padding:{top:18}},plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>` 開立數：${c.parsed.y} 筆`}}},scales:{x:{ticks:{font:{size:10}},grid:{display:false}},y:{ticks:{font:{size:10}},beginAtZero:true,grid:{color:'#e2e8f0'}}}}
+  });
+  chartInstances['weeklyDrillExec'] = new Chart(document.getElementById('weeklyDrillExecChart').getContext('2d'),{
+    type:'bar', plugins:[barLabelPlugin],
+    data:{labels,datasets:[{label:'執行數',data:execData,backgroundColor:'rgba(232,147,10,0.80)',borderColor:'#e8930a',borderWidth:1.5,borderRadius:5}]},
+    options:{responsive:true,maintainAspectRatio:false,layout:{padding:{top:18}},plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>` 執行數：${c.parsed.y} 筆`}}},scales:{x:{ticks:{font:{size:10}},grid:{display:false}},y:{ticks:{font:{size:10}},beginAtZero:true,grid:{color:'#e2e8f0'}}}}
+  });
+}
+
+function openTypeWeeklyDrill(idx, typeName, monthLbl){
+  if(!rawRows.length){ alert('需要原始資料才能鑽取,請先上傳 Excel'); return; }
+  if(drillMonth.typeweekly[idx] === monthLbl){
+    closeDrill('typeweekly', idx, true);
+    return;
+  }
+  drillMonth.typeweekly[idx] = monthLbl;
+  const weekly = computeMonthWeeks(monthLbl, typeName);
+  const box = document.getElementById('tw-drill-'+idx);
+  const titleEl = document.getElementById('tw-drill-title-'+idx);
+  if(titleEl) titleEl.textContent = `${typeName} · ${monthLbl} 週統計`;
+  if(box) box.classList.remove('hidden');
+  const labels = weekly.map(d=>d.week_label);
+  const presData = weekly.map(d=>d.開立數);
+  const execData = weekly.map(d=>d.執行數);
+  destroyChart('twDrill'+idx);
+  if(!labels.length) return;
+  chartInstances['twDrill'+idx] = new Chart(document.getElementById('twDrill'+idx).getContext('2d'),{
+    type:'bar', plugins:[barLabelPlugin],
+    data:{labels,datasets:[
+      {label:'開立數',data:presData,backgroundColor:'rgba(42,172,138,0.85)',borderRadius:4},
+      {label:'執行數',data:execData,backgroundColor:'rgba(232,147,10,0.85)',borderRadius:4}
+    ]},
+    options:{responsive:true,maintainAspectRatio:false,layout:{padding:{top:20}},plugins:{legend:{position:'top',labels:{font:{size:10},boxWidth:12,padding:8}},tooltip:{callbacks:{label:c=>` ${c.dataset.label}：${c.parsed.y} 筆`}}},scales:{x:{ticks:{font:{size:10}},grid:{display:false}},y:{ticks:{font:{size:10}},beginAtZero:true,grid:{color:'#e2e8f0'}}}}
+  });
+}
+
+function closeDrill(tab, key, silent){
+  if(tab==='weekly'){
+    const box = document.getElementById('weekly-drill-'+key);
+    if(box) box.classList.add('hidden');
+    destroyChart(key==='pres'?'weeklyDrillPres':'weeklyDrillExec');
+    // 兩張都關了才清空狀態
+    const p = document.getElementById('weekly-drill-pres');
+    const e = document.getElementById('weekly-drill-exec');
+    if(p && e && p.classList.contains('hidden') && e.classList.contains('hidden')){
+      drillMonth.weekly = null;
+    }
+  } else if(tab==='typeweekly'){
+    const idx = key;
+    const box = document.getElementById('tw-drill-'+idx);
+    if(box) box.classList.add('hidden');
+    destroyChart('twDrill'+idx);
+    drillMonth.typeweekly[idx] = null;
+  }
 }
 
 // ══════════════════════════════════════════════
@@ -1803,10 +2058,15 @@ function rebuildFromFilters(){
     });
   }
   const result = aggregateRawRows(filtered);
-  weeklyData    = result.newWeeklyData;
-  typeStats     = result.newTypeStats;
-  typeWeeklyRaw = result.newTWRaw;
-  clinicStats   = result.newClinicStats;
+  weeklyData     = result.newWeeklyData;
+  monthlyData    = result.newMonthlyData;
+  typeStats      = result.newTypeStats;
+  typeWeeklyRaw  = result.newTWRaw;
+  typeMonthlyRaw = result.newTMRaw;
+  clinicStats    = result.newClinicStats;
+  // 篩選後原有的鑽取月份可能已不在範圍內,一律關閉
+  closeDrill('weekly','pres',true); closeDrill('weekly','exec',true);
+  [0,1,2,3].forEach(i=>closeDrill('typeweekly',i,true));
   buildAllCharts(); updateSummary();
   updateFilterStatus(from, to, false, filtered.length);
 }
@@ -1858,26 +2118,69 @@ function detectCol(headers, candidates, exact=false){
   return null;
 }
 
+// 月份標籤：接受 Date 或 ISO 字串，回傳 'YYYY-MM'
+function monthLabel(d){
+  if(typeof d==='string'){
+    const m=d.match(/^(\d{4})-(\d{2})/);
+    return m?`${m[1]}-${m[2]}`:null;
+  }
+  if(d instanceof Date && !isNaN(d)){
+    return `${d.getUTCFullYear()}-${String(d.getUTCMonth()+1).padStart(2,'0')}`;
+  }
+  return null;
+}
+// 下一個月標籤
+function nextMonthLabel(ml){
+  const [y,m]=ml.split('-').map(Number);
+  const nm=m===12?1:m+1, ny=m===12?y+1:y;
+  return `${ny}-${String(nm).padStart(2,'0')}`;
+}
+
 function aggregateRawRows(rows){
   const weekMap={},typeWeekMap={},typeMapTotal={},clinicMap={};
+  const monthMap={},typeMonthMap={};
   let minDate=null,maxDate=null;
   rows.forEach(r=>{
     const pd=new Date(r.prescDate);
     const wl=isoWeekLabel(pd);if(!wl)return;
+    const ml=monthLabel(r.prescDate);
     const exWlBase = r.execDate ? isoWeekLabel(new Date(r.execDate)) : null;
     const exWl = r.ex ? (exWlBase||wl) : null;
+    const exMlBase = r.execDate ? monthLabel(r.execDate) : null;
+    const exMl = r.ex ? (exMlBase||ml) : null;
+    // 週
     if(!weekMap[wl])weekMap[wl]={開立數:0,執行數:0};
     weekMap[wl].開立數++;
     if(r.ex && exWl){
       if(!weekMap[exWl])weekMap[exWl]={開立數:0,執行數:0};
       weekMap[exWl].執行數++;
     }
+    // 月
+    if(ml){
+      if(!monthMap[ml])monthMap[ml]={開立數:0,執行數:0};
+      monthMap[ml].開立數++;
+      if(r.ex && exMl){
+        if(!monthMap[exMl])monthMap[exMl]={開立數:0,執行數:0};
+        monthMap[exMl].執行數++;
+      }
+    }
+    // 類型 × 週
     if(!typeWeekMap[r.type])typeWeekMap[r.type]={};
     if(!typeWeekMap[r.type][wl])typeWeekMap[r.type][wl]={開立數:0,執行數:0};
     typeWeekMap[r.type][wl].開立數++;
     if(r.ex && exWl){
       if(!typeWeekMap[r.type][exWl])typeWeekMap[r.type][exWl]={開立數:0,執行數:0};
       typeWeekMap[r.type][exWl].執行數++;
+    }
+    // 類型 × 月
+    if(ml){
+      if(!typeMonthMap[r.type])typeMonthMap[r.type]={};
+      if(!typeMonthMap[r.type][ml])typeMonthMap[r.type][ml]={開立數:0,執行數:0};
+      typeMonthMap[r.type][ml].開立數++;
+      if(r.ex && exMl){
+        if(!typeMonthMap[r.type][exMl])typeMonthMap[r.type][exMl]={開立數:0,執行數:0};
+        typeMonthMap[r.type][exMl].執行數++;
+      }
     }
     if(!typeMapTotal[r.type])typeMapTotal[r.type]={開立數:0,執行數:0};
     typeMapTotal[r.type].開立數++;if(r.ex)typeMapTotal[r.type].執行數++;
@@ -1904,15 +2207,26 @@ function aggregateRawRows(rows){
     while(cur<=last&&safety++<200){allWeeks.push(cur);cur=nextWeekLabel(cur);}
   } else { allWeeks.push(...existingWeeks); }
   const sw=allWeeks;
+  // 月份填補：從最早月到最晚月連續
+  const existingMonths=Object.keys(monthMap).sort();
+  const allMonths=[];
+  if(existingMonths.length>=1){
+    let cur=existingMonths[0], last=existingMonths[existingMonths.length-1], safety=0;
+    while(cur<=last && safety++<240){ allMonths.push(cur); if(cur===last)break; cur=nextMonthLabel(cur); }
+  }
+  const sm=allMonths;
   const newWeeklyData=sw.map(wl=>{const d=weekMap[wl]||{開立數:0,執行數:0};return{week_label:wl,開立數:d.開立數,執行數:d.執行數,執行率:d.開立數>0?parseFloat((d.執行數/d.開立數*100).toFixed(1)):0};});
+  const newMonthlyData=sm.map(ml=>{const d=monthMap[ml]||{開立數:0,執行數:0};return{month_label:ml,開立數:d.開立數,執行數:d.執行數,執行率:d.開立數>0?parseFloat((d.執行數/d.開立數*100).toFixed(1)):0};});
   const allTypes=Object.keys(typeMapTotal);
   const newTypeStats=allTypes.map(t=>{const p=typeMapTotal[t].開立數,e=typeMapTotal[t].執行數;return{處方類型:t,開立數:p,執行數:e,執行率:p>0?parseFloat((e/p*100).toFixed(1)):0};});
   const newTWRaw=[];
   allTypes.forEach(t=>sw.forEach(wl=>{const d=typeWeekMap[t]&&typeWeekMap[t][wl];if(d)newTWRaw.push({week_label:wl,處方類型:t,開立數:d.開立數,執行數:d.執行數});}));
+  const newTMRaw=[];
+  allTypes.forEach(t=>sm.forEach(ml=>{const d=typeMonthMap[t]&&typeMonthMap[t][ml];if(d)newTMRaw.push({month_label:ml,處方類型:t,開立數:d.開立數,執行數:d.執行數});}));
   const newClinicStats=Object.entries(clinicMap).map(([name,v])=>({診所名稱:name,開立數:v.開立數,選課或執行:v.選課或執行,比率:v.開立數>0?parseFloat((v.選課或執行/v.開立數*100).toFixed(1)):0}));
   const fmt=d=>`${d.getFullYear()}/${String(d.getMonth()+1).padStart(2,'0')}/${String(d.getDate()).padStart(2,'0')}`;
   const dr=minDate&&maxDate?`${fmt(minDate)} – ${fmt(maxDate)}`:'—';
-  return{newWeeklyData,newTypeStats,newTWRaw,newClinicStats,dateRange:dr};
+  return{newWeeklyData,newMonthlyData,newTypeStats,newTWRaw,newTMRaw,newClinicStats,dateRange:dr};
 }
 
 function parseExcel(file){
@@ -1987,8 +2301,9 @@ async function handleFile(file){
   if(!/\.(xlsx|xls)$/i.test(file.name)){setStatus('請上傳 .xlsx 或 .xls 格式的 Excel 檔案',true);return;}
   setStatus('⏳ 解析中…');
   try{
-    const {newWeeklyData, newTypeStats, newTWRaw, newClinicStats, dateRange} = await parseExcel(file);
-    weeklyData=newWeeklyData; typeStats=newTypeStats; typeWeeklyRaw=newTWRaw; clinicStats=newClinicStats;
+    const {newWeeklyData, newMonthlyData, newTypeStats, newTWRaw, newTMRaw, newClinicStats, dateRange} = await parseExcel(file);
+    weeklyData=newWeeklyData; monthlyData=newMonthlyData;
+    typeStats=newTypeStats; typeWeeklyRaw=newTWRaw; typeMonthlyRaw=newTMRaw; clinicStats=newClinicStats;
     updateSummary(); buildAllCharts();
     document.getElementById('headerDesc').textContent =
       `資料區間：${dateRange}　｜　共 ${weeklyData.reduce((s,d)=>s+d.開立數,0).toLocaleString()} 筆處方紀錄`;
@@ -2021,10 +2336,12 @@ function showTab(name, btn){
   document.getElementById('tab-'+name).classList.remove('hidden');
   document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
   if(btn) btn.classList.add('active');
+  currentActiveTab = name;
   const bar = document.getElementById('dateFilterBar');
   if(bar) bar.style.display = name!=='prescday' ? 'flex' : 'none';
   if(name==='clinic') setTimeout(()=>buildClinicCharts(), 50);
   if(name==='prescday') setTimeout(()=>buildPrescDayCharts(), 50);
+  updateSummary();
 }
 
 // ══════════════════════════════════════════════
