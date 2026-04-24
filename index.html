@@ -1504,16 +1504,27 @@ function computeMonthWeeks(monthLbl, typeFilter){
     if(to   && r.prescDate > to)   return false;
     return true;
   });
-  const wkMap={};
+  // 枚舉當月所有可能的週標籤(每天 → isoWeekLabel → 去重),
+  // 這樣即使某週沒資料也會保留 0 的格,且不會出現當月以外的週
+  const [yr, mo] = monthLbl.split('-').map(Number);
+  const daysInMonth = new Date(yr, mo, 0).getDate();
+  const monthWeeks = new Set();
+  for(let day=1; day<=daysInMonth; day++){
+    const d = new Date(Date.UTC(yr, mo-1, day));
+    const wl = isoWeekLabel(d);
+    if(wl) monthWeeks.add(wl);
+  }
+  const wkMap = {};
+  monthWeeks.forEach(w=>{ wkMap[w]={開立數:0,執行數:0}; });
   rows.forEach(r=>{
     const pd=new Date(r.prescDate);
-    const wl=isoWeekLabel(pd); if(!wl) return;
-    if(!wkMap[wl]) wkMap[wl]={開立數:0,執行數:0};
+    const wl=isoWeekLabel(pd);
+    if(!wl || !wkMap[wl]) return;
     wkMap[wl].開立數++;
     if(r.ex){
       const exWl = r.execDate ? (isoWeekLabel(new Date(r.execDate))||wl) : wl;
-      if(!wkMap[exWl]) wkMap[exWl]={開立數:0,執行數:0};
-      wkMap[exWl].執行數++;
+      // 只有在「當月週」內才計入執行數,避免跑到後面的月
+      if(wkMap[exWl]) wkMap[exWl].執行數++;
     }
   });
   const sortedWks = Object.keys(wkMap).sort();
