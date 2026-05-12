@@ -966,19 +966,25 @@ async function loadFromCloud() {
       setCloudStatus('error', '❌ 讀取失敗：' + (error && error.message || '資料表尚無資料，請先上傳 Excel'));
       return;
     }
-    weeklyData    = data.weekly_data     || [];
-    typeStats     = data.type_stats      || [];
-    typeWeeklyRaw = data.type_weekly_raw || [];
-    clinicStats   = data.clinic_stats    || [];
-    rawRows       = data.raw_rows        || [];
-    // 從原始資料重新產出月份聚合,雲端資料表可能尚未有欄位
+    rawRows = data.raw_rows || [];
     if(rawRows.length){
+      // 有 raw_rows 就以它為單一資料來源,即時重算所有聚合
       const agg = aggregateRawRows(rawRows);
+      weeklyData     = agg.newWeeklyData;
       monthlyData    = agg.newMonthlyData;
+      typeStats      = agg.newTypeStats;
+      typeWeeklyRaw  = agg.newTWRaw;
       typeMonthlyRaw = agg.newTMRaw;
+      clinicStats    = agg.newClinicStats;
       updateDateFilterRange();
     } else {
-      monthlyData = []; typeMonthlyRaw = [];
+      // 舊資料無 raw_rows 時 fallback 到雲端聚合欄位
+      weeklyData    = data.weekly_data     || [];
+      typeStats     = data.type_stats      || [];
+      typeWeeklyRaw = data.type_weekly_raw || [];
+      clinicStats   = data.clinic_stats    || [];
+      monthlyData   = [];
+      typeMonthlyRaw = [];
     }
     const dr = data.date_range || '—';
     const fn = data.file_name  || '—';
@@ -2922,6 +2928,16 @@ loadFromCloud();
 incrementViewCount();
 document.getElementById('dateFilterBar').style.display = 'flex';
 if(prescDayDatasets.length){ renderPrescDayList(); buildPrescDayCharts(); buildPrescDayCourseCharts(); }
+
+// ── 自動同步雲端資料(n8n 每 5 分鐘更新 Supabase) ──
+setInterval(loadFromCloud, 5 * 60 * 1000);
+let lastVisibleReload = Date.now();
+document.addEventListener('visibilitychange', () => {
+  if(document.visibilityState === 'visible' && Date.now() - lastVisibleReload > 30 * 1000){
+    lastVisibleReload = Date.now();
+    loadFromCloud();
+  }
+});
 </script>
 </body>
 </html>
