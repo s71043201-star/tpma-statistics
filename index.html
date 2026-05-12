@@ -550,6 +550,7 @@ footer {
     <span id="cloud-msg">正在從雲端讀取最新資料…</span>
   </div>
   <div style="display:flex;align-items:center;gap:14px;">
+    <button onclick="openNotesEditor()" style="padding:6px 14px;border-radius:18px;border:1.5px solid #e8930a;background:#fff;color:#b3620a;font-family:inherit;font-size:0.82rem;font-weight:700;cursor:pointer;white-space:nowrap">📝 編輯備註並重新產出</button>
     <button id="weeklyReportBtn" onclick="downloadLatestWeeklyReport()" style="display:none;padding:6px 14px;border-radius:18px;border:1.5px solid var(--teal);background:#fff;color:var(--teal);font-family:inherit;font-size:0.82rem;font-weight:700;cursor:pointer;white-space:nowrap">📥 下載最新週報</button>
     <div id="view-counter" style="font-size:0.8rem;opacity:0.8;white-space:nowrap;"></div>
   </div>
@@ -892,6 +893,26 @@ footer {
   </div>
 </div>
 
+<!-- ═══ 編輯備註 Modal ═══ -->
+<div id="notes-modal-overlay" onclick="closeNotesEditorOutside(event)" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:100;align-items:flex-start;justify-content:center;padding:40px 20px;overflow-y:auto">
+  <div style="background:var(--surface);border-radius:14px;max-width:760px;width:100%;box-shadow:var(--shadow-lg);max-height:calc(100vh - 80px);display:flex;flex-direction:column">
+    <div style="display:flex;justify-content:space-between;align-items:center;padding:18px 24px;border-bottom:1.5px solid var(--border)">
+      <h3 style="font-size:1.08rem;font-weight:800;color:var(--text);display:flex;align-items:center;gap:8px;margin:0">📝 編輯各診所備註</h3>
+      <button onclick="closeNotesEditor()" style="background:none;border:none;font-size:1.4rem;color:var(--text-muted);cursor:pointer;line-height:1">✕</button>
+    </div>
+    <div style="padding:14px 24px 0;font-size:0.82rem;color:var(--text-muted);line-height:1.5">
+      備註會直接寫進每週 docx 的「備註」欄。改完按下方「儲存並立即重新產出」,n8n 會在 2 分鐘內把新版週報產出來,完成時上方下載按鈕會自動更新日期。
+    </div>
+    <div id="notes-modal-body" style="padding:14px 24px;overflow-y:auto;flex:1"></div>
+    <div style="padding:16px 24px;border-top:1.5px solid var(--border);display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+      <span id="notes-modal-status" style="font-size:0.82rem;color:var(--text-muted);flex:1"></span>
+      <button onclick="closeNotesEditor()" style="padding:8px 16px;border-radius:8px;border:1.5px solid var(--border);background:var(--surface);color:var(--text);font-family:inherit;font-size:0.84rem;font-weight:600;cursor:pointer">取消</button>
+      <button onclick="saveNotesOnly()" style="padding:8px 16px;border-radius:8px;border:1.5px solid var(--teal);background:#fff;color:var(--teal);font-family:inherit;font-size:0.84rem;font-weight:700;cursor:pointer">僅儲存(下週一才套用)</button>
+      <button onclick="saveNotesAndRegen()" style="padding:8px 16px;border-radius:8px;border:none;background:linear-gradient(135deg,#e8930a,#f5c03a);color:#fff;font-family:inherit;font-size:0.84rem;font-weight:700;cursor:pointer">儲存並立即重新產出</button>
+    </div>
+  </div>
+</div>
+
 <footer>健康處方開立統計儀表板 &nbsp;·&nbsp; ⬡ 資料儲存於 Supabase &nbsp;·&nbsp; ◈ 圖表由 Chart.js 製作</footer>
 
 <!-- ══════════════════════════════════
@@ -1034,6 +1055,8 @@ let courseSlots = []; // 課程時段資料(從 admin/slots/summary 來)
 let courseSlotStats = null; // 課程總計
 let pinnedDates = new Set(); // 處方日等需置頂的日期(雲端同步)
 let latestWeeklyReport = null; // 每週一自動產出的 docx(base64)
+let clinicNotes = {};          // 診所備註(雲端同步)
+let _regenPollTimer = null;    // 重新產出進度輪詢
 
 // ══════════════════════════════════════════════
 //  雲端狀態列
@@ -1092,6 +1115,8 @@ async function loadFromCloud() {
     // 最新週報
     latestWeeklyReport = (data.latest_weekly_report && data.latest_weekly_report.b64) ? data.latest_weekly_report : null;
     updateWeeklyReportButton();
+    // 診所備註
+    clinicNotes = data.clinic_notes && typeof data.clinic_notes === 'object' ? data.clinic_notes : {};
     // 置頂日期(雲端優先,否則 localStorage fallback)
     if(Array.isArray(data.pinned_dates)){
       pinnedDates = new Set(data.pinned_dates);
@@ -2740,6 +2765,103 @@ function toggleSlotExpand(slotId, evt){
   _expandedSlot = (_expandedSlot === slotId) ? null : slotId;
   renderSlotsTable();
 }
+// ══════════════════════════════════════════════
+//  編輯診所備註 + 重新產出週報
+// ══════════════════════════════════════════════
+function openNotesEditor(){
+  const overlay = document.getElementById('notes-modal-overlay');
+  const body = document.getElementById('notes-modal-body');
+  document.getElementById('notes-modal-status').textContent = '';
+  // 收集所有診所:clinicStats(從處方記錄) ∪ clinicNotes(已備註過的) ∪ 雲端目前的
+  const allClinics = new Set();
+  (clinicStats || []).forEach(c => c.診所名稱 && allClinics.add(c.診所名稱));
+  Object.keys(clinicNotes || {}).forEach(n => allClinics.add(n));
+  const sorted = [...allClinics].sort((a,b) => a.localeCompare(b, 'zh-Hant'));
+  if(sorted.length === 0){
+    body.innerHTML = '<div style="padding:32px;text-align:center;color:var(--text-muted)">尚無診所資料</div>';
+  } else {
+    body.innerHTML = sorted.map(name => {
+      const cur = clinicNotes[name] || '';
+      const inputId = 'note_' + btoa(unescape(encodeURIComponent(name))).replace(/[^a-z0-9]/gi,'');
+      return `<div style="display:grid;grid-template-columns:1fr 2fr;gap:10px;align-items:center;padding:7px 0;border-bottom:1px solid var(--border)">
+        <div style="font-size:0.86rem;font-weight:600;color:var(--text)">${name}</div>
+        <input type="text" id="${inputId}" data-clinic="${name.replace(/"/g,'&quot;')}" value="${cur.replace(/"/g,'&quot;')}" placeholder="(無備註)" style="padding:6px 10px;border-radius:6px;border:1.5px solid var(--border);font-family:inherit;font-size:0.84rem;background:var(--surface);color:var(--text);outline:none">
+      </div>`;
+    }).join('');
+  }
+  overlay.style.display = 'flex';
+  document.body.style.overflow = 'hidden';
+}
+function closeNotesEditor(){
+  document.getElementById('notes-modal-overlay').style.display = 'none';
+  document.body.style.overflow = '';
+}
+function closeNotesEditorOutside(e){
+  if(e.target.id === 'notes-modal-overlay') closeNotesEditor();
+}
+function collectNotesFromForm(){
+  const out = {};
+  document.querySelectorAll('#notes-modal-body input[data-clinic]').forEach(inp => {
+    const name = inp.getAttribute('data-clinic');
+    const v = inp.value.trim();
+    if(v) out[name] = v;
+  });
+  return out;
+}
+async function _saveNotes(alsoRegen){
+  if(!sbClient){ alert('Supabase 未設定'); return; }
+  const status = document.getElementById('notes-modal-status');
+  status.textContent = '⏳ 儲存中…';
+  const notes = collectNotesFromForm();
+  const payload = { id:'main', clinic_notes: notes };
+  if(alsoRegen) payload.regen_request_at = new Date().toISOString();
+  const { error } = await sbClient.from('prescription_data').upsert(payload, { onConflict:'id' });
+  if(error){
+    const isMissingCol = (error.message||'').toLowerCase().includes('column');
+    status.textContent = '❌ ' + error.message;
+    alert((isMissingCol ? '⚠️ Supabase 欄位尚未建立\n\n請跑:\nALTER TABLE prescription_data ADD COLUMN IF NOT EXISTS clinic_notes jsonb, ADD COLUMN IF NOT EXISTS regen_request_at timestamptz, ADD COLUMN IF NOT EXISTS regen_last_run_at timestamptz;'
+                        : '❌ 儲存失敗:'+error.message));
+    return false;
+  }
+  clinicNotes = notes;
+  status.textContent = '✓ 已儲存 ' + Object.keys(notes).length + ' 間診所備註';
+  return true;
+}
+async function saveNotesOnly(){
+  if(await _saveNotes(false)){
+    setTimeout(closeNotesEditor, 600);
+  }
+}
+async function saveNotesAndRegen(){
+  if(!(await _saveNotes(true))) return;
+  const status = document.getElementById('notes-modal-status');
+  status.textContent = '🔄 已送出重新產出請求,n8n 將在 2 分鐘內處理…';
+  const beforeStamp = latestWeeklyReport?.generated_at || '';
+  // 開始輪詢:看 latest_weekly_report.generated_at 是否變新
+  if(_regenPollTimer) clearInterval(_regenPollTimer);
+  let elapsed = 0;
+  _regenPollTimer = setInterval(async () => {
+    elapsed += 15;
+    if(elapsed > 300){
+      clearInterval(_regenPollTimer); _regenPollTimer = null;
+      status.textContent = '⚠️ 超過 5 分鐘還沒完成,請查 n8n executions';
+      return;
+    }
+    const { data } = await sbClient.from('prescription_data').select('latest_weekly_report,regen_last_run_at').eq('id','main').single();
+    const newStamp = data && data.latest_weekly_report && data.latest_weekly_report.generated_at || '';
+    if(newStamp && newStamp !== beforeStamp){
+      clearInterval(_regenPollTimer); _regenPollTimer = null;
+      latestWeeklyReport = data.latest_weekly_report;
+      updateWeeklyReportButton();
+      status.textContent = `✓ 新版本已產出(${data.latest_weekly_report.report_date}),點上方下載按鈕`;
+      // 自動關閉 modal
+      setTimeout(closeNotesEditor, 1200);
+    } else {
+      status.textContent = `🔄 等候 n8n 產出中… (${elapsed}s)`;
+    }
+  }, 15000);
+}
+
 function updateWeeklyReportButton(){
   const btn = document.getElementById('weeklyReportBtn');
   if(!btn) return;
