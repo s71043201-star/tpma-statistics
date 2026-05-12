@@ -594,7 +594,7 @@ footer {
   <div class="card green"> <span class="icon">☑️</span><div class="val" id="sumExec">—</div><div class="lbl">總執行數</div><div class="delta" id="sumExecToday"></div></div>
   <div class="card orange"><span class="icon">📈</span><div class="val" id="sumRate">—</div><div class="lbl">整體執行率</div></div>
   <div class="card purple"><span class="icon">🗓️</span><div class="val" id="sumWeeks">—</div><div class="lbl">統計週數</div></div>
-  <div class="card violet"><span class="icon">🎓</span><div class="val" id="sumEnroll">—</div><div class="lbl">總選課人次</div></div>
+  <div class="card violet"><span class="icon">🎓</span><div class="val" id="sumEnroll">—</div><div class="lbl">總選課人次</div><div class="delta" id="sumEnrollToday"></div></div>
 </div>
 
 <!-- 頁籤 -->
@@ -1165,14 +1165,17 @@ function updateSummary(){
   const monthDay = `${t.getMonth()+1}/${t.getDate()}`;
   const todayPresc = rawRows.reduce((s,r) => s + (r.prescDate === todayStr ? 1 : 0), 0);
   const todayExec  = rawRows.reduce((s,r) => s + (r.execDate === todayStr ? 1 : 0), 0);
+  // 選課人次今日增量:跟 clinicStats.選課或執行 同口徑(enrolled OR ex),取 prescDate / execDate 任一為今日
+  const todayEnroll = rawRows.reduce((s,r) => s + ((r.enrolled && r.prescDate === todayStr) || r.execDate === todayStr ? 1 : 0), 0);
   const setDelta = (id, count) => {
     const el = document.getElementById(id);
     if(!el) return;
     el.textContent = `(${monthDay} +${count.toLocaleString()})`;
     el.classList.toggle('zero', count === 0);
   };
-  setDelta('sumTotalToday', todayPresc);
-  setDelta('sumExecToday',  todayExec);
+  setDelta('sumTotalToday',  todayPresc);
+  setDelta('sumExecToday',   todayExec);
+  setDelta('sumEnrollToday', todayEnroll);
 }
 
 // ══════════════════════════════════════════════
