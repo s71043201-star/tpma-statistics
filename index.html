@@ -835,16 +835,24 @@ footer {
     </div>
   </div>
   <div class="chart-section" style="margin:18px 36px;">
-    <div class="chart-header"><h2>📋 即將到來的場次</h2></div>
-    <div style="overflow-x:auto;max-height:480px;overflow-y:auto">
-      <table class="data-table" style="width:100%">
+    <div class="chart-header" style="flex-wrap:wrap;gap:10px">
+      <h2 style="white-space:nowrap">📋 場次明細(點任一列展開預約清單)</h2>
+      <div id="slotsFilterBar" style="display:flex;gap:6px;flex-wrap:wrap">
+        <button class="pdf-tab-btn active" data-filter="all" onclick="filterSlotsTable('all',this)">全部</button>
+        <button class="pdf-tab-btn" data-filter="scheduled" onclick="filterSlotsTable('scheduled',this)">即將舉辦</button>
+        <button class="pdf-tab-btn" data-filter="completed" onclick="filterSlotsTable('completed',this)">已完成</button>
+        <button class="pdf-tab-btn" data-filter="cancelled" onclick="filterSlotsTable('cancelled',this)">已取消</button>
+      </div>
+    </div>
+    <div style="overflow-x:auto;max-height:560px;overflow-y:auto">
+      <table class="data-table" style="width:100%;font-size:0.86rem">
         <thead style="position:sticky;top:0;background:var(--surface);z-index:1">
-          <tr><th>日期</th><th>時間</th><th>課程</th><th>類型</th><th>地點</th><th class="num">已報名</th><th class="num">容量</th><th class="num">滿座率</th></tr>
+          <tr><th style="width:32px"></th><th>日期</th><th>時間</th><th>課程</th><th>類型</th><th>地點</th><th class="num">已報名</th><th class="num">已到</th><th class="num">容量</th><th class="num">滿座率</th><th class="num">狀態</th></tr>
         </thead>
-        <tbody id="upcomingSlotsBody"></tbody>
+        <tbody id="allSlotsBody"></tbody>
       </table>
     </div>
-    <div id="upcomingSlotsEmpty" style="display:none;padding:24px;text-align:center;color:var(--text-muted)">目前沒有 scheduled 狀態的場次</div>
+    <div id="allSlotsEmpty" style="display:none;padding:24px;text-align:center;color:var(--text-muted)">沒有符合的場次</div>
   </div>
 </div>
 
@@ -2518,34 +2526,99 @@ function buildCourseCharts(){
     });
   }
 
-  // 即將到來的場次表
-  const tbody = document.getElementById('upcomingSlotsBody');
-  const empty = document.getElementById('upcomingSlotsEmpty');
-  if(tbody){
-    const today = new Date().toISOString().slice(0,10);
-    const upcoming = courseSlots
-      .filter(s => s.status==='scheduled' && s.slot_date >= today)
-      .sort((a,b) => (a.slot_date+a.start_time).localeCompare(b.slot_date+b.start_time));
-    tbody.innerHTML = upcoming.map(s => {
-      const cap = s.capacity || 0;
-      const bk = s.booked_count || 0;
-      const rate = cap > 0 ? Math.round(bk/cap*100) : 0;
-      const tlbl = typeLabels[s.course_type] || s.course_type || '—';
-      const tcolor = typeColors[s.course_type] || '#9aa5b1';
-      const rateColor = rate >= 100 ? '#c0392b' : (rate >= 70 ? '#e8930a' : 'var(--text-muted)');
-      return `<tr>
-        <td>${s.slot_date}</td>
-        <td>${(s.start_time||'').slice(0,5)} - ${(s.end_time||'').slice(0,5)}</td>
-        <td>${s.course_name||''}</td>
-        <td><span style="display:inline-block;padding:2px 8px;border-radius:10px;background:${tcolor}22;color:${tcolor};font-size:0.78rem;font-weight:700">${tlbl}</span></td>
-        <td style="font-size:0.85rem;color:var(--text-muted)">${s.course_location||'—'}</td>
-        <td class="num">${bk}</td>
-        <td class="num">${cap}</td>
-        <td class="num" style="color:${rateColor};font-weight:700">${rate}%</td>
-      </tr>`;
-    }).join('');
-    if(empty) empty.style.display = upcoming.length === 0 ? 'block' : 'none';
+  // 場次明細表(全部 + filter + 展開)
+  window._slotsFilter = window._slotsFilter || 'all';
+  renderSlotsTable();
+}
+
+let _expandedSlot = null;
+function filterSlotsTable(f, btn){
+  window._slotsFilter = f;
+  document.querySelectorAll('#slotsFilterBar .pdf-tab-btn').forEach(b => b.classList.remove('active'));
+  if(btn) btn.classList.add('active');
+  renderSlotsTable();
+}
+function toggleSlotExpand(slotId){
+  _expandedSlot = (_expandedSlot === slotId) ? null : slotId;
+  renderSlotsTable();
+}
+function renderSlotsTable(){
+  const tbody = document.getElementById('allSlotsBody');
+  const empty = document.getElementById('allSlotsEmpty');
+  if(!tbody) return;
+  const f = window._slotsFilter || 'all';
+  const typeLabels = { mental:'情緒調適', nutrition:'營養', social:'社會', exercise:'運動', other:'其他' };
+  const typeColors = { mental:'#7c3aed', nutrition:'#2aac8a', social:'#1a9fbe', exercise:'#e8930a', other:'#9aa5b1' };
+  const statusLabels = { scheduled:'即將舉辦', completed:'已完成', cancelled:'已取消' };
+  const statusColors = { scheduled:'#1a9fbe', completed:'#2aac8a', cancelled:'#c0c0c0' };
+  // sort: scheduled (upcoming first), completed (recent first), cancelled
+  const today = new Date().toISOString().slice(0,10);
+  const sorted = courseSlots
+    .filter(s => f==='all' ? true : s.status===f)
+    .sort((a,b) => {
+      // upcoming scheduled first
+      const aDate = a.slot_date+a.start_time, bDate = b.slot_date+b.start_time;
+      if(a.status==='scheduled' && b.status!=='scheduled') return -1;
+      if(b.status==='scheduled' && a.status!=='scheduled') return 1;
+      if(a.status==='scheduled') return aDate.localeCompare(bDate);
+      return bDate.localeCompare(aDate);
+    });
+  if(sorted.length === 0){
+    tbody.innerHTML = '';
+    if(empty) empty.style.display = 'block';
+    return;
   }
+  if(empty) empty.style.display = 'none';
+  const rows = [];
+  sorted.forEach(s => {
+    const cap = s.capacity || 0;
+    const bk = s.booked_count || 0;
+    const ck = s.checked_count != null ? s.checked_count : '—';
+    const rate = cap > 0 ? Math.round(bk/cap*100) : 0;
+    const tlbl = typeLabels[s.course_type] || s.course_type || '—';
+    const tcolor = typeColors[s.course_type] || '#9aa5b1';
+    const slbl = statusLabels[s.status] || s.status || '—';
+    const scolor = statusColors[s.status] || '#9aa5b1';
+    const rateColor = rate >= 100 ? '#c0392b' : (rate >= 70 ? '#e8930a' : 'var(--text-muted)');
+    const expanded = _expandedSlot === s.slot_id;
+    const hasEntries = Array.isArray(s.entries) && s.entries.length > 0;
+    const expandIcon = hasEntries ? (expanded ? '▼' : '▶') : '·';
+    const cursor = hasEntries ? 'pointer' : 'default';
+    rows.push(`<tr style="cursor:${cursor}" ${hasEntries ? `onclick="toggleSlotExpand('${s.slot_id}')"` : ''}>
+      <td style="color:var(--text-muted);font-size:0.75rem">${expandIcon}</td>
+      <td>${s.slot_date}</td>
+      <td>${(s.start_time||'').slice(0,5)} - ${(s.end_time||'').slice(0,5)}</td>
+      <td>${s.course_name||''}</td>
+      <td><span style="display:inline-block;padding:2px 8px;border-radius:10px;background:${tcolor}22;color:${tcolor};font-size:0.78rem;font-weight:700">${tlbl}</span></td>
+      <td style="font-size:0.82rem;color:var(--text-muted)">${s.course_location||'—'}</td>
+      <td class="num">${bk}</td>
+      <td class="num" style="color:${ck === bk && bk > 0 ? '#2aac8a' : 'var(--text-muted)'}">${ck}</td>
+      <td class="num">${cap}</td>
+      <td class="num" style="color:${rateColor};font-weight:700">${rate}%</td>
+      <td class="num"><span style="display:inline-block;padding:2px 8px;border-radius:10px;background:${scolor}22;color:${scolor};font-size:0.76rem;font-weight:700">${slbl}</span></td>
+    </tr>`);
+    if(expanded && hasEntries){
+      const entriesHtml = s.entries
+        .sort((a,b)=>(a.ba||'').localeCompare(b.ba||''))
+        .map(e => {
+          const baLocal = e.ba ? new Date(e.ba).toLocaleString('zh-TW',{hour12:false,year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'}) : '—';
+          const ctLocal = e.ct ? new Date(e.ct).toLocaleString('zh-TW',{hour12:false,month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'}) : '—';
+          const ckColor = e.cs === 'checked' ? '#2aac8a' : '#9aa5b1';
+          const ckLbl = e.cs === 'checked' ? '✓ 已到' : (e.cs ? e.cs : '未到');
+          return `<div style="display:grid;grid-template-columns:90px 1fr 1fr 110px;gap:10px;padding:7px 0;border-bottom:1px solid #f0f4f1;align-items:center;font-size:0.84rem">
+            <div style="font-family:monospace;color:var(--text-muted)">${e.pn||'—'}</div>
+            <div style="color:var(--text-muted)">報名:${baLocal}</div>
+            <div style="color:var(--text-muted)">${e.ct?'簽到:'+ctLocal:''}</div>
+            <div style="color:${ckColor};font-weight:700;text-align:right">${ckLbl}</div>
+          </div>`;
+        }).join('');
+      rows.push(`<tr><td colspan="11" style="padding:14px 28px;background:#f7fbf9">
+        <div style="font-size:0.78rem;color:var(--text-muted);margin-bottom:6px">— ${s.entries.length} 筆預約 —</div>
+        ${entriesHtml}
+      </td></tr>`);
+    }
+  });
+  tbody.innerHTML = rows.join('');
 }
 
 // ══════════════════════════════════════════════
