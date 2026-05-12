@@ -867,10 +867,6 @@ footer {
   </div>
 
   <!-- ── 分析圖表(放下方作為補充) ── -->
-  <div class="chart-section" data-pdf-id="course-top10" data-pdf-label="熱門課程 TOP 10" style="margin:18px 36px;">
-    <div class="chart-header"><h2>🔥 熱門課程 TOP 10(累積報名,不含已完成)</h2><button class="dl-btn" onclick="downloadChart(this)">↓ 下載 JPG</button></div>
-    <div class="chart-wrap" style="height:380px"><canvas id="courseTop15Chart"></canvas></div>
-  </div>
   <div class="side-by-side">
     <div class="chart-section" data-pdf-id="course-type-fill" data-pdf-label="各處方類型未完成場次分布">
       <div class="chart-header"><h2>📊 各處方類型未完成場次(滿座 vs 未滿)</h2><button class="dl-btn" onclick="downloadChart(this)">↓ 下載 JPG</button></div>
@@ -2502,41 +2498,13 @@ function buildCourseCharts(){
   setText('csAttendRate',  (stats.attendance_rate!=null ? stats.attendance_rate : 0) + '%');
   setText('csFullSlots',   (stats.full_slots||0).toLocaleString());
 
-  // 熱門 TOP 10、處方類型未完成、場次狀態:都套頂層日期區間
+  // 處方類型未完成 / 場次狀態:都套頂層日期區間
   const inRange = filteredCourseSlots();
-  const courseMap = {};
   const statusMap = {};
   inRange.forEach(s => {
-    if(s.status !== 'completed'){
-      const cn = (s.course_name||'未命名').toString().trim();
-      if(!courseMap[cn]) courseMap[cn] = { name:cn, booked:0, slots:0 };
-      courseMap[cn].booked += (s.booked_count||0);
-      courseMap[cn].slots += 1;
-    }
     const sk = s.status || 'unknown';
     statusMap[sk] = (statusMap[sk]||0) + 1;
   });
-  const top = Object.values(courseMap).filter(t=>t.booked>0).sort((a,b)=>b.booked-a.booked).slice(0,10);
-  destroyChart('courseTop15Chart');
-  const ctx1 = document.getElementById('courseTop15Chart');
-  if(ctx1){
-    chartInstances.courseTop15Chart = new Chart(ctx1, {
-      type:'bar',
-      data:{
-        labels: top.map(t=>t.name.length>26 ? t.name.slice(0,26)+'…' : t.name),
-        datasets:[{ label:'累積報名', data: top.map(t=>t.booked), backgroundColor:'rgba(124,58,237,0.78)', borderRadius:4 }]
-      },
-      options:{
-        indexAxis:'y', responsive:true, maintainAspectRatio:false,
-        plugins:{
-          legend:{display:false},
-          tooltip:{callbacks:{ afterLabel:(c)=>'場次數:'+top[c.dataIndex].slots }},
-          datalabels:{ anchor:'end', align:'right', color:'#6d28d9', font:{family:defaultFont.family,weight:'700',size:11.5}, formatter:(v)=>v>0?v.toLocaleString():'' }
-        },
-        scales:{ x:{beginAtZero:true,ticks:{font:defaultFont}}, y:{ticks:{font:Object.assign({},defaultFont,{size:11.5}),autoSkip:false}} }
-      }
-    });
-  }
 
   // 各處方類型未完成場次:滿座 / 未滿(只看 scheduled)
   const typeFillLabels = { mental:'情緒調適', nutrition:'營養', social:'社會', exercise:'運動' };
