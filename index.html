@@ -1055,8 +1055,9 @@ let courseSlots = []; // 課程時段資料(從 admin/slots/summary 來)
 let courseSlotStats = null; // 課程總計
 let pinnedDates = new Set(); // 處方日等需置頂的日期(雲端同步)
 let latestWeeklyReport = null; // 每週一自動產出的 docx(base64)
-let clinicNotes = {};          // 診所備註(雲端同步)
+let clinicNotes = {};          // 診所備註(從 Google Sheets 同步)
 let _regenPollTimer = null;    // 重新產出進度輪詢
+const NOTES_APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbw7O8Y5fjBYMHIZ9G7jK-eWu1XXfaYhlqyZUg-BGNteQ-qlPGpTLu5lAnWygn12hj6b9A/exec';
 
 // ══════════════════════════════════════════════
 //  雲端狀態列
@@ -2768,29 +2769,38 @@ function toggleSlotExpand(slotId, evt){
 // ══════════════════════════════════════════════
 //  編輯診所備註 + 重新產出週報
 // ══════════════════════════════════════════════
-function openNotesEditor(){
+async function openNotesEditor(){
   const overlay = document.getElementById('notes-modal-overlay');
   const body = document.getElementById('notes-modal-body');
-  document.getElementById('notes-modal-status').textContent = '';
-  // 收集所有診所:clinicStats(從處方記錄) ∪ clinicNotes(已備註過的) ∪ 雲端目前的
-  const allClinics = new Set();
-  (clinicStats || []).forEach(c => c.診所名稱 && allClinics.add(c.診所名稱));
-  Object.keys(clinicNotes || {}).forEach(n => allClinics.add(n));
-  const sorted = [...allClinics].sort((a,b) => a.localeCompare(b, 'zh-Hant'));
+  const status = document.getElementById('notes-modal-status');
+  status.textContent = '';
+  body.innerHTML = '<div style="padding:32px;text-align:center;color:var(--text-muted)">⏳ 從 Google Sheet 載入中…</div>';
+  overlay.style.display = 'flex';
+  document.body.style.overflow = 'hidden';
+  // 從 Google Apps Script 抓最新 — Sheet 才是 source of truth
+  let fresh = null;
+  try {
+    const r = await fetch(NOTES_APPS_SCRIPT_URL, { method:'GET' });
+    const d = await r.json();
+    fresh = d.notes || {};
+  } catch(e){
+    body.innerHTML = `<div style="padding:24px;text-align:center;color:#c0392b">❌ 從 Google Sheet 載入失敗:${e.message}<br><br><button onclick="closeNotesEditor()" style="padding:6px 16px;border-radius:6px;border:1.5px solid var(--border);background:var(--surface);cursor:pointer">關閉</button></div>`;
+    return;
+  }
+  clinicNotes = fresh;
+  const sorted = Object.keys(fresh).sort((a,b) => a.localeCompare(b, 'zh-Hant'));
   if(sorted.length === 0){
-    body.innerHTML = '<div style="padding:32px;text-align:center;color:var(--text-muted)">尚無診所資料</div>';
+    body.innerHTML = '<div style="padding:32px;text-align:center;color:var(--text-muted)">Sheet 內無診所資料</div>';
   } else {
     body.innerHTML = sorted.map(name => {
-      const cur = clinicNotes[name] || '';
-      const inputId = 'note_' + btoa(unescape(encodeURIComponent(name))).replace(/[^a-z0-9]/gi,'');
+      const cur = fresh[name] || '';
       return `<div style="display:grid;grid-template-columns:1fr 2fr;gap:10px;align-items:center;padding:7px 0;border-bottom:1px solid var(--border)">
         <div style="font-size:0.86rem;font-weight:600;color:var(--text)">${name}</div>
-        <input type="text" id="${inputId}" data-clinic="${name.replace(/"/g,'&quot;')}" value="${cur.replace(/"/g,'&quot;')}" placeholder="(無備註)" style="padding:6px 10px;border-radius:6px;border:1.5px solid var(--border);font-family:inherit;font-size:0.84rem;background:var(--surface);color:var(--text);outline:none">
+        <textarea data-clinic="${name.replace(/"/g,'&quot;')}" rows="1" placeholder="(無備註)" style="padding:6px 10px;border-radius:6px;border:1.5px solid var(--border);font-family:inherit;font-size:0.84rem;background:var(--surface);color:var(--text);outline:none;resize:vertical;min-height:32px">${cur.replace(/</g,'&lt;')}</textarea>
       </div>`;
     }).join('');
   }
-  overlay.style.display = 'flex';
-  document.body.style.overflow = 'hidden';
+  status.textContent = `✓ 從 Sheet 載入 ${sorted.length} 間診所`;
 }
 function closeNotesEditor(){
   document.getElementById('notes-modal-overlay').style.display = 'none';
@@ -2801,30 +2811,44 @@ function closeNotesEditorOutside(e){
 }
 function collectNotesFromForm(){
   const out = {};
-  document.querySelectorAll('#notes-modal-body input[data-clinic]').forEach(inp => {
-    const name = inp.getAttribute('data-clinic');
-    const v = inp.value.trim();
-    if(v) out[name] = v;
+  document.querySelectorAll('#notes-modal-body [data-clinic]').forEach(el => {
+    const name = el.getAttribute('data-clinic');
+    out[name] = el.value;  // 保留空字串(讓 user 能清空備註)
   });
   return out;
 }
 async function _saveNotes(alsoRegen){
-  if(!sbClient){ alert('Supabase 未設定'); return; }
   const status = document.getElementById('notes-modal-status');
-  status.textContent = '⏳ 儲存中…';
+  status.textContent = '⏳ 寫入 Google Sheet…';
   const notes = collectNotesFromForm();
-  const payload = { id:'main', clinic_notes: notes };
-  if(alsoRegen) payload.regen_request_at = new Date().toISOString();
-  const { error } = await sbClient.from('prescription_data').upsert(payload, { onConflict:'id' });
-  if(error){
-    const isMissingCol = (error.message||'').toLowerCase().includes('column');
-    status.textContent = '❌ ' + error.message;
-    alert((isMissingCol ? '⚠️ Supabase 欄位尚未建立\n\n請跑:\nALTER TABLE prescription_data ADD COLUMN IF NOT EXISTS clinic_notes jsonb, ADD COLUMN IF NOT EXISTS regen_request_at timestamptz, ADD COLUMN IF NOT EXISTS regen_last_run_at timestamptz;'
-                        : '❌ 儲存失敗:'+error.message));
+  // 1) POST 到 Apps Script → 寫回 Google Sheet
+  try {
+    const r = await fetch(NOTES_APPS_SCRIPT_URL, {
+      method: 'POST',
+      headers: { 'Content-Type':'text/plain;charset=utf-8' },  // 避免 CORS preflight
+      body: JSON.stringify({ notes }),
+    });
+    const d = await r.json();
+    if(d.error){ throw new Error(d.error); }
+    status.textContent = `✓ Google Sheet 已更新 ${d.updated} 列(總共傳 ${Object.keys(notes).length} 間)`;
+  } catch(e){
+    status.textContent = '❌ ' + e.message;
+    alert('❌ 寫入 Google Sheet 失敗:' + e.message);
     return false;
   }
   clinicNotes = notes;
-  status.textContent = '✓ 已儲存 ' + Object.keys(notes).length + ' 間診所備註';
+  // 2) 若要重新產出,設 regen_request_at(n8n quick-poll workflow 偵測到後跑 Python)
+  if(alsoRegen && sbClient){
+    const { error } = await sbClient.from('prescription_data')
+      .upsert({ id:'main', regen_request_at: new Date().toISOString() }, { onConflict:'id' });
+    if(error){
+      const isMissingCol = (error.message||'').toLowerCase().includes('column');
+      status.textContent = '⚠️ 備註已存 Sheet,但觸發重新產出失敗:' + error.message;
+      alert(isMissingCol ? '⚠️ Supabase 缺欄位\n\nALTER TABLE prescription_data ADD COLUMN IF NOT EXISTS regen_request_at timestamptz, ADD COLUMN IF NOT EXISTS regen_last_run_at timestamptz;'
+                        : '⚠️ 觸發失敗:' + error.message);
+      return false;
+    }
+  }
   return true;
 }
 async function saveNotesOnly(){
