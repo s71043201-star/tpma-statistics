@@ -868,8 +868,8 @@ footer {
 
   <!-- ── 分析圖表(放下方作為補充) ── -->
   <div class="side-by-side">
-    <div class="chart-section" data-pdf-id="course-type-fill" data-pdf-label="各處方類型未完成場次分布">
-      <div class="chart-header"><h2>📊 各處方類型未完成場次(滿座 vs 未滿)</h2><button class="dl-btn" onclick="downloadChart(this)">↓ 下載 JPG</button></div>
+    <div class="chart-section" data-pdf-id="course-type-seats" data-pdf-label="各處方類型剩餘可預訂人次">
+      <div class="chart-header"><h2>📊 各處方類型剩餘可預訂(人次)</h2><button class="dl-btn" onclick="downloadChart(this)">↓ 下載 JPG</button></div>
       <div class="chart-wrap"><canvas id="courseTypeFillChart"></canvas></div>
     </div>
     <div class="chart-section" data-pdf-id="course-status-pie" data-pdf-label="場次狀態分布">
@@ -2509,12 +2509,16 @@ function buildCourseCharts(){
   // 各處方類型未完成場次:滿座 / 未滿(只看 scheduled)
   const typeFillLabels = { mental:'情緒調適', nutrition:'營養', social:'社會', exercise:'運動' };
   const typeOrder = ['mental','nutrition','social','exercise'];
-  const typeFill = { mental:{full:0,available:0}, nutrition:{full:0,available:0}, social:{full:0,available:0}, exercise:{full:0,available:0} };
+  // 改成「人次」:已預訂 + 剩餘空位(每類 scheduled 場次的 booked / capacity-booked 加總)
+  const typeFill = { mental:{booked:0,remaining:0}, nutrition:{booked:0,remaining:0}, social:{booked:0,remaining:0}, exercise:{booked:0,remaining:0} };
   inRange.forEach(s => {
     if(s.status==='scheduled'){
       const t = s.course_type;
       if(typeFill[t]){
-        if(s.is_full) typeFill[t].full++; else typeFill[t].available++;
+        const cap = s.capacity || 0;
+        const bk  = s.booked_count || 0;
+        typeFill[t].booked += bk;
+        typeFill[t].remaining += Math.max(0, cap - bk);
       }
     }
   });
@@ -2526,17 +2530,18 @@ function buildCourseCharts(){
       data:{
         labels: typeOrder.map(t=>typeFillLabels[t]),
         datasets:[
-          { label:'已滿座', data: typeOrder.map(t=>typeFill[t].full), backgroundColor:'rgba(192,57,43,0.78)', borderRadius:4 },
-          { label:'尚有空位', data: typeOrder.map(t=>typeFill[t].available), backgroundColor:'rgba(42,172,138,0.78)', borderRadius:4 }
+          { label:'已預訂人次', data: typeOrder.map(t=>typeFill[t].booked),    backgroundColor:'rgba(192,57,43,0.78)', borderRadius:4 },
+          { label:'剩餘可預訂',  data: typeOrder.map(t=>typeFill[t].remaining), backgroundColor:'rgba(42,172,138,0.78)', borderRadius:4 }
         ]
       },
       options:{
         responsive:true, maintainAspectRatio:false,
         plugins:{
           legend:{position:'top',labels:{font:defaultFont}},
+          tooltip:{callbacks:{ afterLabel:(c)=>{ const t=typeOrder[c.dataIndex]; const tot=typeFill[t].booked+typeFill[t].remaining; return '總容量:'+tot+' 人'; } }},
           datalabels:{ anchor:'center', align:'center', color:'#fff', font:{family:defaultFont.family,weight:'700',size:13}, formatter:(v)=>v>0?v:'' }
         },
-        scales:{ x:{stacked:true,ticks:{font:defaultFont}}, y:{stacked:true,beginAtZero:true,ticks:{font:defaultFont,precision:0}} }
+        scales:{ x:{stacked:true,ticks:{font:defaultFont}}, y:{stacked:true,beginAtZero:true,ticks:{font:defaultFont,precision:0},title:{display:true,text:'人次',font:Object.assign({},defaultFont,{size:12,weight:'600'})}} }
       }
     });
   }
