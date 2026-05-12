@@ -986,6 +986,12 @@ async function loadFromCloud() {
       monthlyData   = [];
       typeMonthlyRaw = [];
     }
+    // 診所分區雲端同步:雲端有資料就以雲端為準,沒設定才保留本機
+    if (data.clinic_region_map && typeof data.clinic_region_map === 'object'){
+      clinicRegionMap = data.clinic_region_map;
+      try { localStorage.setItem('clinicRegionMap', JSON.stringify(clinicRegionMap)); } catch(e){}
+      updateRegionSummaryBadge();
+    }
     const dr = data.date_range || '—';
     const fn = data.file_name  || '—';
     const at = data.uploaded_at ? new Date(data.uploaded_at).toLocaleString('zh-TW') : '—';
@@ -1879,9 +1885,17 @@ function loadRegionMap(){
   }catch(e){ clinicRegionMap = {}; }
   updateRegionSummaryBadge();
 }
-function saveRegionMap(){
+async function saveRegionMap(){
   localStorage.setItem('clinicRegionMap', JSON.stringify(clinicRegionMap));
   updateRegionSummaryBadge();
+  if(sbClient){
+    const { error } = await sbClient.from('prescription_data')
+      .upsert({ id: 'main', clinic_region_map: clinicRegionMap }, { onConflict: 'id' });
+    if(error){
+      console.warn('saveRegionMap cloud error:', error);
+      alert('⚠️ 分區已存本機但同步雲端失敗：\n' + error.message + '\n\n其他人開的儀表板暫時看不到這次的變更,請確認 Supabase 是否已新增 clinic_region_map 欄位');
+    }
+  }
 }
 function countRegion(r){
   return Object.values(clinicRegionMap).filter(x=>x===r).length;
@@ -1938,7 +1952,7 @@ async function handleRegionFile(file){
   try{
     const map = await parseRegionExcel(file);
     clinicRegionMap = map;
-    saveRegionMap();
+    await saveRegionMap();
     renderRegionModalContent();
     // 若有資料立即重新套用篩選
     if(rawRows.length || clinicStats.length) rebuildFromFilters();
@@ -1965,10 +1979,10 @@ function closeRegionModal(){
 function closeRegionModalOutside(e){
   if(e.target === document.getElementById('region-modal-overlay')) closeRegionModal();
 }
-function clearRegionMap(){
-  if(!confirm('確定要清除目前的診所分區對照表？')) return;
+async function clearRegionMap(){
+  if(!confirm('確定要清除目前的診所分區對照表？(會同步清除雲端,所有人都看不到)')) return;
   clinicRegionMap = {};
-  saveRegionMap();
+  await saveRegionMap();
   renderRegionModalContent();
   if(rawRows.length || clinicStats.length) rebuildFromFilters();
 }
