@@ -814,7 +814,23 @@ footer {
 
 <!-- ═══ TAB 6:課程選課 ═══ -->
 <div id="tab-course" class="hidden">
-  <!-- ── KPIs ── -->
+  <!-- ── 頂層查詢區間(影響:處方類型未完成圖 / 場次狀態圖 / 場次明細表)── -->
+  <div style="margin:20px 36px 0;padding:14px 18px;background:linear-gradient(135deg,#f7fbf9,#fff);border-radius:14px;border:1px solid var(--border);box-shadow:var(--shadow-sm)">
+    <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;font-size:0.85rem">
+      <span style="font-weight:700;color:var(--teal);white-space:nowrap">🗓️ 查詢區間:</span>
+      <input type="date" id="courseGlobalFrom" oninput="onGlobalDateChange()" style="padding:6px 10px;border-radius:6px;border:1.5px solid var(--border);font-family:inherit;font-size:0.84rem;background:var(--surface);color:var(--text)">
+      <span style="color:var(--text-muted)">~</span>
+      <input type="date" id="courseGlobalTo" oninput="onGlobalDateChange()" style="padding:6px 10px;border-radius:6px;border:1.5px solid var(--border);font-family:inherit;font-size:0.84rem;background:var(--surface);color:var(--text)">
+      <button onclick="setGlobalDateQuick('all',this)" class="quick-date-btn active" style="padding:5px 12px;border-radius:14px;border:1.5px solid var(--border);background:var(--surface);font-family:inherit;font-size:0.8rem;cursor:pointer">全部</button>
+      <button onclick="setGlobalDateQuick('thisweek',this)" class="quick-date-btn" style="padding:5px 12px;border-radius:14px;border:1.5px solid var(--border);background:var(--surface);font-family:inherit;font-size:0.8rem;cursor:pointer">本週</button>
+      <button onclick="setGlobalDateQuick('thismonth',this)" class="quick-date-btn" style="padding:5px 12px;border-radius:14px;border:1.5px solid var(--border);background:var(--surface);font-family:inherit;font-size:0.8rem;cursor:pointer">本月</button>
+      <button onclick="setGlobalDateQuick('upcoming30',this)" class="quick-date-btn" style="padding:5px 12px;border-radius:14px;border:1.5px solid var(--border);background:var(--surface);font-family:inherit;font-size:0.8rem;cursor:pointer">未來 30 天</button>
+      <span id="courseFilterStatus" style="margin-left:auto;color:var(--text-muted);font-size:0.78rem"></span>
+    </div>
+    <div id="pinnedDateChips" style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-top:10px;padding-top:10px;border-top:1px dashed var(--border)"></div>
+  </div>
+
+  <!-- ── KPIs(維持累積總計)── -->
   <div class="summary-grid" style="margin-top:20px">
     <div class="card blue">  <span class="icon">📅</span><div class="val" id="csTotalSlots">—</div><div class="lbl">總場次</div></div>
     <div class="card green"> <span class="icon">📝</span><div class="val" id="csTotalEnroll">—</div><div class="lbl">總報名人次</div></div>
@@ -822,9 +838,6 @@ footer {
     <div class="card purple"><span class="icon">📈</span><div class="val" id="csAttendRate">—</div><div class="lbl">出席率</div></div>
     <div class="card violet"><span class="icon">🔥</span><div class="val" id="csFullSlots">—</div><div class="lbl">滿座場次</div></div>
   </div>
-
-  <!-- ── 需要關注 chips(快速 filter) ── -->
-  <div id="courseAlertChips" style="display:flex;gap:8px;flex-wrap:wrap;padding:8px 36px 0;font-size:0.82rem"></div>
 
   <!-- ── 場次明細(主要交互區,放最上) ── -->
   <div class="chart-section" style="margin:14px 36px;">
@@ -838,12 +851,8 @@ footer {
       </div>
     </div>
     <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:12px;padding-top:4px;border-top:1px dashed var(--border)">
-      <input type="text" id="slotsFilterSearch" placeholder="🔍 搜尋課程名稱或地點…" oninput="renderSlotsTable()" style="flex:1;min-width:200px;padding:7px 12px;border-radius:8px;border:1.5px solid var(--border);font-family:inherit;font-size:0.86rem;background:var(--surface);color:var(--text);outline:none">
-      <span style="font-size:0.82rem;color:var(--text-muted);white-space:nowrap">日期:</span>
-      <input type="date" id="slotsFilterFrom" oninput="renderSlotsTable()" style="padding:6px 8px;border-radius:6px;border:1.5px solid var(--border);font-family:inherit;font-size:0.82rem;background:var(--surface);color:var(--text)">
-      <span style="font-size:0.82rem;color:var(--text-muted)">~</span>
-      <input type="date" id="slotsFilterTo" oninput="renderSlotsTable()" style="padding:6px 8px;border-radius:6px;border:1.5px solid var(--border);font-family:inherit;font-size:0.82rem;background:var(--surface);color:var(--text)">
-      <button onclick="clearSlotsAllFilters()" style="padding:6px 10px;border-radius:6px;border:1.5px solid var(--border);background:var(--surface);color:var(--text-muted);font-size:0.78rem;cursor:pointer">清除全部</button>
+      <input type="text" id="slotsFilterSearch" placeholder="🔍 搜尋課程名稱或地點…" oninput="renderSlotsTable()" style="flex:1;min-width:240px;padding:7px 12px;border-radius:8px;border:1.5px solid var(--border);font-family:inherit;font-size:0.86rem;background:var(--surface);color:var(--text);outline:none">
+      <button onclick="clearSlotsAllFilters()" style="padding:6px 10px;border-radius:6px;border:1.5px solid var(--border);background:var(--surface);color:var(--text-muted);font-size:0.78rem;cursor:pointer">清除搜尋</button>
       <span id="slotsCountBadge" style="margin-left:auto;font-size:0.82rem;color:var(--text-muted)"></span>
     </div>
     <div style="overflow-x:auto;max-height:560px;overflow-y:auto">
@@ -2493,10 +2502,11 @@ function buildCourseCharts(){
   setText('csAttendRate',  (stats.attendance_rate!=null ? stats.attendance_rate : 0) + '%');
   setText('csFullSlots',   (stats.full_slots||0).toLocaleString());
 
-  // 熱門課程 TOP 15(累積報名,不含已完成 + 已取消的場次,聚焦未完成)
+  // 熱門 TOP 10、處方類型未完成、場次狀態:都套頂層日期區間
+  const inRange = filteredCourseSlots();
   const courseMap = {};
   const statusMap = {};
-  courseSlots.forEach(s => {
+  inRange.forEach(s => {
     if(s.status !== 'completed'){
       const cn = (s.course_name||'未命名').toString().trim();
       if(!courseMap[cn]) courseMap[cn] = { name:cn, booked:0, slots:0 };
@@ -2532,7 +2542,7 @@ function buildCourseCharts(){
   const typeFillLabels = { mental:'情緒調適', nutrition:'營養', social:'社會', exercise:'運動' };
   const typeOrder = ['mental','nutrition','social','exercise'];
   const typeFill = { mental:{full:0,available:0}, nutrition:{full:0,available:0}, social:{full:0,available:0}, exercise:{full:0,available:0} };
-  courseSlots.forEach(s => {
+  inRange.forEach(s => {
     if(s.status==='scheduled'){
       const t = s.course_type;
       if(typeFill[t]){
@@ -2587,44 +2597,81 @@ function buildCourseCharts(){
     });
   }
 
-  // 「需要關注」chips:點 chip 自動套對應 filter
-  const todayStr = new Date().toISOString().slice(0,10);
-  const in7 = new Date(Date.now()+7*86400000).toISOString().slice(0,10);
-  const scheduled = courseSlots.filter(s=>s.status==='scheduled');
-  const upcoming7 = scheduled.filter(s=>s.slot_date>=todayStr && s.slot_date<=in7).length;
-  const lowCap = scheduled.filter(s=>{
-    if(s.slot_date < todayStr) return false;
-    const c = s.capacity||0; const b = s.booked_count||0;
-    return c>0 && (b/c)>=0.8 && !s.is_full;
-  }).length;
-  const fullUpcoming = scheduled.filter(s=>s.slot_date>=todayStr && s.is_full).length;
-  const cancelledRecent = courseSlots.filter(s=>{
-    if(s.status!=='cancelled') return false;
-    const back7 = new Date(Date.now()-7*86400000).toISOString().slice(0,10);
-    return s.slot_date>=back7;
-  }).length;
-  const pinnedCount = pinnedDates.size;
-  const chipsEl = document.getElementById('courseAlertChips');
-  if(chipsEl){
-    const chip = (icon, label, count, action, color) => count > 0
-      ? `<button onclick="${action}" style="display:inline-flex;align-items:center;gap:6px;padding:6px 12px;border-radius:14px;border:1.5px solid ${color}44;background:${color}11;color:${color};font-size:0.82rem;font-weight:700;cursor:pointer;font-family:inherit">${icon} ${label} <span style="background:${color};color:#fff;padding:1px 8px;border-radius:10px;font-size:0.76rem">${count}</span></button>`
-      : '';
-    chipsEl.innerHTML = [
-      chip('📌', '已置頂', pinnedCount, 'showTab("course",document.querySelector(\'.tab-btn[onclick*=course]\')); filterSlotsTable("all",document.querySelector(\'#slotsFilterBar [data-filter=all]\'))', '#e8930a'),
-      chip('🔥', '已滿座(即將舉辦)', fullUpcoming, 'jumpToScheduled()', '#c0392b'),
-      chip('⚠️', '剩餘 ≤ 20%', lowCap, 'jumpToScheduled()', '#d97706'),
-      chip('🗓️', '7 天內', upcoming7, 'jumpToScheduled()', '#1a9fbe'),
-      chip('🚫', '近 7 天取消', cancelledRecent, 'filterSlotsTable("cancelled",document.querySelector(\'#slotsFilterBar [data-filter=cancelled]\'))', '#9aa5b1'),
-    ].filter(s=>s).join(' ');
-  }
+  // 渲染置頂日期快速速查 chips(取代之前的需要關注 chips)
+  renderPinnedDateChips();
 
   window._slotsFilter = window._slotsFilter || 'all';
   renderSlotsTable();
 }
 
-function jumpToScheduled(){
-  filterSlotsTable('scheduled', document.querySelector('#slotsFilterBar [data-filter=scheduled]'));
+// 頂層日期區間
+function getCourseDateRange(){
+  return {
+    from: document.getElementById('courseGlobalFrom')?.value || '',
+    to:   document.getElementById('courseGlobalTo')?.value || '',
+  };
+}
+function filteredCourseSlots(){
+  const {from,to} = getCourseDateRange();
+  if(!from && !to) return courseSlots;
+  return courseSlots.filter(s => {
+    if(from && s.slot_date < from) return false;
+    if(to   && s.slot_date > to)   return false;
+    return true;
+  });
+}
+function onGlobalDateChange(){
+  // 手動改 input 後 quick 按鈕都不算 active
+  document.querySelectorAll('#tab-course .quick-date-btn').forEach(b=>b.classList.remove('active'));
+  buildCourseCharts();
+}
+function setGlobalDateQuick(type, btn){
+  const today = new Date();
+  const tStr = today.toISOString().slice(0,10);
+  let from='', to='';
+  if(type==='all'){ from=''; to=''; }
+  else if(type==='thisweek'){
+    const day = today.getDay();
+    const monday = new Date(today); monday.setDate(today.getDate() - ((day+6)%7));
+    const sunday = new Date(monday); sunday.setDate(monday.getDate()+6);
+    from = monday.toISOString().slice(0,10);
+    to   = sunday.toISOString().slice(0,10);
+  } else if(type==='thismonth'){
+    const y = today.getFullYear(), m = today.getMonth();
+    from = y+'-'+String(m+1).padStart(2,'0')+'-01';
+    const last = new Date(y, m+1, 0).getDate();
+    to   = y+'-'+String(m+1).padStart(2,'0')+'-'+String(last).padStart(2,'0');
+  } else if(type==='upcoming30'){
+    from = tStr;
+    to   = new Date(today.getTime()+30*86400000).toISOString().slice(0,10);
+  }
+  document.getElementById('courseGlobalFrom').value = from;
+  document.getElementById('courseGlobalTo').value   = to;
+  document.querySelectorAll('#tab-course .quick-date-btn').forEach(b=>b.classList.remove('active'));
+  if(btn) btn.classList.add('active');
+  buildCourseCharts();
+}
+function setGlobalDateToDay(d){
+  document.getElementById('courseGlobalFrom').value = d;
+  document.getElementById('courseGlobalTo').value   = d;
+  document.querySelectorAll('#tab-course .quick-date-btn').forEach(b=>b.classList.remove('active'));
+  buildCourseCharts();
   document.getElementById('allSlotsBody')?.scrollIntoView({behavior:'smooth',block:'start'});
+}
+function renderPinnedDateChips(){
+  const el = document.getElementById('pinnedDateChips');
+  if(!el) return;
+  if(pinnedDates.size === 0){
+    el.innerHTML = '<span style="font-size:0.78rem;color:var(--text-muted)">📌 尚未置頂任何日期 · 在下方表格點 ◯ 圖示即可置頂(雲端同步)</span>';
+    return;
+  }
+  const sorted = [...pinnedDates].sort();
+  const cur = getCourseDateRange();
+  el.innerHTML = '<span style="font-size:0.78rem;color:var(--text-muted);font-weight:600">📌 速查:</span>' +
+    sorted.map(d => {
+      const isActive = (cur.from === d && cur.to === d);
+      return `<button onclick="setGlobalDateToDay('${d}')" title="點擊查看 ${d} 的場次狀況" style="padding:5px 11px;border-radius:14px;border:1.5px solid #e8930a${isActive?'':'44'};background:${isActive?'#e8930a':'#fffbeb'};color:${isActive?'#fff':'#b3620a'};font-size:0.82rem;font-weight:700;cursor:pointer;font-family:inherit">📌 ${d}</button>`;
+    }).join('');
 }
 
 let _expandedSlot = null;
@@ -2640,8 +2687,6 @@ function clearSlotsDateFilter(){
   renderSlotsTable();
 }
 function clearSlotsAllFilters(){
-  const a = document.getElementById('slotsFilterFrom'); if(a) a.value='';
-  const b = document.getElementById('slotsFilterTo');   if(b) b.value='';
   const s = document.getElementById('slotsFilterSearch'); if(s) s.value='';
   filterSlotsTable('all', document.querySelector('#slotsFilterBar [data-filter=all]'));
 }
@@ -2656,6 +2701,7 @@ async function togglePinDate(date, evt){
   const arr = [...pinnedDates];
   try{ localStorage.setItem('pinnedDates', JSON.stringify(arr)); }catch(e){}
   renderSlotsTable();
+  renderPinnedDateChips();
   if(sbClient){
     const { error } = await sbClient.from('prescription_data')
       .upsert({ id:'main', pinned_dates: arr }, { onConflict:'id' });
@@ -2672,9 +2718,18 @@ function renderSlotsTable(){
   const empty = document.getElementById('allSlotsEmpty');
   if(!tbody) return;
   const f = window._slotsFilter || 'all';
-  const dFrom = document.getElementById('slotsFilterFrom')?.value || '';
-  const dTo   = document.getElementById('slotsFilterTo')?.value || '';
+  const {from: dFrom, to: dTo} = getCourseDateRange();
   const q = (document.getElementById('slotsFilterSearch')?.value || '').toLowerCase().trim();
+  // 同步 filter 狀態文字
+  const statusEl = document.getElementById('courseFilterStatus');
+  if(statusEl){
+    const parts = [];
+    if(dFrom && dTo){ if(dFrom === dTo) parts.push('查詢日:'+dFrom); else parts.push(dFrom+' ~ '+dTo); }
+    else if(dFrom) parts.push('從 '+dFrom);
+    else if(dTo)   parts.push('至 '+dTo);
+    else           parts.push('全部時間');
+    statusEl.textContent = parts.join(' · ');
+  }
   const typeLabels = { mental:'情緒調適', nutrition:'營養', social:'社會', exercise:'運動', other:'其他' };
   const typeColors = { mental:'#7c3aed', nutrition:'#2aac8a', social:'#1a9fbe', exercise:'#e8930a', other:'#9aa5b1' };
   const statusLabels = { scheduled:'即將舉辦', completed:'已完成', cancelled:'已取消' };
