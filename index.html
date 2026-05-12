@@ -814,6 +814,7 @@ footer {
 
 <!-- ═══ TAB 6:課程選課 ═══ -->
 <div id="tab-course" class="hidden">
+  <!-- ── KPIs ── -->
   <div class="summary-grid" style="margin-top:20px">
     <div class="card blue">  <span class="icon">📅</span><div class="val" id="csTotalSlots">—</div><div class="lbl">總場次</div></div>
     <div class="card green"> <span class="icon">📝</span><div class="val" id="csTotalEnroll">—</div><div class="lbl">總報名人次</div></div>
@@ -821,34 +822,29 @@ footer {
     <div class="card purple"><span class="icon">📈</span><div class="val" id="csAttendRate">—</div><div class="lbl">出席率</div></div>
     <div class="card violet"><span class="icon">🔥</span><div class="val" id="csFullSlots">—</div><div class="lbl">滿座場次</div></div>
   </div>
-  <div class="chart-section" data-pdf-id="course-top15" data-pdf-label="熱門課程 TOP 15" style="margin:18px 36px;">
-    <div class="chart-header"><h2>🔥 熱門課程 TOP 15(依累積報名人次)</h2><button class="dl-btn" onclick="downloadChart(this)">↓ 下載 JPG</button></div>
-    <div class="chart-wrap" style="height:480px"><canvas id="courseTop15Chart"></canvas></div>
-  </div>
-  <div class="side-by-side">
-    <div class="chart-section" data-pdf-id="course-14day" data-pdf-label="未來 14 天每日預訂人次">
-      <div class="chart-header"><h2>📈 未來 14 天每日預訂人次</h2><button class="dl-btn" onclick="downloadChart(this)">↓ 下載 JPG</button></div>
-      <div class="chart-wrap"><canvas id="course14DayChart"></canvas></div>
-    </div>
-    <div class="chart-section" data-pdf-id="course-status-pie" data-pdf-label="場次狀態分布">
-      <div class="chart-header"><h2>場次狀態分布</h2><button class="dl-btn" onclick="downloadChart(this)">↓ 下載 JPG</button></div>
-      <div class="chart-wrap"><canvas id="courseStatusPieChart"></canvas></div>
-    </div>
-  </div>
-  <div class="chart-section" style="margin:18px 36px;">
+
+  <!-- ── 需要關注 chips(快速 filter) ── -->
+  <div id="courseAlertChips" style="display:flex;gap:8px;flex-wrap:wrap;padding:8px 36px 0;font-size:0.82rem"></div>
+
+  <!-- ── 場次明細(主要交互區,放最上) ── -->
+  <div class="chart-section" style="margin:14px 36px;">
     <div class="chart-header" style="flex-wrap:wrap;gap:10px">
-      <h2 style="white-space:nowrap">📋 場次明細(點 📌 置頂、點列展開)</h2>
+      <h2 style="white-space:nowrap">📋 場次明細(點 📌 置頂、點列展開預約)</h2>
       <div id="slotsFilterBar" style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
         <button class="pdf-tab-btn active" data-filter="all" onclick="filterSlotsTable('all',this)">全部(未完成)</button>
         <button class="pdf-tab-btn" data-filter="scheduled" onclick="filterSlotsTable('scheduled',this)">即將舉辦</button>
         <button class="pdf-tab-btn" data-filter="cancelled" onclick="filterSlotsTable('cancelled',this)">已取消</button>
         <button class="pdf-tab-btn" data-filter="completed" onclick="filterSlotsTable('completed',this)">已完成</button>
-        <span style="margin-left:14px;font-size:0.82rem;color:var(--text-muted);white-space:nowrap">日期:</span>
-        <input type="date" id="slotsFilterFrom" oninput="renderSlotsTable()" style="padding:6px 8px;border-radius:6px;border:1.5px solid var(--border);font-family:inherit;font-size:0.82rem;background:var(--surface);color:var(--text)">
-        <span style="font-size:0.82rem;color:var(--text-muted)">~</span>
-        <input type="date" id="slotsFilterTo" oninput="renderSlotsTable()" style="padding:6px 8px;border-radius:6px;border:1.5px solid var(--border);font-family:inherit;font-size:0.82rem;background:var(--surface);color:var(--text)">
-        <button onclick="clearSlotsDateFilter()" style="padding:6px 10px;border-radius:6px;border:1.5px solid var(--border);background:var(--surface);color:var(--text-muted);font-size:0.78rem;cursor:pointer">清除</button>
       </div>
+    </div>
+    <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:12px;padding-top:4px;border-top:1px dashed var(--border)">
+      <input type="text" id="slotsFilterSearch" placeholder="🔍 搜尋課程名稱或地點…" oninput="renderSlotsTable()" style="flex:1;min-width:200px;padding:7px 12px;border-radius:8px;border:1.5px solid var(--border);font-family:inherit;font-size:0.86rem;background:var(--surface);color:var(--text);outline:none">
+      <span style="font-size:0.82rem;color:var(--text-muted);white-space:nowrap">日期:</span>
+      <input type="date" id="slotsFilterFrom" oninput="renderSlotsTable()" style="padding:6px 8px;border-radius:6px;border:1.5px solid var(--border);font-family:inherit;font-size:0.82rem;background:var(--surface);color:var(--text)">
+      <span style="font-size:0.82rem;color:var(--text-muted)">~</span>
+      <input type="date" id="slotsFilterTo" oninput="renderSlotsTable()" style="padding:6px 8px;border-radius:6px;border:1.5px solid var(--border);font-family:inherit;font-size:0.82rem;background:var(--surface);color:var(--text)">
+      <button onclick="clearSlotsAllFilters()" style="padding:6px 10px;border-radius:6px;border:1.5px solid var(--border);background:var(--surface);color:var(--text-muted);font-size:0.78rem;cursor:pointer">清除全部</button>
+      <span id="slotsCountBadge" style="margin-left:auto;font-size:0.82rem;color:var(--text-muted)"></span>
     </div>
     <div style="overflow-x:auto;max-height:560px;overflow-y:auto">
       <table class="data-table" style="width:100%;font-size:0.86rem">
@@ -859,6 +855,22 @@ footer {
       </table>
     </div>
     <div id="allSlotsEmpty" style="display:none;padding:24px;text-align:center;color:var(--text-muted)">沒有符合的場次</div>
+  </div>
+
+  <!-- ── 分析圖表(放下方作為補充) ── -->
+  <div class="chart-section" data-pdf-id="course-top10" data-pdf-label="熱門課程 TOP 10" style="margin:18px 36px;">
+    <div class="chart-header"><h2>🔥 熱門課程 TOP 10(累積報名,不含已完成)</h2><button class="dl-btn" onclick="downloadChart(this)">↓ 下載 JPG</button></div>
+    <div class="chart-wrap" style="height:380px"><canvas id="courseTop15Chart"></canvas></div>
+  </div>
+  <div class="side-by-side">
+    <div class="chart-section" data-pdf-id="course-type-fill" data-pdf-label="各處方類型未完成場次分布">
+      <div class="chart-header"><h2>📊 各處方類型未完成場次(滿座 vs 未滿)</h2><button class="dl-btn" onclick="downloadChart(this)">↓ 下載 JPG</button></div>
+      <div class="chart-wrap"><canvas id="courseTypeFillChart"></canvas></div>
+    </div>
+    <div class="chart-section" data-pdf-id="course-status-pie" data-pdf-label="場次狀態分布">
+      <div class="chart-header"><h2>場次狀態分布</h2><button class="dl-btn" onclick="downloadChart(this)">↓ 下載 JPG</button></div>
+      <div class="chart-wrap"><canvas id="courseStatusPieChart"></canvas></div>
+    </div>
   </div>
 </div>
 
@@ -2494,7 +2506,7 @@ function buildCourseCharts(){
     const sk = s.status || 'unknown';
     statusMap[sk] = (statusMap[sk]||0) + 1;
   });
-  const top = Object.values(courseMap).filter(t=>t.booked>0).sort((a,b)=>b.booked-a.booked).slice(0,15);
+  const top = Object.values(courseMap).filter(t=>t.booked>0).sort((a,b)=>b.booked-a.booked).slice(0,10);
   destroyChart('courseTop15Chart');
   const ctx1 = document.getElementById('courseTop15Chart');
   if(ctx1){
@@ -2516,41 +2528,37 @@ function buildCourseCharts(){
     });
   }
 
-  // 未來 14 天每日預訂人次(只看 scheduled)
-  const today = new Date(new Date().toISOString().slice(0,10)+'T00:00:00');
-  const dayMap = {};
-  for(let i=0;i<14;i++){
-    const d = new Date(today.getTime()+i*86400000).toISOString().slice(0,10);
-    dayMap[d] = { date:d, booked:0, capacity:0, slots:0 };
-  }
+  // 各處方類型未完成場次:滿座 / 未滿(只看 scheduled)
+  const typeFillLabels = { mental:'情緒調適', nutrition:'營養', social:'社會', exercise:'運動' };
+  const typeOrder = ['mental','nutrition','social','exercise'];
+  const typeFill = { mental:{full:0,available:0}, nutrition:{full:0,available:0}, social:{full:0,available:0}, exercise:{full:0,available:0} };
   courseSlots.forEach(s => {
-    if(s.status==='scheduled' && dayMap[s.slot_date]){
-      dayMap[s.slot_date].booked += (s.booked_count||0);
-      dayMap[s.slot_date].capacity += (s.capacity||0);
-      dayMap[s.slot_date].slots += 1;
+    if(s.status==='scheduled'){
+      const t = s.course_type;
+      if(typeFill[t]){
+        if(s.is_full) typeFill[t].full++; else typeFill[t].available++;
+      }
     }
   });
-  const dayKeys = Object.keys(dayMap);
-  destroyChart('course14DayChart');
-  const ctx2 = document.getElementById('course14DayChart');
+  destroyChart('courseTypeFillChart');
+  const ctx2 = document.getElementById('courseTypeFillChart');
   if(ctx2){
-    chartInstances.course14DayChart = new Chart(ctx2, {
+    chartInstances.courseTypeFillChart = new Chart(ctx2, {
       type:'bar',
       data:{
-        labels: dayKeys.map(d=>{const[y,m,day]=d.split('-');return `${parseInt(m)}/${parseInt(day)}`;}),
+        labels: typeOrder.map(t=>typeFillLabels[t]),
         datasets:[
-          { label:'已預訂', data: dayKeys.map(d=>dayMap[d].booked), backgroundColor:'rgba(42,172,138,0.8)', borderRadius:4 },
-          { label:'剩餘容量', data: dayKeys.map(d=>Math.max(0,dayMap[d].capacity-dayMap[d].booked)), backgroundColor:'rgba(154,165,177,0.35)', borderRadius:4 }
+          { label:'已滿座', data: typeOrder.map(t=>typeFill[t].full), backgroundColor:'rgba(192,57,43,0.78)', borderRadius:4 },
+          { label:'尚有空位', data: typeOrder.map(t=>typeFill[t].available), backgroundColor:'rgba(42,172,138,0.78)', borderRadius:4 }
         ]
       },
       options:{
         responsive:true, maintainAspectRatio:false,
         plugins:{
           legend:{position:'top',labels:{font:defaultFont}},
-          tooltip:{callbacks:{ afterLabel:(c)=>'場次:'+dayMap[dayKeys[c.dataIndex]].slots }},
-          datalabels:{ anchor:'center', align:'center', color:(c)=>c.datasetIndex===0?'#fff':'#5a7a70', font:{family:defaultFont.family,weight:'700',size:10.5}, formatter:(v)=>v>0?v:'' }
+          datalabels:{ anchor:'center', align:'center', color:'#fff', font:{family:defaultFont.family,weight:'700',size:13}, formatter:(v)=>v>0?v:'' }
         },
-        scales:{ x:{stacked:true,ticks:{font:defaultFont}}, y:{stacked:true,beginAtZero:true,ticks:{font:defaultFont}} }
+        scales:{ x:{stacked:true,ticks:{font:defaultFont}}, y:{stacked:true,beginAtZero:true,ticks:{font:defaultFont,precision:0}} }
       }
     });
   }
@@ -2579,9 +2587,44 @@ function buildCourseCharts(){
     });
   }
 
-  // 場次明細表(全部 + filter + 展開)
+  // 「需要關注」chips:點 chip 自動套對應 filter
+  const todayStr = new Date().toISOString().slice(0,10);
+  const in7 = new Date(Date.now()+7*86400000).toISOString().slice(0,10);
+  const scheduled = courseSlots.filter(s=>s.status==='scheduled');
+  const upcoming7 = scheduled.filter(s=>s.slot_date>=todayStr && s.slot_date<=in7).length;
+  const lowCap = scheduled.filter(s=>{
+    if(s.slot_date < todayStr) return false;
+    const c = s.capacity||0; const b = s.booked_count||0;
+    return c>0 && (b/c)>=0.8 && !s.is_full;
+  }).length;
+  const fullUpcoming = scheduled.filter(s=>s.slot_date>=todayStr && s.is_full).length;
+  const cancelledRecent = courseSlots.filter(s=>{
+    if(s.status!=='cancelled') return false;
+    const back7 = new Date(Date.now()-7*86400000).toISOString().slice(0,10);
+    return s.slot_date>=back7;
+  }).length;
+  const pinnedCount = pinnedDates.size;
+  const chipsEl = document.getElementById('courseAlertChips');
+  if(chipsEl){
+    const chip = (icon, label, count, action, color) => count > 0
+      ? `<button onclick="${action}" style="display:inline-flex;align-items:center;gap:6px;padding:6px 12px;border-radius:14px;border:1.5px solid ${color}44;background:${color}11;color:${color};font-size:0.82rem;font-weight:700;cursor:pointer;font-family:inherit">${icon} ${label} <span style="background:${color};color:#fff;padding:1px 8px;border-radius:10px;font-size:0.76rem">${count}</span></button>`
+      : '';
+    chipsEl.innerHTML = [
+      chip('📌', '已置頂', pinnedCount, 'showTab("course",document.querySelector(\'.tab-btn[onclick*=course]\')); filterSlotsTable("all",document.querySelector(\'#slotsFilterBar [data-filter=all]\'))', '#e8930a'),
+      chip('🔥', '已滿座(即將舉辦)', fullUpcoming, 'jumpToScheduled()', '#c0392b'),
+      chip('⚠️', '剩餘 ≤ 20%', lowCap, 'jumpToScheduled()', '#d97706'),
+      chip('🗓️', '7 天內', upcoming7, 'jumpToScheduled()', '#1a9fbe'),
+      chip('🚫', '近 7 天取消', cancelledRecent, 'filterSlotsTable("cancelled",document.querySelector(\'#slotsFilterBar [data-filter=cancelled]\'))', '#9aa5b1'),
+    ].filter(s=>s).join(' ');
+  }
+
   window._slotsFilter = window._slotsFilter || 'all';
   renderSlotsTable();
+}
+
+function jumpToScheduled(){
+  filterSlotsTable('scheduled', document.querySelector('#slotsFilterBar [data-filter=scheduled]'));
+  document.getElementById('allSlotsBody')?.scrollIntoView({behavior:'smooth',block:'start'});
 }
 
 let _expandedSlot = null;
@@ -2595,6 +2638,12 @@ function clearSlotsDateFilter(){
   const a = document.getElementById('slotsFilterFrom'); if(a) a.value='';
   const b = document.getElementById('slotsFilterTo');   if(b) b.value='';
   renderSlotsTable();
+}
+function clearSlotsAllFilters(){
+  const a = document.getElementById('slotsFilterFrom'); if(a) a.value='';
+  const b = document.getElementById('slotsFilterTo');   if(b) b.value='';
+  const s = document.getElementById('slotsFilterSearch'); if(s) s.value='';
+  filterSlotsTable('all', document.querySelector('#slotsFilterBar [data-filter=all]'));
 }
 function toggleSlotExpand(slotId, evt){
   if(evt) evt.stopPropagation();
@@ -2625,6 +2674,7 @@ function renderSlotsTable(){
   const f = window._slotsFilter || 'all';
   const dFrom = document.getElementById('slotsFilterFrom')?.value || '';
   const dTo   = document.getElementById('slotsFilterTo')?.value || '';
+  const q = (document.getElementById('slotsFilterSearch')?.value || '').toLowerCase().trim();
   const typeLabels = { mental:'情緒調適', nutrition:'營養', social:'社會', exercise:'運動', other:'其他' };
   const typeColors = { mental:'#7c3aed', nutrition:'#2aac8a', social:'#1a9fbe', exercise:'#e8930a', other:'#9aa5b1' };
   const statusLabels = { scheduled:'即將舉辦', completed:'已完成', cancelled:'已取消' };
@@ -2634,8 +2684,14 @@ function renderSlotsTable(){
     else if(s.status !== f) return false;
     if(dFrom && s.slot_date < dFrom) return false;
     if(dTo   && s.slot_date > dTo)   return false;
+    if(q){
+      const hay = ((s.course_name||'') + ' ' + (s.course_location||'')).toLowerCase();
+      if(!hay.includes(q)) return false;
+    }
     return true;
   });
+  const badge = document.getElementById('slotsCountBadge');
+  if(badge) badge.textContent = filtered.length > 0 ? `共 ${filtered.length} 場` : '';
   // 排序:1) 置頂日期優先(置頂組內按日期升序) 2) 非置頂:scheduled 升序、其餘降序
   const sorted = filtered.slice().sort((a,b) => {
     const ap = pinnedDates.has(a.slot_date) ? 1 : 0;
