@@ -998,14 +998,11 @@ const CLINIC_COLORS = ['#2aac8a','#1a9fbe','#8fba2e','#1a7ea0','#e8930a','#7c3ae
 const DATE_COLORS   = ['#2aac8a','#e8930a','#7c3aed','#db2777','#0891b2','#65a30d','#b45309','#6366f1','#1a9fbe','#8fba2e'];
 const DATE_COLORS_A = ['rgba(42,172,138,0.72)','rgba(232,147,10,0.72)','rgba(124,58,237,0.72)','rgba(219,39,119,0.72)','rgba(8,145,178,0.72)','rgba(101,163,13,0.72)','rgba(180,83,9,0.72)','rgba(99,102,241,0.72)','rgba(26,159,190,0.72)','rgba(143,186,46,0.72)'];
 const defaultFont = {family:"'Microsoft JhengHei','Noto Sans TC',sans-serif", size:14};
-// 全域註冊 datalabels 並設預設(每張圖都自動顯示數字)
+// 註冊 datalabels 插件,但預設不顯示;只有特定 chart 顯式 opt-in 才會顯示數字
+// (避免其他分頁的圖被加上重複的數字)
 if(window.ChartDataLabels){
   Chart.register(ChartDataLabels);
-  Chart.defaults.set('plugins.datalabels', {
-    color: '#1a2e28',
-    font: { family: defaultFont.family, weight: '700', size: 11 },
-    formatter: (v) => (typeof v === 'number' && v > 0) ? v.toLocaleString() : (v && v.y > 0 ? v.y : ''),
-  });
+  Chart.defaults.set('plugins.datalabels', { display: false });
 }
 const chartInstances = {};
 const currentChartType = {weekly:'bar', type:'line', typeweekly:'line'};
@@ -2549,7 +2546,7 @@ function buildCourseCharts(){
         plugins:{
           legend:{position:'top',labels:{font:defaultFont}},
           tooltip:{callbacks:{ afterLabel:(c)=>{ const t=typeOrder[c.dataIndex]; const tot=typeFill[t].booked+typeFill[t].remaining; return '總容量:'+tot+' 人'; } }},
-          datalabels:{ anchor:'center', align:'center', color:'#fff', font:{family:defaultFont.family,weight:'700',size:13}, formatter:(v)=>v>0?v:'' }
+          datalabels:{ display:true, anchor:'center', align:'center', color:'#fff', font:{family:defaultFont.family,weight:'700',size:13}, formatter:(v)=>v>0?v:'' }
         },
         scales:{ x:{stacked:true,ticks:{font:defaultFont}}, y:{stacked:true,beginAtZero:true,ticks:{font:defaultFont,precision:0},title:{display:true,text:'人次',font:Object.assign({},defaultFont,{size:12,weight:'600'})}} }
       }
@@ -2574,7 +2571,7 @@ function buildCourseCharts(){
         responsive:true, maintainAspectRatio:false,
         plugins:{
           legend:{position:'right',labels:{font:defaultFont}},
-          datalabels:{ color:'#fff', font:{family:defaultFont.family,weight:'700',size:13}, formatter:(v)=>{const pct=statusTotal>0?Math.round(v/statusTotal*100):0; return v+'\n('+pct+'%)';}, textAlign:'center' }
+          datalabels:{ display:true, color:'#fff', font:{family:defaultFont.family,weight:'700',size:13}, formatter:(v)=>{const pct=statusTotal>0?Math.round(v/statusTotal*100):0; return v+'\n('+pct+'%)';}, textAlign:'center' }
         }
       }
     });
