@@ -2637,7 +2637,6 @@ function setGlobalDateToDay(d){
   document.getElementById('courseGlobalTo').value   = d;
   document.querySelectorAll('#tab-course .quick-date-btn').forEach(b=>b.classList.remove('active'));
   buildCourseCharts();
-  document.getElementById('allSlotsBody')?.scrollIntoView({behavior:'smooth',block:'start'});
 }
 let _calMonth = null; // "YYYY-MM"
 function navCal(delta){
