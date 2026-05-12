@@ -604,6 +604,7 @@ footer {
   <button class="tab-btn" onclick="showTab('typeweekly',this)">🔎 各類型週趨勢細項</button>
   <button class="tab-btn" onclick="showTab('clinic',this)">🏥 診所分析</button>
   <button class="tab-btn" onclick="showTab('prescday',this)">📅 處方日執行數</button>
+  <button class="tab-btn" onclick="showTab('course',this)">🎓 課程選課</button>
 </div>
 
 <!-- 區域篩選列 -->
@@ -810,6 +811,43 @@ footer {
   </div>
 </div>
 
+<!-- ═══ TAB 6:課程選課 ═══ -->
+<div id="tab-course" class="hidden">
+  <div class="summary-grid" style="margin-top:20px">
+    <div class="card blue">  <span class="icon">📅</span><div class="val" id="csTotalSlots">—</div><div class="lbl">總場次</div></div>
+    <div class="card green"> <span class="icon">📝</span><div class="val" id="csTotalEnroll">—</div><div class="lbl">總報名人次</div></div>
+    <div class="card orange"><span class="icon">✅</span><div class="val" id="csTotalAttend">—</div><div class="lbl">總出席人次</div></div>
+    <div class="card purple"><span class="icon">📈</span><div class="val" id="csAttendRate">—</div><div class="lbl">出席率</div></div>
+    <div class="card violet"><span class="icon">🔥</span><div class="val" id="csFullSlots">—</div><div class="lbl">滿座場次</div></div>
+  </div>
+  <div class="chart-section" data-pdf-id="course-top15" data-pdf-label="熱門課程 TOP 15" style="margin:18px 36px;">
+    <div class="chart-header"><h2>🔥 熱門課程 TOP 15(依累積報名人次)</h2><button class="dl-btn" onclick="downloadChart(this)">↓ 下載 JPG</button></div>
+    <div class="chart-wrap" style="height:480px"><canvas id="courseTop15Chart"></canvas></div>
+  </div>
+  <div class="side-by-side">
+    <div class="chart-section" data-pdf-id="course-type-pie" data-pdf-label="各處方類型選課分布">
+      <div class="chart-header"><h2>各處方類型選課分布</h2><button class="dl-btn" onclick="downloadChart(this)">↓ 下載 JPG</button></div>
+      <div class="chart-wrap"><canvas id="courseTypePieChart"></canvas></div>
+    </div>
+    <div class="chart-section" data-pdf-id="course-status-pie" data-pdf-label="場次狀態分布">
+      <div class="chart-header"><h2>場次狀態分布</h2><button class="dl-btn" onclick="downloadChart(this)">↓ 下載 JPG</button></div>
+      <div class="chart-wrap"><canvas id="courseStatusPieChart"></canvas></div>
+    </div>
+  </div>
+  <div class="chart-section" style="margin:18px 36px;">
+    <div class="chart-header"><h2>📋 即將到來的場次</h2></div>
+    <div style="overflow-x:auto;max-height:480px;overflow-y:auto">
+      <table class="data-table" style="width:100%">
+        <thead style="position:sticky;top:0;background:var(--surface);z-index:1">
+          <tr><th>日期</th><th>時間</th><th>課程</th><th>類型</th><th>地點</th><th class="num">已報名</th><th class="num">容量</th><th class="num">滿座率</th></tr>
+        </thead>
+        <tbody id="upcomingSlotsBody"></tbody>
+      </table>
+    </div>
+    <div id="upcomingSlotsEmpty" style="display:none;padding:24px;text-align:center;color:var(--text-muted)">目前沒有 scheduled 狀態的場次</div>
+  </div>
+</div>
+
 <footer>健康處方開立統計儀表板 &nbsp;·&nbsp; ⬡ 資料儲存於 Supabase &nbsp;·&nbsp; ◈ 圖表由 Chart.js 製作</footer>
 
 <!-- ══════════════════════════════════
@@ -942,6 +980,8 @@ let currentRegion   = 'all'; // 'all'|'北投區'|'士林區'|'中山區'
 let weeklyData = [], typeStats = [], typeWeeklyRaw = [], clinicStats = [];
 let monthlyData = [], typeMonthlyRaw = [];
 let rawRows = []; // 原始 row 資料，供日期篩選用
+let courseSlots = []; // 課程時段資料(從 admin/slots/summary 來)
+let courseSlotStats = null; // 課程總計
 
 // ══════════════════════════════════════════════
 //  雲端狀態列
@@ -994,6 +1034,9 @@ async function loadFromCloud() {
       try { localStorage.setItem('clinicRegionMap', JSON.stringify(clinicRegionMap)); } catch(e){}
       updateRegionSummaryBadge();
     }
+    // 課程時段資料
+    courseSlots = Array.isArray(data.course_slots) ? data.course_slots : [];
+    courseSlotStats = data.course_slot_stats || null;
     const dr = data.date_range || '—';
     const fn = data.file_name  || '—';
     const at = data.uploaded_at ? new Date(data.uploaded_at).toLocaleString('zh-TW') : '—';
@@ -2382,16 +2425,127 @@ dz.addEventListener('drop', e=>{e.preventDefault();dz.classList.remove('drag-ove
 //  Tab 切換
 // ══════════════════════════════════════════════
 function showTab(name, btn){
-  ['weekly','type','typeweekly','clinic','prescday'].forEach(t=>document.getElementById('tab-'+t).classList.add('hidden'));
+  ['weekly','type','typeweekly','clinic','prescday','course'].forEach(t=>document.getElementById('tab-'+t).classList.add('hidden'));
   document.getElementById('tab-'+name).classList.remove('hidden');
   document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
   if(btn) btn.classList.add('active');
   currentActiveTab = name;
   const bar = document.getElementById('dateFilterBar');
-  if(bar) bar.style.display = name!=='prescday' ? 'flex' : 'none';
+  if(bar) bar.style.display = (name!=='prescday' && name!=='course') ? 'flex' : 'none';
   if(name==='clinic') setTimeout(()=>buildClinicCharts(), 50);
   if(name==='prescday') setTimeout(()=>buildPrescDayCharts(), 50);
+  if(name==='course') setTimeout(()=>buildCourseCharts(), 50);
   updateSummary();
+}
+
+// ══════════════════════════════════════════════
+//  TAB 6 — 課程選課
+// ══════════════════════════════════════════════
+function buildCourseCharts(){
+  const stats = courseSlotStats || {};
+  const setText = (id,v) => { const el = document.getElementById(id); if(el) el.textContent = v; };
+  setText('csTotalSlots',  (stats.total_slots||0).toLocaleString());
+  setText('csTotalEnroll', (stats.total_enrollments||0).toLocaleString());
+  setText('csTotalAttend', (stats.total_attendances||0).toLocaleString());
+  setText('csAttendRate',  (stats.attendance_rate!=null ? stats.attendance_rate : 0) + '%');
+  setText('csFullSlots',   (stats.full_slots||0).toLocaleString());
+
+  // 熱門課程 TOP 15 — 按累積 booked_count 排序
+  const courseMap = {};
+  const typeMap = {};
+  const statusMap = {};
+  courseSlots.forEach(s => {
+    const cn = (s.course_name||'未命名').toString().trim();
+    if(!courseMap[cn]) courseMap[cn] = { name:cn, booked:0, slots:0, type:s.course_type };
+    courseMap[cn].booked += (s.booked_count||0);
+    courseMap[cn].slots += 1;
+    const tk = s.course_type || 'other';
+    typeMap[tk] = (typeMap[tk]||0) + (s.booked_count||0);
+    const sk = s.status || 'unknown';
+    statusMap[sk] = (statusMap[sk]||0) + 1;
+  });
+  const top = Object.values(courseMap).sort((a,b)=>b.booked-a.booked).slice(0,15);
+  destroyChart('courseTop15Chart');
+  const ctx1 = document.getElementById('courseTop15Chart');
+  if(ctx1){
+    chartInstances.courseTop15Chart = new Chart(ctx1, {
+      type:'bar',
+      data:{
+        labels: top.map(t=>t.name.length>26 ? t.name.slice(0,26)+'…' : t.name),
+        datasets:[{ label:'累積報名人次', data: top.map(t=>t.booked), backgroundColor:'rgba(124,58,237,0.78)', borderRadius:4 }]
+      },
+      options:{
+        indexAxis:'y', responsive:true, maintainAspectRatio:false,
+        plugins:{ legend:{display:false}, tooltip:{callbacks:{
+          afterLabel:(c)=>'場次數:'+top[c.dataIndex].slots
+        }}},
+        scales:{ x:{beginAtZero:true,ticks:{font:defaultFont}}, y:{ticks:{font:Object.assign({},defaultFont,{size:11.5}),autoSkip:false}} }
+      }
+    });
+  }
+
+  // 處方類型分布
+  const typeLabels = { mental:'情緒調適', nutrition:'營養', social:'社會', exercise:'運動', other:'其他' };
+  const typeColors = { mental:'#7c3aed', nutrition:'#2aac8a', social:'#1a9fbe', exercise:'#e8930a', other:'#9aa5b1' };
+  const typeKeys = Object.keys(typeMap).sort((a,b)=>typeMap[b]-typeMap[a]);
+  destroyChart('courseTypePieChart');
+  const ctx2 = document.getElementById('courseTypePieChart');
+  if(ctx2){
+    chartInstances.courseTypePieChart = new Chart(ctx2, {
+      type:'doughnut',
+      data:{
+        labels: typeKeys.map(k=>typeLabels[k]||k),
+        datasets:[{ data: typeKeys.map(k=>typeMap[k]), backgroundColor: typeKeys.map(k=>typeColors[k]||'#9aa5b1'), borderWidth:2, borderColor:'#fff' }]
+      },
+      options:{ responsive:true, maintainAspectRatio:false, plugins:{ legend:{position:'right',labels:{font:defaultFont}} } }
+    });
+  }
+
+  // 場次狀態分布
+  const statusLabels = { scheduled:'即將舉辦', completed:'已完成', cancelled:'已取消', unknown:'未知' };
+  const statusColors = { scheduled:'#1a9fbe', completed:'#2aac8a', cancelled:'#c0c0c0', unknown:'#9aa5b1' };
+  const statusKeys = Object.keys(statusMap).sort((a,b)=>statusMap[b]-statusMap[a]);
+  destroyChart('courseStatusPieChart');
+  const ctx3 = document.getElementById('courseStatusPieChart');
+  if(ctx3){
+    chartInstances.courseStatusPieChart = new Chart(ctx3, {
+      type:'doughnut',
+      data:{
+        labels: statusKeys.map(k=>statusLabels[k]||k),
+        datasets:[{ data: statusKeys.map(k=>statusMap[k]), backgroundColor: statusKeys.map(k=>statusColors[k]||'#9aa5b1'), borderWidth:2, borderColor:'#fff' }]
+      },
+      options:{ responsive:true, maintainAspectRatio:false, plugins:{ legend:{position:'right',labels:{font:defaultFont}} } }
+    });
+  }
+
+  // 即將到來的場次表
+  const tbody = document.getElementById('upcomingSlotsBody');
+  const empty = document.getElementById('upcomingSlotsEmpty');
+  if(tbody){
+    const today = new Date().toISOString().slice(0,10);
+    const upcoming = courseSlots
+      .filter(s => s.status==='scheduled' && s.slot_date >= today)
+      .sort((a,b) => (a.slot_date+a.start_time).localeCompare(b.slot_date+b.start_time));
+    tbody.innerHTML = upcoming.map(s => {
+      const cap = s.capacity || 0;
+      const bk = s.booked_count || 0;
+      const rate = cap > 0 ? Math.round(bk/cap*100) : 0;
+      const tlbl = typeLabels[s.course_type] || s.course_type || '—';
+      const tcolor = typeColors[s.course_type] || '#9aa5b1';
+      const rateColor = rate >= 100 ? '#c0392b' : (rate >= 70 ? '#e8930a' : 'var(--text-muted)');
+      return `<tr>
+        <td>${s.slot_date}</td>
+        <td>${(s.start_time||'').slice(0,5)} - ${(s.end_time||'').slice(0,5)}</td>
+        <td>${s.course_name||''}</td>
+        <td><span style="display:inline-block;padding:2px 8px;border-radius:10px;background:${tcolor}22;color:${tcolor};font-size:0.78rem;font-weight:700">${tlbl}</span></td>
+        <td style="font-size:0.85rem;color:var(--text-muted)">${s.course_location||'—'}</td>
+        <td class="num">${bk}</td>
+        <td class="num">${cap}</td>
+        <td class="num" style="color:${rateColor};font-weight:700">${rate}%</td>
+      </tr>`;
+    }).join('');
+    if(empty) empty.style.display = upcoming.length === 0 ? 'block' : 'none';
+  }
 }
 
 // ══════════════════════════════════════════════
