@@ -549,7 +549,10 @@ footer {
     <div class="dot"></div>
     <span id="cloud-msg">正在從雲端讀取最新資料…</span>
   </div>
-  <div id="view-counter" style="font-size:0.8rem;opacity:0.8;white-space:nowrap;"></div>
+  <div style="display:flex;align-items:center;gap:14px;">
+    <button id="weeklyReportBtn" onclick="downloadLatestWeeklyReport()" style="display:none;padding:6px 14px;border-radius:18px;border:1.5px solid var(--teal);background:#fff;color:var(--teal);font-family:inherit;font-size:0.82rem;font-weight:700;cursor:pointer;white-space:nowrap">📥 下載最新週報</button>
+    <div id="view-counter" style="font-size:0.8rem;opacity:0.8;white-space:nowrap;"></div>
+  </div>
 </div>
 
 <div class="upload-bar">
@@ -1030,6 +1033,7 @@ let rawRows = []; // 原始 row 資料，供日期篩選用
 let courseSlots = []; // 課程時段資料(從 admin/slots/summary 來)
 let courseSlotStats = null; // 課程總計
 let pinnedDates = new Set(); // 處方日等需置頂的日期(雲端同步)
+let latestWeeklyReport = null; // 每週一自動產出的 docx(base64)
 
 // ══════════════════════════════════════════════
 //  雲端狀態列
@@ -1085,6 +1089,9 @@ async function loadFromCloud() {
     // 課程時段資料
     courseSlots = Array.isArray(data.course_slots) ? data.course_slots : [];
     courseSlotStats = data.course_slot_stats || null;
+    // 最新週報
+    latestWeeklyReport = (data.latest_weekly_report && data.latest_weekly_report.b64) ? data.latest_weekly_report : null;
+    updateWeeklyReportButton();
     // 置頂日期(雲端優先,否則 localStorage fallback)
     if(Array.isArray(data.pinned_dates)){
       pinnedDates = new Set(data.pinned_dates);
@@ -2732,6 +2739,33 @@ function toggleSlotExpand(slotId, evt){
   if(evt) evt.stopPropagation();
   _expandedSlot = (_expandedSlot === slotId) ? null : slotId;
   renderSlotsTable();
+}
+function updateWeeklyReportButton(){
+  const btn = document.getElementById('weeklyReportBtn');
+  if(!btn) return;
+  if(latestWeeklyReport && latestWeeklyReport.b64){
+    btn.style.display = 'inline-block';
+    btn.title = `${latestWeeklyReport.filename} · ${(latestWeeklyReport.size/1024).toFixed(1)} KB · 產出於 ${latestWeeklyReport.generated_at ? new Date(latestWeeklyReport.generated_at).toLocaleString('zh-TW') : latestWeeklyReport.date}`;
+    btn.textContent = `📥 下載週報(${latestWeeklyReport.date})`;
+  } else {
+    btn.style.display = 'none';
+  }
+}
+function downloadLatestWeeklyReport(){
+  if(!latestWeeklyReport || !latestWeeklyReport.b64) return;
+  // base64 → Blob → 觸發下載
+  const bin = atob(latestWeeklyReport.b64);
+  const len = bin.length;
+  const u8 = new Uint8Array(len);
+  for(let i=0; i<len; i++) u8[i] = bin.charCodeAt(i);
+  const blob = new Blob([u8], { type:'application/vnd.openxmlformats-officedocument.wordprocessingml.document' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = latestWeeklyReport.filename || `處方統計表_${latestWeeklyReport.date}.docx`;
+  document.body.appendChild(a);
+  a.click();
+  setTimeout(() => { URL.revokeObjectURL(url); a.remove(); }, 100);
 }
 async function togglePinDate(date, evt){
   if(evt) evt.stopPropagation();
