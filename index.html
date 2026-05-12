@@ -329,6 +329,8 @@ header p { font-size: 0.86rem; opacity: 0.88; margin-top: 5px; letter-spacing: 0
 .card.purple .val { color: var(--blue-teal); }
 .card.violet .val { color: #6d28d9; }
 .card .lbl { font-size: 0.8rem; color: var(--text-muted); margin-top: 7px; font-weight: 500; }
+.card .delta { font-size: 0.72rem; color: var(--teal); margin-top: 4px; font-weight: 700; letter-spacing: 0.02em; }
+.card .delta.zero { color: var(--text-muted); font-weight: 500; }
 
 /* ── 頁籤 ── */
 .tabs {
@@ -588,8 +590,8 @@ footer {
 
 <!-- 摘要卡片（5 張） -->
 <div class="summary-grid">
-  <div class="card blue">  <span class="icon">📁</span><div class="val" id="sumTotal">—</div><div class="lbl">總開立數</div></div>
-  <div class="card green"> <span class="icon">☑️</span><div class="val" id="sumExec">—</div><div class="lbl">總執行數</div></div>
+  <div class="card blue">  <span class="icon">📁</span><div class="val" id="sumTotal">—</div><div class="lbl">總開立數</div><div class="delta" id="sumTotalToday"></div></div>
+  <div class="card green"> <span class="icon">☑️</span><div class="val" id="sumExec">—</div><div class="lbl">總執行數</div><div class="delta" id="sumExecToday"></div></div>
   <div class="card orange"><span class="icon">📈</span><div class="val" id="sumRate">—</div><div class="lbl">整體執行率</div></div>
   <div class="card purple"><span class="icon">🗓️</span><div class="val" id="sumWeeks">—</div><div class="lbl">統計週數</div></div>
   <div class="card violet"><span class="icon">🎓</span><div class="val" id="sumEnroll">—</div><div class="lbl">總選課人次</div></div>
@@ -1157,6 +1159,20 @@ function updateSummary(){
     if(lbl) lbl.textContent = useMonth ? '統計月數' : '統計週數';
   }
   document.getElementById('sumEnroll').textContent  = enroll > 0 ? enroll.toLocaleString() : '—';
+  // 今日增量(從 rawRows 算當日 prescDate / execDate,不受任何 UI 篩選影響)
+  const t = new Date();
+  const todayStr = `${t.getFullYear()}-${String(t.getMonth()+1).padStart(2,'0')}-${String(t.getDate()).padStart(2,'0')}`;
+  const monthDay = `${t.getMonth()+1}/${t.getDate()}`;
+  const todayPresc = rawRows.reduce((s,r) => s + (r.prescDate === todayStr ? 1 : 0), 0);
+  const todayExec  = rawRows.reduce((s,r) => s + (r.execDate === todayStr ? 1 : 0), 0);
+  const setDelta = (id, count) => {
+    const el = document.getElementById(id);
+    if(!el) return;
+    el.textContent = `(${monthDay} +${count.toLocaleString()})`;
+    el.classList.toggle('zero', count === 0);
+  };
+  setDelta('sumTotalToday', todayPresc);
+  setDelta('sumExecToday',  todayExec);
 }
 
 // ══════════════════════════════════════════════
