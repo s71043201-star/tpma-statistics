@@ -681,6 +681,11 @@ footer {
     <div style="font-size:0.85rem;">請先上傳含「開立日期」的 Excel，或等待雲端資料同步。</div>
   </div>
   <div id="daily-content">
+    <div class="chart-section" style="margin:18px 36px">
+      <div class="chart-header"><h2>⏱️ 今日更新時間軸<span id="dailyFeedTodayLabel" style="font-size:0.78rem;font-weight:400;color:var(--text-muted);margin-left:10px"></span></h2><button onclick="clearDailyUpdateLog()" style="border:1.5px solid var(--border);background:transparent;color:var(--text-muted);border-radius:14px;padding:4px 14px;font-size:0.78rem;cursor:pointer;font-family:inherit">清空紀錄</button></div>
+      <div id="dailyUpdateFeed" style="display:flex;flex-wrap:wrap;gap:8px;max-height:200px;overflow-y:auto;padding:6px 2px"></div>
+      <div style="margin-top:8px;font-size:0.72rem;color:var(--text-muted)">資料每 5 分鐘自動同步,此處紀錄頁面開啟期間偵測到的當日新增。重新整理瀏覽器不影響本機紀錄。</div>
+    </div>
     <div class="chart-section" data-pdf-id="daily-pres" data-pdf-label="單月每日處方開立數">
       <div class="chart-header"><h2 id="d1-title">單月每日處方開立數</h2><button class="dl-btn" onclick="downloadChart(this)">↓ 下載 JPG</button></div>
       <div class="chart-wrap"><canvas id="dailyPresChart"></canvas></div>
@@ -1166,6 +1171,7 @@ async function loadFromCloud() {
     setCloudStatus('', `✦ 已載入最新資料　來源：${fn}　上傳時間：${at}`);
     updateSummary();
     buildAllCharts();
+    trackDailyUpdate();
   } catch(e) {
     setCloudStatus('error', '❌ 連線失敗，請確認網路及 Supabase 設定');
   }
@@ -1441,9 +1447,82 @@ function onDailyMonthChange(){
   selectedDailyMonth = sel.value || null;
   buildDailyCharts(currentChartType.daily);
 }
+
+// ── 今日更新時間軸:偵測 loadFromCloud 之間的 delta ──
+let dailyUpdateLog = [];
+function _todayStrLocal(){
+  const t = new Date();
+  return `${t.getFullYear()}-${String(t.getMonth()+1).padStart(2,'0')}-${String(t.getDate()).padStart(2,'0')}`;
+}
+function _saveDailyUpdateLog(lastCount){
+  try{
+    localStorage.setItem('dailyUpdateLog', JSON.stringify({
+      date: _todayStrLocal(), entries: dailyUpdateLog, lastCount
+    }));
+  }catch(e){}
+}
+function trackDailyUpdate(){
+  if(!rawRows || !rawRows.length){ renderDailyUpdateFeed(); return; }
+  const todayStr = _todayStrLocal();
+  const todayCount = rawRows.reduce((s,r)=>s+(r.prescDate===todayStr?1:0),0);
+  let stored = null;
+  try{ stored = JSON.parse(localStorage.getItem('dailyUpdateLog')||'null'); }catch(e){}
+  if(!stored || stored.date !== todayStr){
+    // 新一天或第一次,設基準不算 delta
+    dailyUpdateLog = [];
+    _saveDailyUpdateLog(todayCount);
+    renderDailyUpdateFeed();
+    return;
+  }
+  dailyUpdateLog = stored.entries || [];
+  const prevCount = stored.lastCount != null ? stored.lastCount : todayCount;
+  if(todayCount > prevCount){
+    const now = new Date();
+    const timeStr = `${now.getMonth()+1}/${now.getDate()} ${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
+    dailyUpdateLog.push({ time: timeStr, delta: todayCount - prevCount });
+  }
+  _saveDailyUpdateLog(todayCount);
+  renderDailyUpdateFeed();
+}
+function renderDailyUpdateFeed(){
+  const el = document.getElementById('dailyUpdateFeed');
+  if(!el) return;
+  const lbl = document.getElementById('dailyFeedTodayLabel');
+  if(lbl){
+    const todayStr = _todayStrLocal();
+    const todayCount = (rawRows||[]).reduce((s,r)=>s+(r.prescDate===todayStr?1:0),0);
+    const sumDelta = dailyUpdateLog.reduce((s,e)=>s+e.delta,0);
+    lbl.textContent = `(今日累計 ${todayCount.toLocaleString()} 筆 ｜ 本次開啟偵測到 +${sumDelta})`;
+  }
+  if(!dailyUpdateLog.length){
+    el.innerHTML = '<div style="color:var(--text-muted);font-size:0.85rem;text-align:center;padding:14px;width:100%">尚未偵測到今日新增,下次資料同步若有變動會顯示在這</div>';
+    return;
+  }
+  el.innerHTML = [...dailyUpdateLog].reverse().map(e=>`
+    <div style="display:inline-flex;align-items:center;gap:10px;padding:7px 14px;border-radius:20px;background:#f0fbf7;border:1px solid #b3e8d4;font-size:0.86rem">
+      <span style="color:var(--teal);font-weight:700">${e.time}</span>
+      <span style="color:#1a9fbe;font-weight:700">+${e.delta}</span>
+    </div>
+  `).join('');
+}
+function clearDailyUpdateLog(){
+  if(!confirm('確定要清空今日更新紀錄嗎?')) return;
+  dailyUpdateLog = [];
+  const todayStr = _todayStrLocal();
+  const todayCount = (rawRows||[]).reduce((s,r)=>s+(r.prescDate===todayStr?1:0),0);
+  _saveDailyUpdateLog(todayCount);
+  renderDailyUpdateFeed();
+}
 function buildDailyCharts(mode){
   ['dailyPres','dailyExec'].forEach(k=>destroyChart(k));
   populateDailyMonthSelector();
+  // 從 localStorage 載入並渲染今日更新時間軸
+  try{
+    const stored = JSON.parse(localStorage.getItem('dailyUpdateLog')||'null');
+    if(stored && stored.date === _todayStrLocal()) dailyUpdateLog = stored.entries || [];
+    else dailyUpdateLog = [];
+  }catch(e){ dailyUpdateLog = []; }
+  renderDailyUpdateFeed();
   const noDataBox = document.getElementById('daily-no-data');
   const contentBox = document.getElementById('daily-content');
   if(!rawRows || !rawRows.length || !selectedDailyMonth){
