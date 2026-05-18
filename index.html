@@ -3070,13 +3070,23 @@ async function _saveNotes(alsoRegen){
     return false;
   }
   clinicNotes = notes;
-  // 2) 若要重新產出,設 regen_request_at(n8n quick-poll workflow 偵測到後跑 Python)
+  // 2) 同步寫 Supabase clinic_notes(週報 Python 是讀這欄,不是直接打 Sheet)
+  if(sbClient){
+    const { error } = await sbClient.from('prescription_data')
+      .upsert({ id:'main', clinic_notes: notes }, { onConflict:'id' });
+    if(error){
+      status.textContent = '⚠️ Sheet 已存,但同步到 Supabase 失敗:' + error.message;
+      alert('⚠️ Supabase 同步失敗(週報可能拿到舊資料):' + error.message);
+      return false;
+    }
+  }
+  // 3) 若要重新產出,設 regen_request_at(n8n quick-poll workflow 偵測到後跑 Python)
   if(alsoRegen && sbClient){
     const { error } = await sbClient.from('prescription_data')
       .upsert({ id:'main', regen_request_at: new Date().toISOString() }, { onConflict:'id' });
     if(error){
       const isMissingCol = (error.message||'').toLowerCase().includes('column');
-      status.textContent = '⚠️ 備註已存 Sheet,但觸發重新產出失敗:' + error.message;
+      status.textContent = '⚠️ 備註已存 Sheet+Supabase,但觸發重新產出失敗:' + error.message;
       alert(isMissingCol ? '⚠️ Supabase 缺欄位\n\nALTER TABLE prescription_data ADD COLUMN IF NOT EXISTS regen_request_at timestamptz, ADD COLUMN IF NOT EXISTS regen_last_run_at timestamptz;'
                         : '⚠️ 觸發失敗:' + error.message);
       return false;
