@@ -777,7 +777,7 @@ footer {
       <button class="ct-btn" onclick="setClinicSort('name',this)"><span>🔤</span> 名稱↑</button>
     </div>
     <div class="chart-section" data-pdf-id="clinic-enroll" data-pdf-label="各診所選課或執行筆數">
-      <div class="chart-header"><h2>各診所選課或執行筆數（去重）</h2><button class="dl-btn" onclick="downloadChart(this)">↓ 下載 JPG</button></div>
+      <div class="chart-header"><h2>各診所選課或執行筆數（依處方類型堆疊）</h2><button class="dl-btn" onclick="downloadChart(this)">↓ 下載 JPG</button></div>
       <div class="chart-wrap" id="clinicEnrollWrap" style="height:360px"><canvas id="clinicEnrollChart"></canvas></div>
     </div>
     <div class="chart-section" data-pdf-id="clinic-bar" data-pdf-label="各診所開立數 vs 執行筆數">
@@ -900,9 +900,20 @@ footer {
         <button class="pdf-tab-btn" data-filter="completed" onclick="filterSlotsTable('completed',this)">已完成</button>
       </div>
     </div>
-    <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:12px;padding-top:4px;border-top:1px dashed var(--border)">
+    <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-top:8px;padding-top:8px;border-top:1px dashed var(--border)">
+      <span style="font-size:0.78rem;font-weight:700;color:var(--text-muted);margin-right:2px">處方類型:</span>
+      <div id="slotsTypeFilterBar" style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
+        <button class="pdf-tab-btn active" data-type="all" onclick="filterSlotsType('all',this)">全部</button>
+        <button class="pdf-tab-btn" data-type="mental" onclick="filterSlotsType('mental',this)">情緒調適</button>
+        <button class="pdf-tab-btn" data-type="nutrition" onclick="filterSlotsType('nutrition',this)">營養</button>
+        <button class="pdf-tab-btn" data-type="social" onclick="filterSlotsType('social',this)">社會</button>
+        <button class="pdf-tab-btn" data-type="exercise" onclick="filterSlotsType('exercise',this)">運動</button>
+        <button class="pdf-tab-btn" data-type="other" onclick="filterSlotsType('other',this)">其他</button>
+      </div>
+    </div>
+    <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-top:8px;margin-bottom:12px">
       <input type="text" id="slotsFilterSearch" placeholder="🔍 搜尋課程名稱或地點…" oninput="renderSlotsTable()" style="flex:1;min-width:240px;padding:7px 12px;border-radius:8px;border:1.5px solid var(--border);font-family:inherit;font-size:0.86rem;background:var(--surface);color:var(--text);outline:none">
-      <button onclick="clearSlotsAllFilters()" style="padding:6px 10px;border-radius:6px;border:1.5px solid var(--border);background:var(--surface);color:var(--text-muted);font-size:0.78rem;cursor:pointer">清除搜尋</button>
+      <button onclick="clearSlotsAllFilters()" style="padding:6px 10px;border-radius:6px;border:1.5px solid var(--border);background:var(--surface);color:var(--text-muted);font-size:0.78rem;cursor:pointer">清除所有篩選</button>
       <span id="slotsCountBadge" style="margin-left:auto;font-size:0.82rem;color:var(--text-muted)"></span>
     </div>
     <div style="overflow-x:auto;max-height:560px;overflow-y:auto">
@@ -1756,6 +1767,68 @@ function buildTypeWeeklyCharts(mode){
 // ══════════════════════════════════════════════
 //  TAB 4 — 診所分析
 // ══════════════════════════════════════════════
+const CLINIC_TYPE_PALETTE = ['#8fba2e','#2aac8a','#1a9fbe','#1a7ea0','#7c3aed','#e8930a','#d946ef','#dc2626','#06b6d4','#84cc16'];
+
+const stackedTotalLabelPlugin = {
+  id: 'stackedTotalLabel',
+  afterDatasetsDraw(chart) {
+    const {ctx, data, scales} = chart;
+    if (!scales.x || !scales.y) return;
+    const labels = data.labels || [];
+    const datasets = data.datasets || [];
+    ctx.save();
+    ctx.font = '700 11px ' + (defaultFont.family || 'system-ui');
+    ctx.fillStyle = '#475569';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'bottom';
+    labels.forEach((_, idx) => {
+      const total = datasets.reduce((s, ds) => s + (Number(ds.data[idx]) || 0), 0);
+      if (!total) return;
+      const x = scales.x.getPixelForValue(idx);
+      const y = scales.y.getPixelForValue(total);
+      ctx.fillText(total.toLocaleString(), x, y - 4);
+    });
+    ctx.restore();
+  }
+};
+
+function getFilteredRawRowsForClinic() {
+  if (!rawRows || !rawRows.length) return [];
+  const from = document.getElementById('filterFrom')?.value || '';
+  const to   = document.getElementById('filterTo')?.value   || '';
+  let filtered = rawRows;
+  if (currentRegion !== 'all') {
+    filtered = filtered.filter(r => r.clinic && getRegionOfClinic(r.clinic) === currentRegion);
+  }
+  if (from || to) {
+    filtered = filtered.filter(r => {
+      if (from && r.prescDate < from) return false;
+      if (to   && r.prescDate > to)   return false;
+      return true;
+    });
+  }
+  return filtered;
+}
+
+function computeClinicEnrollByType(sortedStats) {
+  const filtered = getFilteredRawRowsForClinic();
+  if (!filtered.length) return null;
+  const clinicSet = new Set(sortedStats.map(d => d.診所名稱));
+  const matrix = {};
+  const typeTotals = {};
+  filtered.forEach(r => {
+    if (!r.clinic || !clinicSet.has(r.clinic)) return;
+    if (!(r.enrolled || r.ex)) return;
+    const t = r.type || '未分類';
+    if (!matrix[r.clinic]) matrix[r.clinic] = {};
+    matrix[r.clinic][t] = (matrix[r.clinic][t] || 0) + 1;
+    typeTotals[t] = (typeTotals[t] || 0) + 1;
+  });
+  const typeSet = Object.keys(typeTotals).sort((a, b) => typeTotals[b] - typeTotals[a]);
+  if (!typeSet.length) return null;
+  return { typeSet, matrix };
+}
+
 function getSortedClinicStats() {
   const data = [...clinicStats];
   switch(currentClinicSort){
@@ -1785,16 +1858,33 @@ function buildClinicCharts() {
   document.getElementById('clinicEnrollWrap').style.height = dynH + 'px';
   document.getElementById('clinicBarWrap').style.height    = dynH + 'px';
   document.getElementById('clinicRateWrap').style.height   = dynH + 'px';
-  const enrollColors = enrollData.map(v => {
-    const max = Math.max(...enrollData, 1);
-    const alpha = 0.4 + (v / max) * 0.5;
-    return `rgba(124,58,237,${alpha.toFixed(2)})`;
-  });
-  chartInstances['clinicEnroll'] = new Chart(document.getElementById('clinicEnrollChart').getContext('2d'), {
-    type: 'bar', plugins: [barLabelPlugin],
-    data: { labels: names, datasets: [{ label: '選課人次', data: enrollData, backgroundColor: enrollColors, borderColor: '#7c3aed', borderWidth: 1, borderRadius: 4 }] },
-    options: { responsive: true, maintainAspectRatio: false, layout: { padding: { top: 30 } }, plugins: { legend: { display: false }, tooltip: { callbacks: { label: c => ` 選課或執行：${c.parsed.y} 筆` } } }, scales: { y: { ticks:{font:defaultFont}, beginAtZero:true, grid:{color:'#e2e8f0'} }, x: { ticks:{font:Object.assign({}, defaultFont, {size:12}), autoSkip:false, maxRotation:45, minRotation:45}, grid:{display:false} } } }
-  });
+  const enrollByType = computeClinicEnrollByType(sorted);
+  if (enrollByType && enrollByType.typeSet.length) {
+    const enrollDatasets = enrollByType.typeSet.map((t, i) => ({
+      label: t,
+      data: names.map(n => (enrollByType.matrix[n] && enrollByType.matrix[n][t]) || 0),
+      backgroundColor: CLINIC_TYPE_PALETTE[i % CLINIC_TYPE_PALETTE.length],
+      borderWidth: 0,
+      borderRadius: 2,
+      stack: 'enroll'
+    }));
+    chartInstances['clinicEnroll'] = new Chart(document.getElementById('clinicEnrollChart').getContext('2d'), {
+      type: 'bar', plugins: [stackedTotalLabelPlugin],
+      data: { labels: names, datasets: enrollDatasets },
+      options: { responsive: true, maintainAspectRatio: false, layout: { padding: { top: 30 } }, plugins: { legend: { position:'top', labels:{font:defaultFont, boxWidth:14, padding:10} }, tooltip: { callbacks: { label: c => ` ${c.dataset.label}:${c.parsed.y} 筆` } } }, scales: { y: { stacked:true, ticks:{font:defaultFont}, beginAtZero:true, grid:{color:'#e2e8f0'} }, x: { stacked:true, ticks:{font:Object.assign({}, defaultFont, {size:12}), autoSkip:false, maxRotation:45, minRotation:45}, grid:{display:false} } } }
+    });
+  } else {
+    const enrollColors = enrollData.map(v => {
+      const max = Math.max(...enrollData, 1);
+      const alpha = 0.4 + (v / max) * 0.5;
+      return `rgba(124,58,237,${alpha.toFixed(2)})`;
+    });
+    chartInstances['clinicEnroll'] = new Chart(document.getElementById('clinicEnrollChart').getContext('2d'), {
+      type: 'bar', plugins: [barLabelPlugin],
+      data: { labels: names, datasets: [{ label: '選課人次', data: enrollData, backgroundColor: enrollColors, borderColor: '#7c3aed', borderWidth: 1, borderRadius: 4 }] },
+      options: { responsive: true, maintainAspectRatio: false, layout: { padding: { top: 30 } }, plugins: { legend: { display: false }, tooltip: { callbacks: { label: c => ` 選課或執行:${c.parsed.y} 筆` } } }, scales: { y: { ticks:{font:defaultFont}, beginAtZero:true, grid:{color:'#e2e8f0'} }, x: { ticks:{font:Object.assign({}, defaultFont, {size:12}), autoSkip:false, maxRotation:45, minRotation:45}, grid:{display:false} } } }
+    });
+  }
   chartInstances['clinicBar'] = new Chart(document.getElementById('clinicBarChart').getContext('2d'), {
     type: 'bar', plugins: [barLabelPlugin],
     data: { labels: names, datasets: [ { label:'開立數', data:presData, backgroundColor:'rgba(42,172,138,0.82)', borderRadius:4 }, { label:'選課或執行', data:enrollData, backgroundColor:'rgba(124,58,237,0.75)', borderRadius:4 } ] },
@@ -2985,6 +3075,12 @@ function filterSlotsTable(f, btn){
   if(btn) btn.classList.add('active');
   renderSlotsTable();
 }
+function filterSlotsType(t, btn){
+  window._slotsTypeFilter = t;
+  document.querySelectorAll('#slotsTypeFilterBar .pdf-tab-btn').forEach(b => b.classList.remove('active'));
+  if(btn) btn.classList.add('active');
+  renderSlotsTable();
+}
 function clearSlotsDateFilter(){
   const a = document.getElementById('slotsFilterFrom'); if(a) a.value='';
   const b = document.getElementById('slotsFilterTo');   if(b) b.value='';
@@ -2992,6 +3088,7 @@ function clearSlotsDateFilter(){
 }
 function clearSlotsAllFilters(){
   const s = document.getElementById('slotsFilterSearch'); if(s) s.value='';
+  filterSlotsType('all', document.querySelector('#slotsTypeFilterBar [data-type=all]'));
   filterSlotsTable('all', document.querySelector('#slotsFilterBar [data-filter=all]'));
 }
 function toggleSlotExpand(slotId, evt){
@@ -3179,6 +3276,7 @@ function renderSlotsTable(){
   const empty = document.getElementById('allSlotsEmpty');
   if(!tbody) return;
   const f = window._slotsFilter || 'all';
+  const tf = window._slotsTypeFilter || 'all';
   const {from: dFrom, to: dTo} = getCourseDateRange();
   const q = (document.getElementById('slotsFilterSearch')?.value || '').toLowerCase().trim();
   // 同步 filter 狀態文字
@@ -3198,6 +3296,12 @@ function renderSlotsTable(){
   const filtered = courseSlots.filter(s => {
     if(f==='all'){ if(s.status==='completed') return false; }
     else if(s.status !== f) return false;
+    if(tf !== 'all'){
+      const ct = s.course_type || 'other';
+      if(tf === 'other'){
+        if(['mental','nutrition','social','exercise'].includes(ct)) return false;
+      } else if(ct !== tf) return false;
+    }
     if(dFrom && s.slot_date < dFrom) return false;
     if(dTo   && s.slot_date > dTo)   return false;
     if(q){
