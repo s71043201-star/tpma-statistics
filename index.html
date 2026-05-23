@@ -550,6 +550,7 @@ footer {
     <span id="cloud-msg">正在從雲端讀取最新資料…</span>
   </div>
   <div style="display:flex;align-items:center;gap:14px;">
+    <button id="manualSyncBtn" onclick="triggerManualSync()" style="padding:6px 14px;border-radius:18px;border:1.5px solid var(--cyan);background:#fff;color:var(--cyan);font-family:inherit;font-size:0.82rem;font-weight:700;cursor:pointer;white-space:nowrap" title="立即從健康處方管理系統抓最新資料(平常每天 09:30 / 15:00 自動跑)">🔄 立即同步</button>
     <button onclick="openNotesEditor()" style="padding:6px 14px;border-radius:18px;border:1.5px solid #e8930a;background:#fff;color:#b3620a;font-family:inherit;font-size:0.82rem;font-weight:700;cursor:pointer;white-space:nowrap">📝 編輯備註並重新產出</button>
     <button id="weeklyReportBtn" onclick="downloadLatestWeeklyReport()" style="display:none;padding:6px 14px;border-radius:18px;border:1.5px solid var(--teal);background:#fff;color:var(--teal);font-family:inherit;font-size:0.82rem;font-weight:700;cursor:pointer;white-space:nowrap">📥 下載最新週報</button>
     <div id="view-counter" style="font-size:0.8rem;opacity:0.8;white-space:nowrap;"></div>
@@ -1186,6 +1187,90 @@ async function loadFromCloud() {
   } catch(e) {
     setCloudStatus('error', '❌ 連線失敗，請確認網路及 Supabase 設定');
   }
+}
+
+// ══════════════════════════════════════════════
+//  手動觸發 n8n 同步(透過 sync_requests 隊列)
+// ══════════════════════════════════════════════
+let _manualSyncTimer = null;
+async function triggerManualSync() {
+  if (!sbClient) {
+    setCloudStatus('error', '⚠️ Supabase 未設定,無法觸發同步');
+    return;
+  }
+  const btn = document.getElementById('manualSyncBtn');
+  if (!btn || btn.disabled) return;
+
+  const origLabel = '🔄 立即同步';
+  btn.disabled = true;
+  btn.textContent = '⏳ 送出中…';
+
+  // 先看看有沒有人剛剛已經按過(pending / running),有就跟著輪詢同一筆
+  let requestId = null;
+  try {
+    const { data: existing } = await sbClient
+      .from('sync_requests')
+      .select('id, status, requested_at')
+      .in('status', ['pending', 'running'])
+      .order('requested_at', { ascending: false })
+      .limit(1);
+    if (existing && existing.length > 0) {
+      requestId = existing[0].id;
+    }
+  } catch (e) { /* 表不存在或權限不足,等下 insert 會再噴錯 */ }
+
+  if (!requestId) {
+    const { data, error } = await sbClient
+      .from('sync_requests')
+      .insert({ status: 'pending' })
+      .select('id')
+      .single();
+    if (error || !data) {
+      btn.disabled = false;
+      btn.textContent = origLabel;
+      setCloudStatus('error', '❌ 觸發失敗:' + (error && error.message || '請確認 sync_requests 表已建立'));
+      return;
+    }
+    requestId = data.id;
+  }
+
+  setCloudStatus('loading', '🔄 已送出同步請求,n8n 將在 30 秒內處理…');
+
+  if (_manualSyncTimer) clearInterval(_manualSyncTimer);
+  let elapsed = 0;
+  _manualSyncTimer = setInterval(async () => {
+    elapsed += 3;
+    if (elapsed > 180) {
+      clearInterval(_manualSyncTimer); _manualSyncTimer = null;
+      btn.disabled = false;
+      btn.textContent = origLabel;
+      setCloudStatus('error', '⚠️ 同步逾時(>3 分鐘),請查 n8n executions');
+      return;
+    }
+    try {
+      const { data } = await sbClient
+        .from('sync_requests')
+        .select('status, error_message, row_count')
+        .eq('id', requestId)
+        .single();
+      if (!data) return;
+      if (data.status === 'done') {
+        clearInterval(_manualSyncTimer); _manualSyncTimer = null;
+        btn.textContent = `✓ 完成${data.row_count ? `(${data.row_count} 筆)` : ''}`;
+        await loadFromCloud();
+        setTimeout(() => { btn.disabled = false; btn.textContent = origLabel; }, 3000);
+      } else if (data.status === 'error') {
+        clearInterval(_manualSyncTimer); _manualSyncTimer = null;
+        btn.disabled = false;
+        btn.textContent = origLabel;
+        setCloudStatus('error', '❌ 同步失敗:' + (data.error_message || '未知錯誤,請查 n8n executions'));
+      } else {
+        btn.textContent = data.status === 'running'
+          ? `⏳ 抓取中…(${elapsed}s)`
+          : `⏳ 等待 n8n…(${elapsed}s)`;
+      }
+    } catch (e) { /* 連線抖動就下次再試 */ }
+  }, 3000);
 }
 
 // ══════════════════════════════════════════════
