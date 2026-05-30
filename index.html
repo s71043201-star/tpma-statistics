@@ -1205,13 +1205,16 @@ async function triggerManualSync() {
   btn.disabled = true;
   btn.textContent = '⏳ 送出中…';
 
-  // 先看看有沒有人剛剛已經按過(pending / running),有就跟著輪詢同一筆
+  // 先看看有沒有人「最近 90 秒內」按過,有就跟著輪詢同一筆
+  // (時間下限是為了避免跟到 n8n 沒啟動時遺留的 stale pending,否則會一直等到 timeout)
   let requestId = null;
   try {
+    const cutoff = new Date(Date.now() - 90 * 1000).toISOString();
     const { data: existing } = await sbClient
       .from('sync_requests')
       .select('id, status, requested_at')
       .in('status', ['pending', 'running'])
+      .gte('requested_at', cutoff)
       .order('requested_at', { ascending: false })
       .limit(1);
     if (existing && existing.length > 0) {
