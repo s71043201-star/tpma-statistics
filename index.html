@@ -1243,11 +1243,11 @@ async function triggerManualSync() {
   let elapsed = 0;
   _manualSyncTimer = setInterval(async () => {
     elapsed += 3;
-    if (elapsed > 180) {
+    if (elapsed > 300) {
       clearInterval(_manualSyncTimer); _manualSyncTimer = null;
       btn.disabled = false;
       btn.textContent = origLabel;
-      setCloudStatus('error', '⚠️ 同步逾時(>3 分鐘),請查 n8n executions');
+      setCloudStatus('error', '⚠️ 同步逾時(>5 分鐘),請查 n8n executions');
       return;
     }
     try {
