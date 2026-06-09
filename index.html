@@ -3187,6 +3187,20 @@ function toggleSlotExpand(slotId, evt){
 // ══════════════════════════════════════════════
 //  編輯診所備註 + 重新產出週報
 // ══════════════════════════════════════════════
+// Apps Script 讀 Sheet 時偶爾會把「區域勾選格」(例:士林/中山 旁邊打勾=TRUE)
+// 當成診所讀進來。這裡濾掉:值是布林字串(TRUE/FALSE)、或 key 是純區域名。
+const _NOTE_REGION_KEYS = new Set(['北投','士林','中山','北投區','士林區','中山區']);
+function sanitizeNotes(notes){
+  const out = {};
+  for(const [k, v] of Object.entries(notes || {})){
+    const key = (k || '').trim();
+    const val = (typeof v === 'string' ? v : String(v ?? '')).trim();
+    if(_NOTE_REGION_KEYS.has(key)) continue;            // 區域名不是診所
+    if(/^(true|false)$/i.test(val)) continue;           // 勾選格被誤讀成備註
+    out[k] = v;
+  }
+  return out;
+}
 async function openNotesEditor(){
   const overlay = document.getElementById('notes-modal-overlay');
   const body = document.getElementById('notes-modal-body');
@@ -3200,7 +3214,7 @@ async function openNotesEditor(){
   try {
     const r = await fetch(NOTES_APPS_SCRIPT_URL, { method:'GET' });
     const d = await r.json();
-    fresh = d.notes || {};
+    fresh = sanitizeNotes(d.notes || {});
   } catch(e){
     body.innerHTML = `<div style="padding:24px;text-align:center;color:#c0392b">❌ 從 Google Sheet 載入失敗:${e.message}<br><br><button onclick="closeNotesEditor()" style="padding:6px 16px;border-radius:6px;border:1.5px solid var(--border);background:var(--surface);cursor:pointer">關閉</button></div>`;
     return;
