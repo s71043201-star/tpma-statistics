@@ -912,6 +912,16 @@ footer {
         <button class="pdf-tab-btn" data-type="other" onclick="filterSlotsType('other',this)">其他</button>
       </div>
     </div>
+    <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-top:8px">
+      <span style="font-size:0.78rem;font-weight:700;color:var(--text-muted);margin-right:2px">地區:</span>
+      <div id="slotsRegionFilterBar" style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
+        <button class="pdf-tab-btn active" data-region="all" onclick="filterSlotsRegion('all',this)">全部</button>
+        <button class="pdf-tab-btn" data-region="北投區" onclick="filterSlotsRegion('北投區',this)">北投</button>
+        <button class="pdf-tab-btn" data-region="士林區" onclick="filterSlotsRegion('士林區',this)">士林</button>
+        <button class="pdf-tab-btn" data-region="中山區" onclick="filterSlotsRegion('中山區',this)">中山</button>
+        <button class="pdf-tab-btn" data-region="other" onclick="filterSlotsRegion('other',this)">其他</button>
+      </div>
+    </div>
     <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-top:8px;margin-bottom:12px">
       <input type="text" id="slotsFilterSearch" placeholder="🔍 搜尋課程名稱或地點…" oninput="renderSlotsTable()" style="flex:1;min-width:240px;padding:7px 12px;border-radius:8px;border:1.5px solid var(--border);font-family:inherit;font-size:0.86rem;background:var(--surface);color:var(--text);outline:none">
       <button onclick="clearSlotsAllFilters()" style="padding:6px 10px;border-radius:6px;border:1.5px solid var(--border);background:var(--surface);color:var(--text-muted);font-size:0.78rem;cursor:pointer">清除所有篩選</button>
@@ -3169,6 +3179,31 @@ function filterSlotsType(t, btn){
   if(btn) btn.classList.add('active');
   renderSlotsTable();
 }
+function filterSlotsRegion(r, btn){
+  window._slotsRegionFilter = r;
+  document.querySelectorAll('#slotsRegionFilterBar .pdf-tab-btn').forEach(b => b.classList.remove('active'));
+  if(btn) btn.classList.add('active');
+  renderSlotsTable();
+}
+// 場次地點 → 區域。許多地點沒寫區名(如「石牌鄭身心醫學診所」),
+// 先比對診所分區表(clinicRegionMap),再用地標關鍵字推斷。
+function _regionOfText(txt){
+  if(!txt) return null;
+  for(const [clinic, region] of Object.entries(clinicRegionMap)){
+    if(clinic && txt.includes(clinic)) return region;
+  }
+  if(txt.includes('北投區')) return '北投區';
+  if(txt.includes('士林區')) return '士林區';
+  if(txt.includes('中山區')) return '中山區';
+  // 寬鬆關鍵字:士林須先於中山,避免「士林區中山北路」被判成中山
+  if(/北投|石牌|泉源/.test(txt)) return '北投區';
+  if(/士林|天母|百齡|美崙|社子/.test(txt)) return '士林區';
+  if(/中山|圓山|劍南|大直/.test(txt)) return '中山區';
+  return null;
+}
+function getSlotRegion(s){
+  return _regionOfText(s.course_location) || _regionOfText(s.course_name) || '其他';
+}
 function clearSlotsDateFilter(){
   const a = document.getElementById('slotsFilterFrom'); if(a) a.value='';
   const b = document.getElementById('slotsFilterTo');   if(b) b.value='';
@@ -3177,6 +3212,7 @@ function clearSlotsDateFilter(){
 function clearSlotsAllFilters(){
   const s = document.getElementById('slotsFilterSearch'); if(s) s.value='';
   filterSlotsType('all', document.querySelector('#slotsTypeFilterBar [data-type=all]'));
+  filterSlotsRegion('all', document.querySelector('#slotsRegionFilterBar [data-region=all]'));
   filterSlotsTable('all', document.querySelector('#slotsFilterBar [data-filter=all]'));
 }
 function toggleSlotExpand(slotId, evt){
@@ -3379,6 +3415,7 @@ function renderSlotsTable(){
   if(!tbody) return;
   const f = window._slotsFilter || 'all';
   const tf = window._slotsTypeFilter || 'all';
+  const rf = window._slotsRegionFilter || 'all';
   const {from: dFrom, to: dTo} = getCourseDateRange();
   const q = (document.getElementById('slotsFilterSearch')?.value || '').toLowerCase().trim();
   // 同步 filter 狀態文字
@@ -3403,6 +3440,12 @@ function renderSlotsTable(){
       if(tf === 'other'){
         if(['mental','nutrition','social','exercise'].includes(ct)) return false;
       } else if(ct !== tf) return false;
+    }
+    if(rf !== 'all'){
+      const reg = getSlotRegion(s);
+      if(rf === 'other'){
+        if(reg !== '其他') return false;
+      } else if(reg !== rf) return false;
     }
     if(dFrom && s.slot_date < dFrom) return false;
     if(dTo   && s.slot_date > dTo)   return false;
@@ -3443,6 +3486,10 @@ function renderSlotsTable(){
     const slbl = statusLabels[s.status] || s.status || '—';
     const scolor = statusColors[s.status] || '#9aa5b1';
     const rateColor = rate >= 100 ? '#c0392b' : (rate >= 70 ? '#e8930a' : 'var(--text-muted)');
+    const region = getSlotRegion(s);
+    const regionColors = { '北投區':'#2aac8a', '士林區':'#1a9fbe', '中山區':'#7c3aed', '其他':'#9aa5b1' };
+    const rcolor = regionColors[region] || '#9aa5b1';
+    const regionTag = `<span style="display:inline-block;padding:1px 6px;border-radius:8px;background:${rcolor}18;color:${rcolor};font-size:0.72rem;font-weight:700;margin-right:4px;white-space:nowrap">${region.replace(/區$/,'')}</span>`;
     const expanded = _expandedSlot === s.slot_id;
     const hasEntries = Array.isArray(s.entries) && s.entries.length > 0;
     const expandIcon = hasEntries ? (expanded ? '▼' : '▶') : '·';
@@ -3458,7 +3505,7 @@ function renderSlotsTable(){
       <td>${(s.start_time||'').slice(0,5)} - ${(s.end_time||'').slice(0,5)}</td>
       <td>${s.course_name||''}</td>
       <td><span style="display:inline-block;padding:2px 8px;border-radius:10px;background:${tcolor}22;color:${tcolor};font-size:0.78rem;font-weight:700">${tlbl}</span></td>
-      <td style="font-size:0.82rem;color:var(--text-muted)">${s.course_location||'—'}</td>
+      <td style="font-size:0.82rem;color:var(--text-muted)">${regionTag}${s.course_location||'—'}</td>
       <td class="num">${bk}</td>
       <td class="num" style="color:${ck === bk && bk > 0 ? '#2aac8a' : 'var(--text-muted)'}">${ck}</td>
       <td class="num">${cap}</td>
