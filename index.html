@@ -949,6 +949,12 @@ footer {
       <div class="chart-wrap"><canvas id="courseStatusPieChart"></canvas></div>
     </div>
   </div>
+
+  <div class="chart-section" data-pdf-id="course-per-course-seats" data-pdf-label="各課程剩餘可預訂人次">
+    <div class="chart-header"><h2>📊 各課程剩餘可預訂(人次)</h2><button class="dl-btn" onclick="downloadChart(this)">↓ 下載 JPG</button></div>
+    <div class="chart-wrap" id="coursePerCourseWrap" style="height:auto"><canvas id="coursePerCourseChart"></canvas></div>
+    <div id="coursePerCourseEmpty" style="display:none;padding:24px;text-align:center;color:var(--text-muted)">此區間沒有即將舉辦的場次</div>
+  </div>
 </div>
 
 <!-- ═══ 編輯備註 Modal ═══ -->
@@ -2959,8 +2965,8 @@ function buildCourseCharts(){
   setText('csAttendRate',  (stats.attendance_rate!=null ? stats.attendance_rate : 0) + '%');
   setText('csFullSlots',   (stats.full_slots||0).toLocaleString());
 
-  // 處方類型未完成 / 場次狀態:都套頂層日期區間
-  const inRange = filteredCourseSlots();
+  // 處方類型未完成 / 場次狀態:套頂層日期區間 + 場次明細的地區篩選
+  const inRange = applySlotsRegionFilter(filteredCourseSlots());
   const statusMap = {};
   inRange.forEach(s => {
     const sk = s.status || 'unknown';
@@ -3029,6 +3035,59 @@ function buildCourseCharts(){
         }
       }
     });
+  }
+
+  // 各課程剩餘可預訂(人次):同類型圖的邏輯,但按課程聚合(scheduled 的所有場次加總)
+  const perCourse = {};
+  inRange.forEach(s => {
+    if(s.status !== 'scheduled') return;
+    const name = (s.course_name || '(未命名課程)').trim();
+    if(!perCourse[name]) perCourse[name] = { booked:0, remaining:0, slots:0 };
+    const cap = s.capacity || 0;
+    const bk  = s.booked_count || 0;
+    perCourse[name].booked += bk;
+    perCourse[name].remaining += Math.max(0, cap - bk);
+    perCourse[name].slots++;
+  });
+  const courseNames = Object.keys(perCourse).sort((a,b) =>
+    (perCourse[b].remaining - perCourse[a].remaining) || (perCourse[b].booked - perCourse[a].booked));
+  destroyChart('coursePerCourseChart');
+  const wrap4 = document.getElementById('coursePerCourseWrap');
+  const empty4 = document.getElementById('coursePerCourseEmpty');
+  const ctx4 = document.getElementById('coursePerCourseChart');
+  if(ctx4){
+    if(courseNames.length === 0){
+      if(wrap4) wrap4.style.display = 'none';
+      if(empty4) empty4.style.display = 'block';
+    } else {
+      if(wrap4){ wrap4.style.display = ''; wrap4.style.height = Math.max(200, courseNames.length*30 + 70) + 'px'; }
+      if(empty4) empty4.style.display = 'none';
+      chartInstances.coursePerCourseChart = new Chart(ctx4, {
+        type:'bar',
+        data:{
+          labels: courseNames,
+          datasets:[
+            { label:'已預訂人次', data: courseNames.map(n=>perCourse[n].booked),    backgroundColor:'rgba(192,57,43,0.78)', borderRadius:4 },
+            { label:'剩餘可預訂',  data: courseNames.map(n=>perCourse[n].remaining), backgroundColor:'rgba(42,172,138,0.78)', borderRadius:4 }
+          ]
+        },
+        options:{
+          indexAxis:'y', responsive:true, maintainAspectRatio:false,
+          plugins:{
+            legend:{position:'top',labels:{font:defaultFont}},
+            tooltip:{callbacks:{
+              title:(items)=>courseNames[items[0].dataIndex],
+              afterLabel:(c)=>{ const d=perCourse[courseNames[c.dataIndex]]; const tot=d.booked+d.remaining; const pct=tot>0?Math.round(d.booked/tot*100):0; return `總容量:${tot} 人 · 滿座率 ${pct}% · ${d.slots} 場`; }
+            }},
+            datalabels:{ display:true, anchor:'center', align:'center', color:'#fff', font:{family:defaultFont.family,weight:'700',size:12}, formatter:(v)=>v>0?v:'' }
+          },
+          scales:{
+            x:{stacked:true,beginAtZero:true,ticks:{font:defaultFont,precision:0},title:{display:true,text:'人次',font:Object.assign({},defaultFont,{size:12,weight:'600'})}},
+            y:{stacked:true,ticks:{font:defaultFont,autoSkip:false,callback:function(v){ const lbl=this.getLabelForValue(v); return lbl.length>16 ? lbl.slice(0,15)+'…' : lbl; }}}
+          }
+        }
+      });
+    }
   }
 
   // 渲染置頂日期快速速查 chips + mini 日曆
@@ -3183,7 +3242,7 @@ function filterSlotsRegion(r, btn){
   window._slotsRegionFilter = r;
   document.querySelectorAll('#slotsRegionFilterBar .pdf-tab-btn').forEach(b => b.classList.remove('active'));
   if(btn) btn.classList.add('active');
-  renderSlotsTable();
+  buildCourseCharts(); // 地區篩選同時影響下方分析圖表(內含 renderSlotsTable)
 }
 // 場次地點 → 區域。許多地點沒寫區名(如「石牌鄭身心醫學診所」),
 // 先比對診所分區表(clinicRegionMap),再用地標關鍵字推斷。
@@ -3203,6 +3262,14 @@ function _regionOfText(txt){
 }
 function getSlotRegion(s){
   return _regionOfText(s.course_location) || _regionOfText(s.course_name) || '其他';
+}
+function applySlotsRegionFilter(arr){
+  const rf = window._slotsRegionFilter || 'all';
+  if(rf === 'all') return arr;
+  return arr.filter(s => {
+    const reg = getSlotRegion(s);
+    return rf === 'other' ? reg === '其他' : reg === rf;
+  });
 }
 function clearSlotsDateFilter(){
   const a = document.getElementById('slotsFilterFrom'); if(a) a.value='';
