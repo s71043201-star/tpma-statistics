@@ -2965,8 +2965,8 @@ function buildCourseCharts(){
   setText('csAttendRate',  (stats.attendance_rate!=null ? stats.attendance_rate : 0) + '%');
   setText('csFullSlots',   (stats.full_slots||0).toLocaleString());
 
-  // 處方類型未完成 / 場次狀態:套頂層日期區間 + 場次明細的地區篩選
-  const inRange = applySlotsRegionFilter(filteredCourseSlots());
+  // 處方類型未完成 / 場次狀態:套頂層日期區間 + 場次明細的地區/處方類型篩選
+  const inRange = applySlotsTypeFilter(applySlotsRegionFilter(filteredCourseSlots()));
   const statusMap = {};
   inRange.forEach(s => {
     const sk = s.status || 'unknown';
@@ -3237,7 +3237,7 @@ function filterSlotsType(t, btn){
   window._slotsTypeFilter = t;
   document.querySelectorAll('#slotsTypeFilterBar .pdf-tab-btn').forEach(b => b.classList.remove('active'));
   if(btn) btn.classList.add('active');
-  renderSlotsTable();
+  buildCourseCharts(); // 類型篩選同時影響下方分析圖表(內含 renderSlotsTable)
 }
 function filterSlotsRegion(r, btn){
   window._slotsRegionFilter = r;
@@ -3270,6 +3270,14 @@ function applySlotsRegionFilter(arr){
   return arr.filter(s => {
     const reg = getSlotRegion(s);
     return rf === 'other' ? reg === '其他' : reg === rf;
+  });
+}
+function applySlotsTypeFilter(arr){
+  const tf = window._slotsTypeFilter || 'all';
+  if(tf === 'all') return arr;
+  return arr.filter(s => {
+    const ct = s.course_type || 'other';
+    return tf === 'other' ? !['mental','nutrition','social','exercise'].includes(ct) : ct === tf;
   });
 }
 function clearSlotsDateFilter(){
