@@ -3045,11 +3045,12 @@ function buildCourseCharts(){
       const bk  = s.booked_count || 0;
       return {
         label: `${(s.slot_date||'').slice(5)} ${(s.start_time||'').slice(0,5)} ${(s.course_name||'(未命名課程)').trim()}`,
+        sortKey: (s.slot_date||'') + (s.start_time||''),
         booked: bk,
         remaining: Math.max(0, cap - bk),
       };
     })
-    .sort((a,b) => (b.remaining - a.remaining) || (b.booked - a.booked));
+    .sort((a,b) => a.sortKey.localeCompare(b.sortKey) || a.label.localeCompare(b.label, 'zh-Hant'));
   const sessionLabels = perSession.map(d => d.label);
   destroyChart('coursePerCourseChart');
   const wrap4 = document.getElementById('coursePerCourseWrap');
