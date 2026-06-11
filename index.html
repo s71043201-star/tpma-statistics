@@ -950,8 +950,8 @@ footer {
     </div>
   </div>
 
-  <div class="chart-section" data-pdf-id="course-per-course-seats" data-pdf-label="各課程剩餘可預訂人次">
-    <div class="chart-header"><h2>📊 各課程剩餘可預訂(人次)</h2><button class="dl-btn" onclick="downloadChart(this)">↓ 下載 JPG</button></div>
+  <div class="chart-section" data-pdf-id="course-per-course-seats" data-pdf-label="各課程場次剩餘可預訂人次">
+    <div class="chart-header"><h2>📊 各課程場次剩餘可預訂(人次)</h2><button class="dl-btn" onclick="downloadChart(this)">↓ 下載 JPG</button></div>
     <div class="chart-wrap" id="coursePerCourseWrap" style="height:auto"><canvas id="coursePerCourseChart"></canvas></div>
     <div id="coursePerCourseEmpty" style="display:none;padding:24px;text-align:center;color:var(--text-muted)">此區間沒有即將舉辦的場次</div>
   </div>
@@ -3037,38 +3037,38 @@ function buildCourseCharts(){
     });
   }
 
-  // 各課程剩餘可預訂(人次):同類型圖的邏輯,但按課程聚合(scheduled 的所有場次加總)
-  const perCourse = {};
-  inRange.forEach(s => {
-    if(s.status !== 'scheduled') return;
-    const name = (s.course_name || '(未命名課程)').trim();
-    if(!perCourse[name]) perCourse[name] = { booked:0, remaining:0, slots:0 };
-    const cap = s.capacity || 0;
-    const bk  = s.booked_count || 0;
-    perCourse[name].booked += bk;
-    perCourse[name].remaining += Math.max(0, cap - bk);
-    perCourse[name].slots++;
-  });
-  const courseNames = Object.keys(perCourse).sort((a,b) =>
-    (perCourse[b].remaining - perCourse[a].remaining) || (perCourse[b].booked - perCourse[a].booked));
+  // 各課程剩餘可預訂(人次):每個場次(時段)一條,不同時段分開呈現
+  const perSession = inRange
+    .filter(s => s.status === 'scheduled')
+    .map(s => {
+      const cap = s.capacity || 0;
+      const bk  = s.booked_count || 0;
+      return {
+        label: `${(s.slot_date||'').slice(5)} ${(s.start_time||'').slice(0,5)} ${(s.course_name||'(未命名課程)').trim()}`,
+        booked: bk,
+        remaining: Math.max(0, cap - bk),
+      };
+    })
+    .sort((a,b) => (b.remaining - a.remaining) || (b.booked - a.booked));
+  const sessionLabels = perSession.map(d => d.label);
   destroyChart('coursePerCourseChart');
   const wrap4 = document.getElementById('coursePerCourseWrap');
   const empty4 = document.getElementById('coursePerCourseEmpty');
   const ctx4 = document.getElementById('coursePerCourseChart');
   if(ctx4){
-    if(courseNames.length === 0){
+    if(perSession.length === 0){
       if(wrap4) wrap4.style.display = 'none';
       if(empty4) empty4.style.display = 'block';
     } else {
-      if(wrap4){ wrap4.style.display = ''; wrap4.style.height = Math.max(200, courseNames.length*30 + 70) + 'px'; }
+      if(wrap4){ wrap4.style.display = ''; wrap4.style.height = Math.max(200, perSession.length*30 + 70) + 'px'; }
       if(empty4) empty4.style.display = 'none';
       chartInstances.coursePerCourseChart = new Chart(ctx4, {
         type:'bar',
         data:{
-          labels: courseNames,
+          labels: sessionLabels,
           datasets:[
-            { label:'已預訂人次', data: courseNames.map(n=>perCourse[n].booked),    backgroundColor:'rgba(192,57,43,0.78)', borderRadius:4 },
-            { label:'剩餘可預訂',  data: courseNames.map(n=>perCourse[n].remaining), backgroundColor:'rgba(42,172,138,0.78)', borderRadius:4 }
+            { label:'已預訂人次', data: perSession.map(d=>d.booked),    backgroundColor:'rgba(192,57,43,0.78)', borderRadius:4 },
+            { label:'剩餘可預訂',  data: perSession.map(d=>d.remaining), backgroundColor:'rgba(42,172,138,0.78)', borderRadius:4 }
           ]
         },
         options:{
@@ -3076,14 +3076,14 @@ function buildCourseCharts(){
           plugins:{
             legend:{position:'top',labels:{font:defaultFont}},
             tooltip:{callbacks:{
-              title:(items)=>courseNames[items[0].dataIndex],
-              afterLabel:(c)=>{ const d=perCourse[courseNames[c.dataIndex]]; const tot=d.booked+d.remaining; const pct=tot>0?Math.round(d.booked/tot*100):0; return `總容量:${tot} 人 · 滿座率 ${pct}% · ${d.slots} 場`; }
+              title:(items)=>sessionLabels[items[0].dataIndex],
+              afterLabel:(c)=>{ const d=perSession[c.dataIndex]; const tot=d.booked+d.remaining; const pct=tot>0?Math.round(d.booked/tot*100):0; return `總容量:${tot} 人 · 滿座率 ${pct}%`; }
             }},
             datalabels:{ display:true, anchor:'center', align:'center', color:'#fff', font:{family:defaultFont.family,weight:'700',size:12}, formatter:(v)=>v>0?v:'' }
           },
           scales:{
             x:{stacked:true,beginAtZero:true,ticks:{font:defaultFont,precision:0},title:{display:true,text:'人次',font:Object.assign({},defaultFont,{size:12,weight:'600'})}},
-            y:{stacked:true,ticks:{font:defaultFont,autoSkip:false,callback:function(v){ const lbl=this.getLabelForValue(v); return lbl.length>16 ? lbl.slice(0,15)+'…' : lbl; }}}
+            y:{stacked:true,ticks:{font:defaultFont,autoSkip:false,callback:function(v){ const lbl=this.getLabelForValue(v); return lbl.length>26 ? lbl.slice(0,25)+'…' : lbl; }}}
           }
         }
       });
