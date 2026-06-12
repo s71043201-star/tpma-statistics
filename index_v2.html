@@ -147,20 +147,28 @@ body.is-loading .chart-wrap::after {
 #setup-banner code { background: #fff; border: 1px solid #e2c200; border-radius: 4px; padding: 1px 7px; font-size: 0.82rem; }
 #setup-banner.hidden { display: none; }
 
-/* ── 頂部工具列（sticky） ── */
+/* ── 頂部工具列（sticky,原版漸層標題背景） ── */
 #topbar {
   position: sticky; top: 0; z-index: 90;
-  background: rgba(255,255,255,0.86);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
-  border-bottom: 1px solid var(--border);
-  padding: 12px 36px;
+  background: var(--grad-main);
+  padding: 14px 36px;
   display: flex; align-items: center; gap: 16px; flex-wrap: wrap;
-  box-shadow: 0 2px 14px rgba(26,120,90,0.06);
+  box-shadow: 0 4px 24px rgba(26,120,90,0.25);
+  overflow: hidden;
+}
+#topbar::before {
+  content: ''; position: absolute; top: -60px; right: -30px;
+  width: 200px; height: 200px; border-radius: 50%;
+  background: rgba(255,255,255,0.08); pointer-events: none;
+}
+#topbar::after {
+  content: ''; position: absolute; bottom: -80px; right: 220px;
+  width: 150px; height: 150px; border-radius: 50%;
+  background: rgba(255,255,255,0.06); pointer-events: none;
 }
 .topbar-title { min-width: 0; }
-.topbar-title h1 { font-size: 1.06rem; font-weight: 800; letter-spacing: 0.03em; color: var(--text); }
-.topbar-title p { font-size: 0.74rem; color: var(--text-muted); margin-top: 2px; }
+.topbar-title h1 { font-size: 1.1rem; font-weight: 800; letter-spacing: 0.04em; color: #fff; text-shadow: 0 1px 4px rgba(0,0,0,0.18); }
+.topbar-title p { font-size: 0.76rem; color: rgba(255,255,255,0.88); margin-top: 2px; }
 .topbar-actions { margin-left: auto; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .act-btn {
   display: inline-flex; align-items: center; gap: 6px;
@@ -188,15 +196,15 @@ body.is-loading .chart-wrap::after {
 #pdf-export-btn .ic { width: 15px; height: 15px; }
 #pdf-export-btn:hover { transform: translateY(-1px); box-shadow: 0 4px 14px rgba(26,159,190,0.40); }
 #pdf-export-btn:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
-#view-counter { font-size: 0.74rem; color: var(--text-muted); white-space: nowrap; }
+#view-counter { font-size: 0.74rem; color: rgba(255,255,255,0.88); white-space: nowrap; }
 
 /* ── 雲端狀態膠囊 ── */
 #cloud-bar {
   display: inline-flex; align-items: center; gap: 8px;
   padding: 5px 13px; border-radius: 20px;
   font-size: 0.76rem; font-weight: 600;
-  background: #e8f8f2; border: 1px solid #b3e8d4; color: #1a6e50;
-  max-width: 460px;
+  background: rgba(255,255,255,0.92); border: 1px solid rgba(255,255,255,0.6); color: #1a6e50;
+  max-width: 460px; box-shadow: 0 1px 6px rgba(10,50,38,0.15);
 }
 #cloud-bar #cloud-msg { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 #cloud-bar.loading { background: #e6f5fa; border-color: #a8dff0; color: #1a6880; }
