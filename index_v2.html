@@ -452,14 +452,14 @@ body.is-loading .chart-wrap::after {
 
 /* ── 圖表類型選擇 ── */
 .chart-type-bar {
-  display: flex; align-items: center; gap: 8px;
+  display: flex; align-items: center; gap: 9px;
   padding: 16px 36px 0; flex-wrap: wrap;
 }
-.chart-type-bar .ct-label { font-size: 0.8rem; font-weight: 700; color: var(--text-muted); margin-right: 4px; white-space: nowrap; }
+.chart-type-bar .ct-label { font-size: 0.95rem; font-weight: 700; color: var(--text-muted); margin-right: 4px; white-space: nowrap; }
 .ct-btn {
   display: flex; align-items: center; gap: 5px;
-  padding: 5px 14px; border-radius: 20px; border: 1.5px solid var(--border);
-  background: var(--surface); color: var(--text-muted); font-size: 0.8rem;
+  padding: 7px 18px; border-radius: 22px; border: 1.5px solid var(--border);
+  background: var(--surface); color: var(--text-muted); font-size: 0.92rem;
   font-family: inherit; cursor: pointer; transition: all 0.15s; font-weight: 600;
 }
 .ct-btn.active { background: #e0f7ef; border-color: var(--teal); color: var(--teal); }
@@ -467,18 +467,49 @@ body.is-loading .chart-wrap::after {
 
 /* ── 統計單位切換 ── */
 .period-bar {
-  display: flex; align-items: center; gap: 8px;
+  display: flex; align-items: center; gap: 9px;
   padding: 6px 36px 0; flex-wrap: wrap;
 }
-.period-bar .ct-label { font-size: 0.8rem; font-weight: 700; color: var(--text-muted); margin-right: 4px; white-space: nowrap; }
+.period-bar .ct-label { font-size: 0.95rem; font-weight: 700; color: var(--text-muted); margin-right: 4px; white-space: nowrap; }
 .period-btn {
   display: flex; align-items: center; gap: 5px;
-  padding: 5px 14px; border-radius: 20px; border: 1.5px solid var(--border);
-  background: var(--surface); color: var(--text-muted); font-size: 0.8rem;
+  padding: 7px 18px; border-radius: 22px; border: 1.5px solid var(--border);
+  background: var(--surface); color: var(--text-muted); font-size: 0.92rem;
   font-family: inherit; cursor: pointer; transition: all 0.15s; font-weight: 600;
 }
 .period-btn.active { background: #e6f5fa; border-color: var(--cyan); color: var(--cyan); }
 .period-btn:hover:not(.active) { border-color: #7dc7dd; background: #f0fbfd; }
+
+/* ── 區域篩選下拉清單 ── */
+#region-filter-bar { position: relative; display: inline-block; margin: 12px 36px 0; }
+#region-filter-bar > summary {
+  list-style: none; cursor: pointer; user-select: none;
+  display: inline-flex; align-items: center; gap: 9px;
+  padding: 10px 18px; border-radius: 12px;
+  background: #f0fbf7; border: 1px solid #b3e8d4;
+  font-size: 0.98rem; font-weight: 700; color: var(--teal);
+  transition: all 0.15s;
+}
+#region-filter-bar > summary::-webkit-details-marker { display: none; }
+#region-filter-bar > summary:hover { background: #e0f7ef; border-color: var(--teal); }
+#region-filter-bar > summary b { color: #0f6a52; }
+#region-filter-bar > summary .chev { transition: transform 0.2s; width: 16px; height: 16px; }
+#region-filter-bar[open] > summary .chev { transform: rotate(180deg); }
+.region-menu {
+  position: absolute; left: 0; top: calc(100% + 6px); z-index: 80;
+  min-width: 190px; padding: 8px;
+  background: var(--surface); border: 1px solid var(--border); border-radius: 12px;
+  box-shadow: var(--shadow-lg);
+  display: flex; flex-direction: column; gap: 4px;
+}
+.region-menu .region-btn { width: 100%; text-align: left; border-radius: 9px; }
+.region-btn {
+  padding: 9px 16px; border-radius: 22px;
+  border: 1.5px solid var(--border); background: var(--surface);
+  color: var(--text-muted); font-size: 0.95rem;
+  font-family: inherit; cursor: pointer; transition: all 0.15s; font-weight: 600;
+  white-space: nowrap;
+}
 
 /* ── 鑽取(drill-down)區 ── */
 .drill-box {
@@ -638,14 +669,7 @@ footer {
 
 .hidden { display: none; }
 
-/* ── 區域篩選按鈕 ── */
-.region-btn {
-  padding: 5px 16px; border-radius: 20px;
-  border: 1.5px solid var(--border); background: var(--surface);
-  color: var(--text-muted); font-size: 0.82rem;
-  font-family: inherit; cursor: pointer; transition: all 0.15s; font-weight: 600;
-  white-space: nowrap;
-}
+/* ── 區域篩選按鈕 active/hover ── */
 .region-btn.active { background: linear-gradient(135deg,#2aac8a,#1a9fbe); border-color: var(--teal); color: #fff; box-shadow:0 2px 8px rgba(42,172,138,0.25); }
 .region-btn:hover:not(.active) { border-color: #7dd4b8; background: #e8f8f2; color: var(--teal); }
 
@@ -759,26 +783,32 @@ footer {
   <div class="card violet"><span class="icon"><svg class="ic" viewBox="0 0 24 24"><path d="M22 10v6M2 10l10-5 10 5-10 5z"/><path d="M6 12v5c3 3 9 3 12 0v-5"/></svg></span><div class="val" id="sumEnroll">—</div><div class="lbl">總選課人次</div><div class="delta" id="sumEnrollToday"></div></div>
 </div>
 
-<!-- 區域篩選列 -->
-<div id="region-filter-bar" style="margin:12px 36px 0;padding:10px 16px;background:#f0fbf7;border-radius:10px;border:1px solid #b3e8d4;display:flex;align-items:center;gap:10px;flex-wrap:wrap">
-  <span style="font-size:0.88rem;font-weight:700;color:var(--teal);white-space:nowrap;display:inline-flex;align-items:center;gap:6px"><svg class="ic" viewBox="0 0 24 24" style="width:15px;height:15px"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg>區域篩選：</span>
-  <button class="region-btn active" onclick="setRegionFilter('all',this)">全部</button>
-  <button class="region-btn" onclick="setRegionFilter('北投區',this)">北投區</button>
-  <button class="region-btn" onclick="setRegionFilter('士林區',this)">士林區</button>
-  <button class="region-btn" onclick="setRegionFilter('中山區',this)">中山區</button>
-</div>
+<!-- 區域篩選（可收合下拉清單） -->
+<details id="region-filter-bar">
+  <summary>
+    <svg class="ic" viewBox="0 0 24 24" style="width:16px;height:16px"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg>
+    區域篩選：<b id="regionDropdownLabel">全部</b>
+    <svg class="ic chev" viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg>
+  </summary>
+  <div class="region-menu">
+    <button class="region-btn active" onclick="setRegionFilter('all',this)">全部</button>
+    <button class="region-btn" onclick="setRegionFilter('北投區',this)">北投區</button>
+    <button class="region-btn" onclick="setRegionFilter('士林區',this)">士林區</button>
+    <button class="region-btn" onclick="setRegionFilter('中山區',this)">中山區</button>
+  </div>
+</details>
 
 <!-- 日期篩選列 -->
 <div id="dateFilterBar" style="display:none;margin:12px 36px;padding:10px 16px;background:var(--surface);border-radius:10px;border:1px solid var(--border);align-items:center;gap:12px;flex-wrap:wrap">
-  <span style="font-size:0.88rem;font-weight:700;color:var(--teal);white-space:nowrap">篩選開立日期：</span>
+  <span style="font-size:0.98rem;font-weight:700;color:var(--teal);white-space:nowrap">篩選開立日期：</span>
   <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
-    <input type="date" id="filterFrom" style="padding:5px 10px;border-radius:7px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:0.85rem;font-family:inherit">
-    <span style="color:var(--muted);font-size:0.85rem">至</span>
-    <input type="date" id="filterTo" style="padding:5px 10px;border-radius:7px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:0.85rem;font-family:inherit">
+    <input type="date" id="filterFrom" style="padding:7px 12px;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:0.94rem;font-family:inherit">
+    <span style="color:var(--text-muted);font-size:0.94rem">至</span>
+    <input type="date" id="filterTo" style="padding:7px 12px;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:0.94rem;font-family:inherit">
   </div>
-  <button onclick="applyDateFilter()" style="padding:5px 16px;border-radius:7px;border:none;background:var(--teal);color:#fff;font-size:0.85rem;font-weight:700;cursor:pointer;font-family:inherit">套用</button>
-  <button onclick="clearDateFilter()" style="padding:5px 14px;border-radius:7px;border:1px solid var(--border);background:transparent;color:var(--muted);font-size:0.85rem;cursor:pointer;font-family:inherit">清除</button>
-  <span id="filterStatus" style="font-size:0.82rem;color:var(--muted)"></span>
+  <button onclick="applyDateFilter()" style="padding:7px 20px;border-radius:8px;border:none;background:var(--teal);color:#fff;font-size:0.94rem;font-weight:700;cursor:pointer;font-family:inherit">套用</button>
+  <button onclick="clearDateFilter()" style="padding:7px 16px;border-radius:8px;border:1px solid var(--border);background:transparent;color:var(--text-muted);font-size:0.94rem;cursor:pointer;font-family:inherit">清除</button>
+  <span id="filterStatus" style="font-size:0.88rem;color:var(--text-muted)"></span>
 </div>
 
 <!-- ═══ TAB 1 ═══ -->
@@ -2815,14 +2845,26 @@ function renderRegionModalContent(){
 // ══════════════════════════════════════════════
 //  區域 + 日期 綜合篩選
 // ══════════════════════════════════════════════
+function updateRegionDropdownLabel(){
+  const lbl = document.getElementById('regionDropdownLabel');
+  if(lbl) lbl.textContent = currentRegion === 'all' ? '全部' : currentRegion;
+}
 function setRegionFilter(region, btn){
   currentRegion = region;
   if(btn){
     btn.closest('#region-filter-bar').querySelectorAll('.region-btn').forEach(b=>b.classList.remove('active'));
     btn.classList.add('active');
   }
+  updateRegionDropdownLabel();
+  const dd = document.getElementById('region-filter-bar');
+  if(dd && dd.tagName === 'DETAILS') dd.open = false; // 選完自動收合
   rebuildFromFilters();
 }
+// 點下拉清單外面自動收合
+document.addEventListener('click', e => {
+  const dd = document.getElementById('region-filter-bar');
+  if(dd && dd.open && !dd.contains(e.target)) dd.open = false;
+});
 
 function rebuildFromFilters(){
   const from = document.getElementById('filterFrom')?.value || '';
@@ -3964,6 +4006,7 @@ function syncRegionFilterBar(){
     const m = onclick.match(/setRegionFilter\('([^']+)'/);
     if(m) b.classList.toggle('active', m[1] === currentRegion);
   });
+  updateRegionDropdownLabel();
 }
 
 // 記錄目前 tab
