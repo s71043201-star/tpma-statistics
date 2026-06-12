@@ -3633,6 +3633,8 @@ function renderDaySchedule(){
   const typeColors = { mental:'#7c3aed', nutrition:'#2aac8a', social:'#1a9fbe', exercise:'#e8930a', other:'#9aa5b1' };
   const typeLabels = { mental:'情緒調適', nutrition:'營養', social:'社會', exercise:'運動' };
   const regionColors = { '北投區':'#2aac8a', '士林區':'#1a9fbe', '中山區':'#7c3aed', '其他':'#9aa5b1' };
+  // 已取消的場次不顯示在課表上(彙總列仍會註記取消場數)
+  slots = slots.filter(s => s.status !== 'cancelled');
   // 依開始時間分組
   const byTime = {};
   slots.forEach(s => {
@@ -3641,7 +3643,7 @@ function renderDaySchedule(){
   });
   const times = Object.keys(byTime).sort();
   let html = `<div class="day-summary">
-    <span><b>${slots.length - cancelledCnt}</b> 場${cancelledCnt ? `（另 ${cancelledCnt} 場取消）` : ''}</span>
+    <span><b>${slots.length}</b> 場${cancelledCnt ? `（另 ${cancelledCnt} 場取消未列出）` : ''}</span>
     <span>報名 <b>${sumBk.toLocaleString()}</b></span>
     <span>已到 <b>${sumCk.toLocaleString()}</b></span>
     <span>總容量 <b>${sumCap.toLocaleString()}</b></span>
