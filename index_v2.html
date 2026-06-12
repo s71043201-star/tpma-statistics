@@ -666,6 +666,27 @@ body.is-loading .chart-wrap::after {
 .fill-bar { width: 44px; height: 6px; border-radius: 3px; background: #e4f0ea; overflow: hidden; flex-shrink: 0; }
 .fill-bar i { display: block; height: 100%; border-radius: 3px; }
 
+/* ── 場次明細:日期群組列 ── */
+.date-sep td {
+  background: #e9f6f0 !important; color: #15735a;
+  font-weight: 800; font-size: 0.9rem;
+  padding: 9px 12px; border-top: 2px solid var(--border); border-bottom: 1px solid var(--border);
+}
+.date-sep.pinned td { background: #fff6dc !important; color: #9a6308; border-color: #efdda8; }
+.pin-toggle {
+  cursor: pointer; margin-right: 9px; font-size: 0.95rem;
+  display: inline-block; transition: transform 0.15s;
+}
+.pin-toggle:hover { transform: scale(1.25); }
+.date-sep:not(.pinned) .pin-toggle { opacity: 0.4; }
+.pin-tag {
+  margin-left: 9px; font-size: 0.7rem; font-weight: 700;
+  background: #e8930a; color: #fff; padding: 1px 9px; border-radius: 10px;
+  vertical-align: 1px;
+}
+.data-table tbody tr.in-pinned { background: #fffdf0; }
+.data-table tbody tr.row-cancelled td { opacity: 0.5; }
+
 /* ── 診所排序控制 ── */
 .clinic-sort-bar { padding: 14px 36px 0; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .clinic-sort-bar .ct-label { font-size: 0.8rem; font-weight: 700; color: var(--text-muted); }
@@ -1117,7 +1138,7 @@ footer {
   <!-- ── 場次明細(主要交互區,放最上) ── -->
   <div class="chart-section" style="margin:14px 36px;">
     <div class="chart-header" style="flex-wrap:wrap;gap:10px">
-      <h2 style="white-space:nowrap">場次明細(點 📌 置頂、點列展開預約)</h2>
+      <h2 style="white-space:nowrap">場次明細(點日期列 📌 置頂、點課程列展開預約)</h2>
       <div id="slotsFilterBar" style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
         <button class="pdf-tab-btn active" data-filter="all" onclick="filterSlotsTable('all',this)">全部(未完成)</button>
         <button class="pdf-tab-btn" data-filter="scheduled" onclick="filterSlotsTable('scheduled',this)">即將舉辦</button>
@@ -1154,7 +1175,7 @@ footer {
     <div style="overflow-x:auto;max-height:560px;overflow-y:auto">
       <table class="data-table" style="width:100%;font-size:0.86rem">
         <thead>
-          <tr><th style="width:32px"></th><th style="width:38px">📌</th><th>日期</th><th>時間</th><th>課程</th><th>類型</th><th>地點</th><th class="num">已報名</th><th class="num">已到</th><th class="num">容量</th><th class="num">滿座率</th><th class="num">狀態</th></tr>
+          <tr><th style="width:30px"></th><th style="width:108px">時間</th><th>課程</th><th>類型</th><th>地點</th><th class="num">報名 / 容量</th><th class="num" style="min-width:112px">滿座率</th><th class="num">已到</th><th class="num">狀態</th></tr>
         </thead>
         <tbody id="allSlotsBody"></tbody>
       </table>
@@ -3849,8 +3870,22 @@ function renderSlotsTable(){
     return;
   }
   if(empty) empty.style.display = 'none';
+  const WEEKDAYS = ['日','一','二','三','四','五','六'];
   const rows = [];
+  let lastGroupKey = null;
   sorted.forEach(s => {
+    const isPinned = pinnedDates.has(s.slot_date);
+    // 日期變了就插入群組標題列(置頂群與一般群分開)
+    const groupKey = (isPinned ? 'P' : 'N') + s.slot_date;
+    if(groupKey !== lastGroupKey){
+      lastGroupKey = groupKey;
+      const d = new Date(s.slot_date + 'T00:00:00');
+      const wd = isNaN(d) ? '' : `（${WEEKDAYS[d.getDay()]}）`;
+      const dayCount = sorted.filter(x => x.slot_date === s.slot_date).length;
+      const pinIcon = isPinned ? '📌' : '◯';
+      const pinTitle = isPinned ? '取消置頂此日' : '把此日所有場次置頂(雲端同步)';
+      rows.push(`<tr class="date-sep${isPinned ? ' pinned' : ''}"><td colspan="9"><span class="pin-toggle" title="${pinTitle}" onclick="togglePinDate('${s.slot_date}',event)">${pinIcon}</span>${s.slot_date}${wd}　·　${dayCount} 場${isPinned ? '<span class="pin-tag">已置頂</span>' : ''}</td></tr>`);
+    }
     const cap = s.capacity || 0;
     const bk = s.booked_count || 0;
     const ck = s.checked_count != null ? s.checked_count : '—';
@@ -3869,23 +3904,17 @@ function renderSlotsTable(){
     const hasEntries = Array.isArray(s.entries) && s.entries.length > 0;
     const expandIcon = hasEntries ? (expanded ? '▼' : '▶') : '·';
     const cursor = hasEntries ? 'pointer' : 'default';
-    const isPinned = pinnedDates.has(s.slot_date);
-    const pinIcon = isPinned ? '📌' : '◯';
-    const pinTitle = isPinned ? '取消置頂此日' : '把此日所有場次置頂(雲端同步)';
-    const rowBg = isPinned ? 'background:#fffbe6' : '';
-    rows.push(`<tr style="cursor:${cursor};${rowBg}" ${hasEntries ? `onclick="toggleSlotExpand('${s.slot_id}',event)"` : ''}>
+    const rowCls = (isPinned ? 'in-pinned' : '') + (s.status === 'cancelled' ? ' row-cancelled' : '');
+    rows.push(`<tr class="${rowCls.trim()}" style="cursor:${cursor}" ${hasEntries ? `onclick="toggleSlotExpand('${s.slot_id}',event)"` : ''}>
       <td style="color:var(--text-muted);font-size:0.75rem">${expandIcon}</td>
-      <td style="text-align:center;cursor:pointer;font-size:1rem;${isPinned?'':'opacity:0.35'}" title="${pinTitle}" onclick="togglePinDate('${s.slot_date}',event)">${pinIcon}</td>
-      <td style="font-weight:${isPinned?'700':'400'}">${s.slot_date}</td>
-      <td>${(s.start_time||'').slice(0,5)} - ${(s.end_time||'').slice(0,5)}</td>
+      <td style="white-space:nowrap;font-variant-numeric:tabular-nums">${(s.start_time||'').slice(0,5)} - ${(s.end_time||'').slice(0,5)}</td>
       <td>${s.course_name||''}</td>
-      <td><span style="display:inline-block;padding:2px 8px;border-radius:10px;background:${tcolor}22;color:${tcolor};font-size:0.78rem;font-weight:700">${tlbl}</span></td>
+      <td><span style="display:inline-block;padding:2px 8px;border-radius:10px;background:${tcolor}22;color:${tcolor};font-size:0.78rem;font-weight:700;white-space:nowrap">${tlbl}</span></td>
       <td style="font-size:0.82rem;color:var(--text-muted)">${regionTag}${s.course_location||'—'}</td>
-      <td class="num">${bk}</td>
-      <td class="num" style="color:${ck === bk && bk > 0 ? '#2aac8a' : 'var(--text-muted)'}">${ck}</td>
-      <td class="num">${cap}</td>
+      <td class="num" style="white-space:nowrap"><b style="font-size:0.95rem">${bk}</b><span style="color:var(--text-muted)"> / ${cap}</span></td>
       <td class="num"><div class="fill-cell"><div class="fill-bar"><i style="width:${Math.min(rate,100)}%;background:${rateBarColor}"></i></div><span style="color:${rateColor}">${rate}%</span></div></td>
-      <td class="num"><span style="display:inline-block;padding:2px 8px;border-radius:10px;background:${scolor}22;color:${scolor};font-size:0.76rem;font-weight:700">${slbl}</span></td>
+      <td class="num" style="color:${ck === bk && bk > 0 ? '#2aac8a' : 'var(--text-muted)'}">${ck}</td>
+      <td class="num"><span style="display:inline-block;padding:2px 8px;border-radius:10px;background:${scolor}22;color:${scolor};font-size:0.76rem;font-weight:700;white-space:nowrap">${slbl}</span></td>
     </tr>`);
     if(expanded && hasEntries){
       const entriesHtml = s.entries
@@ -3902,7 +3931,7 @@ function renderSlotsTable(){
             <div style="color:${ckColor};font-weight:700;text-align:right">${ckLbl}</div>
           </div>`;
         }).join('');
-      rows.push(`<tr><td colspan="12" style="padding:14px 28px;background:#f7fbf9">
+      rows.push(`<tr><td colspan="9" style="padding:14px 28px;background:#f7fbf9">
         <div style="font-size:0.78rem;color:var(--text-muted);margin-bottom:6px">— ${s.entries.length} 筆預約 —</div>
         ${entriesHtml}
       </td></tr>`);
