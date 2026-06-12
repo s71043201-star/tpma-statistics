@@ -169,7 +169,7 @@ body.is-loading .chart-wrap::after {
 .topbar-title { min-width: 0; }
 .topbar-title h1 { font-size: 1.1rem; font-weight: 800; letter-spacing: 0.04em; color: #fff; text-shadow: 0 1px 4px rgba(0,0,0,0.18); }
 .topbar-title p { font-size: 0.76rem; color: rgba(255,255,255,0.88); margin-top: 2px; }
-.topbar-actions { margin-left: auto; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.topbar-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; flex: 1; }
 .act-btn {
   display: inline-flex; align-items: center; gap: 6px;
   padding: 7px 14px; border-radius: 9px;
@@ -187,16 +187,15 @@ body.is-loading .chart-wrap::after {
 #pdf-export-btn {
   display: inline-flex; align-items: center; gap: 7px;
   padding: 7px 16px; border-radius: 9px;
-  background: linear-gradient(135deg, #2aac8a, #1a9fbe);
-  color: white; font-size: 0.82rem; font-family: inherit;
-  font-weight: 700; border: none; cursor: pointer;
-  box-shadow: 0 2px 8px rgba(26,159,190,0.30);
+  background: var(--surface); border: 1.5px solid var(--border);
+  color: var(--teal); font-size: 0.82rem; font-family: inherit;
+  font-weight: 700; cursor: pointer;
   transition: all 0.18s; white-space: nowrap;
 }
 #pdf-export-btn .ic { width: 15px; height: 15px; }
-#pdf-export-btn:hover { transform: translateY(-1px); box-shadow: 0 4px 14px rgba(26,159,190,0.40); }
+#pdf-export-btn:hover { border-color: var(--teal); background: #f0fbf7; transform: translateY(-1px); }
 #pdf-export-btn:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
-#view-counter { font-size: 0.74rem; color: rgba(255,255,255,0.88); white-space: nowrap; }
+#view-counter { font-size: 0.74rem; color: rgba(255,255,255,0.88); white-space: nowrap; margin-left: auto; }
 
 /* ── 雲端狀態膠囊 ── */
 #cloud-bar {
