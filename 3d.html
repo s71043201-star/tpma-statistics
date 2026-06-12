@@ -16,11 +16,16 @@
   --teal:         #2aac8a;
   --cyan:         #1a9fbe;
   --blue-teal:    #1a7ea0;
-  --bg:           #07130f;
-  --text:         #e9f6f0;
-  --text-muted:   #8fb5a8;
-  --glass:        rgba(14, 36, 29, 0.55);
-  --glass-border: rgba(143, 186, 46, 0.18);
+  --grad-main:    linear-gradient(135deg, #8fba2e 0%, #2aac8a 50%, #1a9fbe 100%);
+  --bg:           #f2f8f5;
+  --surface:      #ffffff;
+  --border:       #d6ede5;
+  --text:         #1a2e28;
+  --text-muted:   #5a7a70;
+  --shadow-sm:    0 1px 4px rgba(26,120,90,0.08);
+  --shadow-md:    0 4px 18px rgba(26,120,90,0.12);
+  --shadow-lg:    0 8px 36px rgba(26,120,90,0.16);
+  --radius:       14px;
 }
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -31,9 +36,12 @@ body {
   font-family: 'Noto Sans TC', 'Microsoft JhengHei', sans-serif;
   background: var(--bg); color: var(--text); min-height: 100vh;
   overflow-x: hidden;
+  background-image:
+    radial-gradient(ellipse at 10% 0%, rgba(143,186,46,0.10) 0%, transparent 55%),
+    radial-gradient(ellipse at 90% 100%, rgba(26,159,190,0.10) 0%, transparent 55%);
 }
 
-/* 互動流體背景 */
+/* 互動流體背景(淺色水彩暈染) */
 #fluidCanvas {
   position: fixed; inset: 0; width: 100vw; height: 100vh;
   z-index: 0; pointer-events: none;
@@ -41,47 +49,61 @@ body {
 
 .page { position: relative; z-index: 1; max-width: 1180px; margin: 0 auto; padding: 0 24px 80px; }
 
-/* ── Header ── */
-header { padding: 42px 0 10px; }
-header h1 {
-  font-size: 2rem; font-weight: 800; letter-spacing: 0.04em;
-  background: linear-gradient(110deg, #b9e35a, #3fd4ac, #3fc2e8);
-  -webkit-background-clip: text; background-clip: text; color: transparent;
+/* ── Header(品牌漸層,與主儀表板一致) ── */
+header {
+  background: var(--grad-main); color: white;
+  border-radius: var(--radius); padding: 26px 32px;
+  margin-top: 26px; box-shadow: 0 4px 24px rgba(26,120,90,0.25);
+  position: relative; overflow: hidden;
 }
-header p { color: var(--text-muted); margin-top: 8px; font-size: 0.92rem; }
-.header-row { display: flex; align-items: flex-end; justify-content: space-between; flex-wrap: wrap; gap: 12px; }
+header::before {
+  content: ''; position: absolute; top: -50px; right: -30px;
+  width: 220px; height: 220px; border-radius: 50%;
+  background: rgba(255,255,255,0.07);
+}
+header::after {
+  content: ''; position: absolute; bottom: -70px; right: 150px;
+  width: 160px; height: 160px; border-radius: 50%;
+  background: rgba(255,255,255,0.05);
+}
+header h1 {
+  font-size: 1.7rem; font-weight: 800; letter-spacing: 0.05em;
+  text-shadow: 0 1px 4px rgba(0,0,0,0.15);
+}
+header p { font-size: 0.9rem; opacity: 0.9; margin-top: 7px; }
+.header-row { display: flex; align-items: flex-end; justify-content: space-between; flex-wrap: wrap; gap: 12px; position: relative; z-index: 1; }
 .back-link {
-  color: var(--teal); text-decoration: none; font-size: 0.88rem;
-  border: 1px solid rgba(42,172,138,0.4); border-radius: 999px; padding: 7px 16px;
+  color: #fff; text-decoration: none; font-size: 0.88rem;
+  border: 1px solid rgba(255,255,255,0.55); border-radius: 999px; padding: 7px 16px;
   transition: background 0.2s;
 }
-.back-link:hover { background: rgba(42,172,138,0.15); }
+.back-link:hover { background: rgba(255,255,255,0.18); }
 #data-status {
-  display: inline-block; margin-top: 10px; font-size: 0.78rem; color: var(--text-muted);
-  border: 1px solid var(--glass-border); border-radius: 999px; padding: 4px 12px;
-  background: var(--glass);
+  display: inline-block; margin-top: 10px; font-size: 0.78rem; color: #fff;
+  border: 1px solid rgba(255,255,255,0.35); border-radius: 999px; padding: 4px 12px;
+  background: rgba(255,255,255,0.16); position: relative; z-index: 1;
 }
-#data-status.live { color: #b9e35a; border-color: rgba(143,186,46,0.45); }
+#data-status.live { color: #f3ffd6; border-color: rgba(255,255,255,0.6); }
 
-.hint { color: var(--text-muted); font-size: 0.8rem; margin-top: 6px; }
+.hint { color: rgba(255,255,255,0.88); font-size: 0.8rem; margin-top: 8px; position: relative; z-index: 1; }
 
 /* ── 區塊 ── */
 section { margin-top: 38px; }
 section > h2 {
   font-size: 1.15rem; font-weight: 700; letter-spacing: 0.06em; margin-bottom: 6px;
-  display: flex; align-items: center; gap: 10px;
+  display: flex; align-items: center; gap: 10px; color: var(--text);
 }
 section > h2::before {
   content: ''; width: 10px; height: 10px; border-radius: 3px;
   background: linear-gradient(135deg, var(--green-yellow), var(--cyan));
-  box-shadow: 0 0 12px rgba(63,212,172,0.8);
+  box-shadow: 0 0 8px rgba(42,172,138,0.5);
 }
 section > .sub { color: var(--text-muted); font-size: 0.83rem; margin-bottom: 16px; }
 
 .glass {
-  background: var(--glass); border: 1px solid var(--glass-border);
-  border-radius: 18px; backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
-  box-shadow: 0 8px 40px rgba(0,0,0,0.35);
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-md);
 }
 
 /* ── KPI 液體卡片 ── */
@@ -89,7 +111,7 @@ section > .sub { color: var(--text-muted); font-size: 0.83rem; margin-bottom: 16
 .kpi-card { position: relative; overflow: hidden; padding: 22px 24px 30px; min-height: 150px; }
 .kpi-card canvas { position: absolute; left: 0; right: 0; bottom: 0; width: 100%; height: 100%; }
 .kpi-card .kpi-label { position: relative; z-index: 2; font-size: 0.85rem; color: var(--text-muted); letter-spacing: 0.08em; }
-.kpi-card .kpi-value { position: relative; z-index: 2; font-size: 2.5rem; font-weight: 800; margin-top: 6px; text-shadow: 0 2px 12px rgba(0,0,0,0.5); }
+.kpi-card .kpi-value { position: relative; z-index: 2; font-size: 2.5rem; font-weight: 800; margin-top: 6px; color: var(--text); }
 .kpi-card .kpi-sub { position: relative; z-index: 2; font-size: 0.78rem; color: var(--text-muted); margin-top: 4px; }
 
 /* ── 類型液體量表 ── */
@@ -102,27 +124,31 @@ section > .sub { color: var(--text-muted); font-size: 0.83rem; margin-bottom: 16
 /* ── 3D 圖表 ── */
 #bar3d-wrap { height: 520px; padding: 8px; }
 #bar3d { width: 100%; height: 100%; }
-.seg { display: inline-flex; border: 1px solid var(--glass-border); border-radius: 999px; overflow: hidden; margin-bottom: 14px; }
+.seg { display: inline-flex; border: 1px solid var(--border); border-radius: 999px; overflow: hidden; margin-bottom: 14px; background: var(--surface); box-shadow: var(--shadow-sm); }
 .seg button {
   background: transparent; color: var(--text-muted); border: none; cursor: pointer;
   padding: 7px 20px; font-size: 0.85rem; font-family: inherit; transition: all 0.2s;
 }
-.seg button.on { background: linear-gradient(135deg, rgba(143,186,46,0.35), rgba(26,159,190,0.35)); color: #fff; font-weight: 700; }
+.seg button.on { background: var(--grad-main); color: #fff; font-weight: 700; }
 
-/* ── 流體粒子場景 ── */
-#flow-wrap { position: relative; height: 520px; overflow: hidden; cursor: grab; }
+/* ── 流體粒子場景(深色水族箱容器,讓粒子發光可見) ── */
+#flow-wrap {
+  position: relative; height: 520px; overflow: hidden; cursor: grab;
+  background: linear-gradient(135deg, #11434a 0%, #0f4a3e 55%, #145a4c 100%);
+  border: 1px solid var(--border); box-shadow: var(--shadow-lg);
+}
 #flow-wrap:active { cursor: grabbing; }
 #flowCanvas { width: 100%; height: 100%; display: block; }
 #flow-legend {
-  position: absolute; top: 16px; left: 18px; z-index: 3;
-  background: rgba(5, 18, 14, 0.65); border: 1px solid var(--glass-border);
+  position: absolute; top: 16px; left: 18px; z-index: 3; color: #eafff5;
+  background: rgba(5, 25, 20, 0.6); border: 1px solid rgba(255,255,255,0.15);
   border-radius: 12px; padding: 12px 16px; backdrop-filter: blur(8px);
   font-size: 0.8rem; line-height: 1.9; pointer-events: none;
 }
 #flow-legend .dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 7px; box-shadow: 0 0 8px currentColor; }
 #flow-note {
   position: absolute; bottom: 12px; right: 16px; z-index: 3;
-  font-size: 0.72rem; color: var(--text-muted); pointer-events: none;
+  font-size: 0.72rem; color: rgba(255,255,255,0.6); pointer-events: none;
 }
 
 footer { margin-top: 50px; text-align: center; color: var(--text-muted); font-size: 0.78rem; }
@@ -400,7 +426,8 @@ async function loadData() {
   uniform sampler2D uTexture;
   void main(){
     vec3 c = texture(uTexture, vUv).rgb;
-    float a = clamp(max(c.r, max(c.g, c.b)) * 1.4, 0.0, 1.0);
+    // 淺色底:壓低 alpha 上限,呈現水彩暈染感而不會把頁面壓暗
+    float a = clamp(max(c.r, max(c.g, c.b)) * 1.2, 0.0, 0.55);
     frag = vec4(c, a);
   }`);
 
@@ -616,9 +643,9 @@ function drawGauge(c, pct, color, phase) {
   }
   ctx.restore();
   // 百分比文字
-  ctx.fillStyle = '#eafff5'; ctx.font = '700 26px "Noto Sans TC",sans-serif';
+  ctx.fillStyle = '#1a2e28'; ctx.font = '700 26px "Noto Sans TC",sans-serif';
   ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-  ctx.shadowColor = 'rgba(0,0,0,0.6)'; ctx.shadowBlur = 6;
+  ctx.shadowColor = 'rgba(255,255,255,0.85)'; ctx.shadowBlur = 5;
   ctx.fillText(Math.round(pct * 100) + '%', cx, cy);
   ctx.shadowBlur = 0;
 }
@@ -695,24 +722,24 @@ function bar3dOption() {
     },
     visualMap: {
       max: maxV, calculable: true,
-      inRange: { color: ['#0f3a4d', '#1a7ea0', '#2aac8a', '#8fba2e', '#e9f57a'] },
-      textStyle: { color: '#8fb5a8' }, left: 8, bottom: 20
+      inRange: { color: ['#1a7ea0', '#1a9fbe', '#2aac8a', '#8fba2e', '#d9e84a'] },
+      textStyle: { color: '#5a7a70' }, left: 8, bottom: 20
     },
-    xAxis3D: { type: 'category', data: months, name: '月份', nameTextStyle: { color: '#8fb5a8' }, axisLabel: { color: '#9fc4b8', fontSize: 10 }, axisLine: { lineStyle: { color: '#2f5448' } } },
-    yAxis3D: { type: 'category', data: types, name: '', axisLabel: { color: '#9fc4b8', fontSize: 11 }, axisLine: { lineStyle: { color: '#2f5448' } } },
-    zAxis3D: { type: 'value', name: bar3dMetric === 'presc' ? '開立數' : '執行數', nameTextStyle: { color: '#8fb5a8' }, axisLabel: { color: '#9fc4b8' }, axisLine: { lineStyle: { color: '#2f5448' } }, splitLine: { lineStyle: { color: 'rgba(143,186,46,0.12)' } } },
+    xAxis3D: { type: 'category', data: months, name: '月份', nameTextStyle: { color: '#5a7a70' }, axisLabel: { color: '#5a7a70', fontSize: 10 }, axisLine: { lineStyle: { color: '#bcd9cd' } } },
+    yAxis3D: { type: 'category', data: types, name: '', axisLabel: { color: '#5a7a70', fontSize: 11 }, axisLine: { lineStyle: { color: '#bcd9cd' } } },
+    zAxis3D: { type: 'value', name: bar3dMetric === 'presc' ? '開立數' : '執行數', nameTextStyle: { color: '#5a7a70' }, axisLabel: { color: '#5a7a70' }, axisLine: { lineStyle: { color: '#bcd9cd' } }, splitLine: { lineStyle: { color: 'rgba(26,126,160,0.15)' } } },
     grid3D: {
       boxWidth: 170, boxDepth: 60, boxHeight: 70,
       axisPointer: { show: false },
       viewControl: { autoRotate: true, autoRotateSpeed: 5, distance: 230, alpha: 22, beta: 35 },
-      light: { main: { intensity: 1.3, alpha: 35, beta: 25 }, ambient: { intensity: 0.45 } },
-      environment: 'transparent'
+      light: { main: { intensity: 1.2, alpha: 35, beta: 25 }, ambient: { intensity: 0.55 } },
+      environment: '#ffffff'
     },
     series: [{
       type: 'bar3D', shading: 'lambert', data,
       barSize: 4.5,
       itemStyle: { opacity: 0.95 },
-      emphasis: { itemStyle: { color: '#ffffff' }, label: { show: true, textStyle: { color: '#fff', fontSize: 13, backgroundColor: 'rgba(0,0,0,0.5)', padding: 4, borderRadius: 4 } } }
+      emphasis: { itemStyle: { color: '#f5c03a' }, label: { show: true, textStyle: { color: '#1a2e28', fontSize: 13, backgroundColor: 'rgba(255,255,255,0.92)', padding: 4, borderRadius: 4 } } }
     }]
   };
 }
@@ -748,7 +775,7 @@ function initFlowScene() {
   renderer.setPixelRatio(Math.min(2, devicePixelRatio));
 
   const scene = new THREE.Scene();
-  scene.fog = new THREE.FogExp2(0x07130f, 0.012);
+  scene.fog = new THREE.FogExp2(0x114a42, 0.012);
   const camera = new THREE.PerspectiveCamera(58, 16 / 9, 0.1, 300);
 
   const totalPresc = typeData.reduce((s, t) => s + t.presc, 0) || 1;
