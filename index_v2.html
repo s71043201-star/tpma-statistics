@@ -60,11 +60,11 @@ body {
 #sidebar {
   position: fixed; top: 0; left: 0; bottom: 0;
   width: var(--sidebar-w-collapsed); z-index: 100;
-  background: linear-gradient(170deg, #8fba2e 0%, #2aac8a 52%, #1a9fbe 100%);
-  color: #fff;
+  background: linear-gradient(170deg, #0f3328 0%, #155244 55%, #145661 100%);
+  color: #e6f5ef;
   display: flex; flex-direction: column;
   transition: width 0.22s ease, box-shadow 0.22s ease;
-  box-shadow: 4px 0 24px rgba(26,120,90,0.25);
+  box-shadow: 4px 0 24px rgba(10,40,32,0.22);
   overflow: hidden;
 }
 #sidebar:hover {
@@ -74,13 +74,13 @@ body {
 .brand {
   display: flex; align-items: center; gap: 11px;
   padding: 18px 13px 16px;
-  border-bottom: 1px solid rgba(255,255,255,0.22);
+  border-bottom: 1px solid rgba(255,255,255,0.12);
 }
 .brand-logo {
   width: 38px; height: 38px; border-radius: 11px; flex-shrink: 0;
-  background: rgba(255,255,255,0.92);
+  background: var(--grad-main);
   display: flex; align-items: center; justify-content: center;
-  color: var(--teal); box-shadow: 0 3px 10px rgba(20,80,60,0.25);
+  color: #fff; box-shadow: 0 3px 10px rgba(42,172,138,0.4);
 }
 .brand-logo .ic { width: 21px; height: 21px; }
 .brand-text { line-height: 1.3; overflow: hidden; white-space: nowrap; }
@@ -91,19 +91,19 @@ body {
   display: flex; align-items: center; gap: 11px;
   padding: 10px 13px; border-radius: 10px;
   border: none; background: transparent;
-  color: rgba(255,255,255,0.88); font-size: 0.88rem; font-weight: 600;
+  color: rgba(230,245,239,0.78); font-size: 0.88rem; font-weight: 600;
   font-family: inherit; cursor: pointer; transition: all 0.16s;
   text-align: left; white-space: nowrap; position: relative;
 }
-.tab-btn:hover { background: rgba(255,255,255,0.18); color: #fff; }
+.tab-btn:hover { background: rgba(255,255,255,0.10); color: #fff; }
 .tab-btn.active {
-  background: rgba(255,255,255,0.94); color: #18745c;
-  box-shadow: 0 2px 10px rgba(15,60,45,0.22);
+  background: rgba(255,255,255,0.94); color: #14745c;
+  box-shadow: 0 2px 10px rgba(0,20,14,0.3);
 }
 .tab-btn.active::before {
   content: ''; position: absolute; left: -10px; top: 9px; bottom: 9px;
   width: 4px; border-radius: 0 4px 4px 0;
-  background: rgba(255,255,255,0.95);
+  background: linear-gradient(180deg, #8fba2e, #2aac8a);
 }
 .nav-lbl {
   overflow: hidden; text-overflow: ellipsis;
@@ -113,8 +113,8 @@ body {
 .brand-text { opacity: 0; transition: opacity 0.18s ease 0.04s; }
 #sidebar:hover .brand-text { opacity: 1; }
 .sidebar-foot {
-  padding: 12px 14px; border-top: 1px solid rgba(255,255,255,0.22);
-  font-size: 0.68rem; color: rgba(255,255,255,0.8); line-height: 1.6;
+  padding: 12px 14px; border-top: 1px solid rgba(255,255,255,0.12);
+  font-size: 0.68rem; color: rgba(230,245,239,0.55); line-height: 1.6;
   white-space: nowrap; overflow: hidden;
   opacity: 0; transition: opacity 0.18s ease 0.04s;
 }
