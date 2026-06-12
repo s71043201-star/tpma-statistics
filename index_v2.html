@@ -697,7 +697,9 @@ body.is-loading .chart-wrap::after {
   font-variant-numeric: tabular-nums;
 }
 .day-cards { display: flex; gap: 10px; flex-wrap: wrap; flex: 1; align-items: flex-start; }
-.day-type-col { display: flex; flex-direction: column; gap: 10px; }
+.day-type-col { display: flex; flex-direction: column; gap: 10px; width: 248px; flex-shrink: 0; }
+.day-type-col.empty { visibility: hidden; }
+.day-type-col .day-card { width: 100%; }
 .day-card {
   width: 248px; padding: 10px 12px;
   border: 1px solid var(--border); border-left: 4px solid #9aa5b1; border-radius: 10px;
@@ -3716,11 +3718,16 @@ function renderDaySchedule(){
           ${entriesHtml}
         </div>`;
       };
-    const cards = Object.keys(typeGroups).sort((a,b)=>a-b).map(k =>
-      `<div class="day-type-col">` +
-        typeGroups[k].slice().sort((a,b)=>(a.course_name||'').localeCompare(b.course_name||'','zh-Hant')).map(renderCard).join('') +
-      `</div>`
-    ).join('');
+    // 四個類型欄位固定占位:該時段沒有的類型留空欄,讓同類型跨時段對齊
+    const orderKeys = [0,1,2,3];
+    if(typeGroups[4]) orderKeys.push(4);
+    const cards = orderKeys.map(k => {
+      const arr = typeGroups[k];
+      if(!arr || !arr.length) return `<div class="day-type-col empty"></div>`;
+      return `<div class="day-type-col">` +
+        arr.slice().sort((a,b)=>(a.course_name||'').localeCompare(b.course_name||'','zh-Hant')).map(renderCard).join('') +
+      `</div>`;
+    }).join('');
     return `<div class="day-time-row"><div class="day-time">${t}</div><div class="day-cards">${cards}</div></div>`;
   }).join('');
   body.innerHTML = html;
