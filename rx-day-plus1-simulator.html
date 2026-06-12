@@ -1,0 +1,1244 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>處方日 Plus 1 — 3D 人流模擬器</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script type="importmap">
+{"imports":{
+  "three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+  "three/addons/":"https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+}}
+</script>
+<style>
+:root{
+  --bg:#0f172a; --panel:#1e293b; --panel2:#273449; --line:#334155;
+  --text:#e2e8f0; --muted:#94a3b8; --accent:#38bdf8;
+  --green:#22c55e; --yellow:#facc15; --red:#ef4444; --gray:#94a3b8;
+}
+*{box-sizing:border-box; margin:0; padding:0;}
+html,body{height:100%; overflow:hidden;}
+body{background:var(--bg); color:var(--text); font-family:"Microsoft JhengHei","Noto Sans TC",sans-serif; font-size:13px;}
+#app{display:grid; grid-template-rows:46px 1fr auto; height:100vh;}
+
+header{display:flex; align-items:center; gap:16px; padding:0 16px; background:var(--panel); border-bottom:1px solid var(--line);}
+header h1{font-size:16px; color:var(--accent); white-space:nowrap;}
+#clock{font-size:20px; font-weight:bold; font-variant-numeric:tabular-nums; color:#fff;}
+.badge{background:var(--panel2); border:1px solid var(--line); border-radius:6px; padding:3px 10px; white-space:nowrap;}
+.badge b{color:var(--accent);}
+header .sp{flex:1;}
+
+main{display:grid; grid-template-columns:minmax(0,3fr) minmax(330px,2fr); min-height:0;}
+#view3d{position:relative; min-width:0; background:#0b1220;}
+#view3d canvas{display:block;}
+#floorBtns{position:absolute; top:10px; left:10px; display:flex; gap:6px; z-index:5;}
+#floorBtns button{background:rgba(30,41,59,.85); color:var(--text); border:1px solid var(--line); border-radius:6px; padding:4px 10px; cursor:pointer; font-size:12px;}
+#floorBtns button.on{background:var(--accent); color:#082f49; font-weight:bold;}
+#legend{position:absolute; bottom:10px; left:10px; background:rgba(15,23,42,.8); border:1px solid var(--line); border-radius:8px; padding:6px 10px; display:flex; gap:12px; z-index:5; font-size:12px;}
+.dot{display:inline-block; width:10px; height:10px; border-radius:50%; margin-right:4px; vertical-align:-1px;}
+
+aside{display:flex; flex-direction:column; gap:8px; padding:8px; overflow-y:auto; background:var(--bg); border-left:1px solid var(--line); min-height:0;}
+.panel{background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:10px;}
+.panel h2{font-size:13px; color:var(--accent); margin-bottom:8px;}
+
+/* 時間軸 */
+#timebar{height:10px; background:var(--panel2); border-radius:5px; overflow:hidden; margin:6px 0;}
+#timefill{height:100%; width:0%; background:linear-gradient(90deg,#38bdf8,#a78bfa);}
+.tlabels{display:flex; justify-content:space-between; color:var(--muted); font-size:11px;}
+.ctrl-row{display:flex; gap:6px; margin-top:8px; align-items:center;}
+.ctrl-row button{background:var(--panel2); color:var(--text); border:1px solid var(--line); border-radius:6px; padding:5px 10px; cursor:pointer; font-size:12px;}
+.ctrl-row button:hover{border-color:var(--accent);}
+.ctrl-row button.on{background:var(--accent); color:#082f49; font-weight:bold;}
+#btnPlay{font-weight:bold; min-width:64px;}
+
+/* 統計 */
+#stats{display:grid; grid-template-columns:repeat(3,1fr); gap:6px;}
+.stat{background:var(--panel2); border-radius:8px; padding:6px 8px; text-align:center;}
+.stat .v{font-size:18px; font-weight:bold; color:#fff; font-variant-numeric:tabular-nums;}
+.stat .l{font-size:11px; color:var(--muted);}
+.stat .v.warn{color:var(--red);}
+
+#chartWrap{height:170px;}
+
+/* 樓層熱度 */
+.heatrow{display:flex; align-items:center; gap:8px; margin:4px 0;}
+.heatrow .fl{width:64px; font-size:12px; color:var(--muted); white-space:nowrap;}
+.heatbar{flex:1; height:14px; background:var(--panel2); border-radius:7px; overflow:hidden;}
+.heatfill{height:100%; width:0%; background:var(--accent); transition:width .3s; border-radius:7px;}
+.heatfill.hot{background:var(--red);}
+.heatrow .n{width:56px; text-align:right; font-variant-numeric:tabular-nums; font-size:12px;}
+
+/* 人力配置 */
+#pcSplit{display:flex; gap:8px; margin-bottom:8px;}
+#pcSplit .stat{flex:1;}
+.staffrow{display:flex; align-items:center; gap:6px; margin:3px 0;}
+.staffrow .nm{flex:1; font-size:12px;}
+.staffrow button{width:22px; height:22px; background:var(--panel2); color:var(--text); border:1px solid var(--line); border-radius:5px; cursor:pointer;}
+.staffrow .cnt{width:26px; text-align:center; font-weight:bold; font-variant-numeric:tabular-nums;}
+#staffLeft{font-size:12px; color:var(--muted); margin-top:6px;}
+#staffLeft b{color:var(--yellow);}
+#evlog{margin-top:6px; font-size:11px; color:var(--muted); max-height:54px; overflow-y:auto;}
+.hint{font-size:11px; color:var(--muted); margin-top:4px; line-height:1.5;}
+
+/* 底部控制台 */
+footer{background:var(--panel); border-top:1px solid var(--line); padding:8px 12px; display:flex; gap:14px; align-items:stretch; overflow-x:auto;}
+.cgroup{min-width:200px; flex:1;}
+.cgroup h3{font-size:12px; color:var(--accent); margin-bottom:5px;}
+.crow{display:flex; align-items:center; gap:6px; margin:3px 0;}
+.crow label{width:96px; font-size:11px; color:var(--muted); white-space:nowrap;}
+.crow input[type=range]{flex:1; accent-color:var(--accent); min-width:60px;}
+.crow .val{width:52px; text-align:right; font-size:11px; font-variant-numeric:tabular-nums;}
+.crow select{flex:1; background:var(--panel2); color:var(--text); border:1px solid var(--line); border-radius:5px; padding:3px; font-size:12px;}
+.crow input[type=checkbox]{accent-color:var(--accent);}
+#startCol{display:flex; flex-direction:column; gap:8px; justify-content:center; min-width:130px; flex:0;}
+#btnStart{background:var(--green); color:#052e16; border:none; border-radius:8px; padding:10px 14px; font-size:15px; font-weight:bold; cursor:pointer;}
+#btnStart:hover{filter:brightness(1.1);}
+#btnReset{background:var(--panel2); color:var(--text); border:1px solid var(--line); border-radius:8px; padding:7px; cursor:pointer;}
+#customW{display:none;}
+#customW.show{display:block;}
+
+/* 報告 modal */
+#report{position:fixed; inset:0; background:rgba(2,6,23,.7); display:none; align-items:center; justify-content:center; z-index:50;}
+#report.show{display:flex;}
+#reportBox{background:var(--panel); border:1px solid var(--line); border-radius:14px; padding:20px 24px; width:min(720px,92vw); max-height:88vh; overflow-y:auto;}
+#reportBox h2{color:var(--accent); margin-bottom:12px;}
+#reportBox h3{font-size:13px; color:var(--yellow); margin:12px 0 6px;}
+#reportBox table{width:100%; border-collapse:collapse; font-size:12px;}
+#reportBox td,#reportBox th{border:1px solid var(--line); padding:5px 8px; text-align:left;}
+#reportBox th{background:var(--panel2); color:var(--muted);}
+#reportBox ul{margin-left:18px; line-height:1.7; font-size:12px;}
+#reportBox .btns{display:flex; gap:10px; margin-top:16px; justify-content:flex-end;}
+#reportBox .btns button{background:var(--panel2); color:var(--text); border:1px solid var(--line); border-radius:8px; padding:8px 16px; cursor:pointer; font-size:13px;}
+#reportBox .btns button.pri{background:var(--accent); color:#082f49; font-weight:bold; border:none;}
+.bn{color:var(--red); font-weight:bold;}
+</style>
+</head>
+<body>
+<div id="app">
+  <header>
+    <h1>🏥 處方日 Plus 1 — 樂群樓人流模擬器</h1>
+    <span id="clock">13:00</span>
+    <span class="badge">場內 <b id="hInside">0</b> 人</span>
+    <span class="badge">已離場 <b id="hDone">0</b> 人</span>
+    <span class="badge" id="hState">⏹ 待開始</span>
+    <span class="sp"></span>
+    <span class="badge" title="2026/7/4(五) 13:00–17:00 北投社大樂群樓">📅 2026/7/4 13:00–17:00</span>
+  </header>
+
+  <main>
+    <section id="view3d">
+      <div id="floorBtns">
+        <button data-f="0" class="on">全景</button>
+        <button data-f="1">1F 穿堂</button>
+        <button data-f="2">2F</button>
+        <button data-f="3">3F</button>
+        <button data-f="4">4F</button>
+        <button data-f="5">5F</button>
+      </div>
+      <div id="legend">
+        <span><span class="dot" style="background:#94a3b8"></span>未分流</span>
+        <span><span class="dot" style="background:#22c55e"></span>綠卡</span>
+        <span><span class="dot" style="background:#facc15"></span>黃卡</span>
+        <span><span class="dot" style="background:#ef4444"></span>紅卡</span>
+      </div>
+    </section>
+
+    <aside>
+      <div class="panel">
+        <h2>⏱ 模擬時間軸</h2>
+        <div id="timebar"><div id="timefill"></div></div>
+        <div class="tlabels"><span>13:00</span><span>14:00</span><span>15:00</span><span>16:00</span><span>17:00</span></div>
+        <div class="ctrl-row">
+          <button id="btnPlay">▶ 播放</button>
+          <button class="spd" data-s="1">x1</button>
+          <button class="spd on" data-s="2">x2</button>
+          <button class="spd" data-s="4">x4</button>
+          <button class="spd" data-s="8">x8</button>
+          <span style="flex:1"></span>
+          <span style="font-size:11px;color:var(--muted)">x1 = 1秒≈1分鐘</span>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h2>📊 即時統計</h2>
+        <div id="stats">
+          <div class="stat"><div class="v" id="sInside">0</div><div class="l">場內人數</div></div>
+          <div class="stat"><div class="v" id="sDone">0</div><div class="l">已離場</div></div>
+          <div class="stat"><div class="v" id="sQueue">0</div><div class="l">排隊中合計</div></div>
+          <div class="stat"><div class="v" id="sQTriage">0</div><div class="l">分流隊伍</div></div>
+          <div class="stat"><div class="v" id="sQReward">0</div><div class="l">領獎隊伍</div></div>
+          <div class="stat"><div class="v" id="sQStamp">0</div><div class="l">蓋章隊伍</div></div>
+          <div class="stat"><div class="v" id="sWTriage">–</div><div class="l">分流等候(分)</div></div>
+          <div class="stat"><div class="v" id="sWStamp">–</div><div class="l">蓋章等候(分)</div></div>
+          <div class="stat"><div class="v" id="sWReward">–</div><div class="l">領獎等候(分)</div></div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h2>📈 排隊趨勢圖</h2>
+        <div id="chartWrap"><canvas id="qchart"></canvas></div>
+      </div>
+
+      <div class="panel">
+        <h2>🔥 樓層熱度(當前人數)</h2>
+        <div id="heat"></div>
+      </div>
+
+      <div class="panel">
+        <h2>👥 人力配置狀態</h2>
+        <div id="pcSplit">
+          <div class="stat"><div class="v" id="pcL">4</div><div class="l">左區電腦(分流)</div></div>
+          <div class="stat"><div class="v" id="pcR">2</div><div class="l">右區電腦(領獎)</div></div>
+          <div class="stat"><div class="v" id="pcBusy">0/6</div><div class="l">電腦忙碌中</div></div>
+        </div>
+        <div class="hint">固定 6 人:戴豐逸、芳怡茜、吳亞璇、陳佩研、張鈺微、沈育琳(左右區動態調配)</div>
+        <div style="margin-top:8px; font-size:12px; color:var(--accent); font-weight:bold;">臨時人員 20 人分配(即時生效)</div>
+        <div id="staffRows"></div>
+        <div id="staffLeft">尚可分配:<b id="staffRemain">0</b> 人</div>
+        <div class="hint">效果:各樓每 2 人 → 該樓蓋章窗口 +1(上限 3)|穿堂 ≥2 人 → 分流/領獎時間 −10%|樓梯電梯 ≥2 人 → 移動時間 −15%</div>
+        <div id="evlog"></div>
+      </div>
+    </aside>
+  </main>
+
+  <footer>
+    <div class="cgroup">
+      <h3>👤 民眾設定(重置後生效)</h3>
+      <div class="crow"><label>總人數</label><input type="range" id="iTotal" min="100" max="1000" step="50" value="600"><span class="val" id="vTotal">600</span></div>
+      <div class="crow"><label>綠卡比例</label><input type="range" id="iGreen" min="0" max="100" value="50"><span class="val" id="vGreen">50%</span></div>
+      <div class="crow"><label>黃卡比例</label><input type="range" id="iYellow" min="0" max="100" value="30"><span class="val" id="vYellow">30%</span></div>
+      <div class="crow"><label>紅卡比例(自動)</label><span class="val" id="vRed" style="width:auto">20%</span></div>
+      <div class="crow"><label>特殊情境(紅卡中)</label><input type="range" id="iSpecial" min="0" max="100" value="30"><span class="val" id="vSpecial">30%</span></div>
+    </div>
+
+    <div class="cgroup">
+      <h3>⏲ 處理時間(分鐘,即時生效)</h3>
+      <div class="crow"><label>分流判定</label><input type="range" id="iTriageT" min="0.5" max="6" step="0.25" value="3"><span class="val" id="vTriageT">3.0</span></div>
+      <div class="crow"><label>蓋章(每站)</label><input type="range" id="iStampT" min="0.25" max="3" step="0.25" value="1"><span class="val" id="vStampT">1.0</span></div>
+      <div class="crow"><label>領獎核銷</label><input type="range" id="iRewardT" min="0.5" max="5" step="0.25" value="2"><span class="val" id="vRewardT">2.0</span></div>
+      <div class="crow"><label>爬一層樓梯</label><input type="range" id="iStairT" min="0.25" max="2" step="0.25" value="0.75"><span class="val" id="vStairT">0.75</span></div>
+      <div class="crow"><label>電梯等候+移動</label><input type="range" id="iElevT" min="1" max="6" step="0.5" value="3"><span class="val" id="vElevT">3.0</span></div>
+      <div class="crow"><label>電梯使用率</label><input type="range" id="iElevP" min="0" max="100" value="30"><span class="val" id="vElevP">30%</span></div>
+    </div>
+
+    <div class="cgroup">
+      <h3>🚪 到達模式與動線策略</h3>
+      <div class="crow"><label>到達模式</label>
+        <select id="iArrival">
+          <option value="uniform">均勻到達</option>
+          <option value="front" selected>開場湧入(首小時 40%)</option>
+          <option value="double">雙波峰(開場+收尾各 30%)</option>
+          <option value="custom">自訂分佈曲線</option>
+        </select>
+      </div>
+      <div id="customW">
+        <div class="crow"><label>13–14 權重</label><input type="range" id="iW1" min="0" max="100" value="25"><span class="val" id="vW1">25</span></div>
+        <div class="crow"><label>14–15 權重</label><input type="range" id="iW2" min="0" max="100" value="25"><span class="val" id="vW2">25</span></div>
+        <div class="crow"><label>15–16 權重</label><input type="range" id="iW3" min="0" max="100" value="25"><span class="val" id="vW3">25</span></div>
+        <div class="crow"><label>16–17 權重</label><input type="range" id="iW4" min="0" max="100" value="25"><span class="val" id="vW4">25</span></div>
+      </div>
+      <div class="crow"><label>樓層選擇策略</label>
+        <select id="iStrategy">
+          <option value="low" selected>由低到高(2F→5F)</option>
+          <option value="smart">智慧路徑(先去人少樓層)</option>
+          <option value="random">隨機</option>
+        </select>
+      </div>
+      <div class="crow"><label>左區初始電腦</label><input type="range" id="iLeftPC" min="1" max="5" value="4"><span class="val" id="vLeftPC">4 台</span></div>
+      <div class="crow"><label><input type="checkbox" id="iRealloc" checked> 動態調配電腦</label>
+        <span style="font-size:11px;color:var(--muted)">排隊閾值</span>
+        <input type="range" id="iThresh" min="3" max="30" value="10" style="flex:1"><span class="val" id="vThresh">10 人</span>
+      </div>
+    </div>
+
+    <div class="cgroup">
+      <h3>🏫 處方教室對應(2F–5F)</h3>
+      <div class="crow"><label>2F 教室 A</label><select id="iRoom2"></select></div>
+      <div class="crow"><label>3F 教室 B</label><select id="iRoom3"></select></div>
+      <div class="crow"><label>4F 教室 C</label><select id="iRoom4"></select></div>
+      <div class="crow"><label>5F 教室 D</label><select id="iRoom5"></select></div>
+    </div>
+
+    <div id="startCol">
+      <button id="btnStart">▶ 開始模擬</button>
+      <button id="btnReset">↺ 重置</button>
+    </div>
+  </footer>
+</div>
+
+<div id="report">
+  <div id="reportBox">
+    <h2>📋 模擬結束報告</h2>
+    <div id="reportContent"></div>
+    <div class="btns">
+      <button id="btnContinue">⏩ 延長模擬(讓場內民眾跑完)</button>
+      <button id="btnCloseReport" class="pri">關閉</button>
+    </div>
+  </div>
+</div>
+
+<script type="module">
+import * as THREE from 'three';
+import {OrbitControls} from 'three/addons/controls/OrbitControls.js';
+
+const $ = id => document.getElementById(id);
+const FLOOR_H = 4, FLOORS = 5, MAX_AGENTS = 1000, EVENT_MIN = 240;
+const WALK = 80; // 單位/分鐘
+const fy = f => (f-1)*FLOOR_H;          // 樓板高度
+const ay = f => fy(f) + 0.55;           // agent 球心高度
+
+const RX_TYPES = {
+  exercise:{name:'運動處方', color:0xf97316, css:'#f97316'},
+  nutrition:{name:'營養處方', color:0x14b8a6, css:'#14b8a6'},
+  social:{name:'社會處方', color:0x8b5cf6, css:'#8b5cf6'},
+  emotion:{name:'情緒調適處方', color:0xec4899, css:'#ec4899'},
+};
+
+// ======================= 場地座標 =======================
+const DOOR = {x:-16, z:7};                 // 1F 大門(左前)
+const SPAWN = {x:-16, z:11};
+const EXIT = {x:17, z:7};                  // 右前側門(離場)
+const DIVIDER_X = -4;                      // 分隔板
+const GAP = {x:DIVIDER_X, z:4.8};          // 分隔板前側通道
+const STAIR = {x:0, z:-5};                 // 樓梯(正中偏後)
+const STAIR_WAIT = {x:0, z:-2.8};
+const ELEV = {x:20, z:-5};                 // 電梯(右底)
+const ELEV_WAIT = {x:18, z:-2.8};
+const LEFT_SLOTS = [[-17,-4],[-12.5,-4],[-8,-4],[-17,4],[-12.5,4],[-8,4]];   // 左區 6 桌位
+const RIGHT_SLOTS = [[6,-4],[10,-4],[14,-4],[6,4],[10,4],[14,4]];            // 右區桌位
+const PAMPHLET = {x:18, z:4};              // 文宣發放台
+const STAMP_DESK = f => [[-12, -3.2],[-9.5,-3.2],[-7,-3.2]];                 // 各樓蓋章窗口(最多3)
+
+// ======================= Three.js 場景 =======================
+const view = $('view3d');
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x0b1220);
+scene.fog = new THREE.Fog(0x0b1220, 90, 220);
+const camera = new THREE.PerspectiveCamera(50, 1, 0.1, 500);
+camera.position.set(42, 30, 46);
+const renderer = new THREE.WebGLRenderer({antialias:true});
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+view.appendChild(renderer.domElement);
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.target.set(0, 8, 0);
+controls.maxPolarAngle = Math.PI/2 - 0.02;
+controls.enableDamping = true;
+
+scene.add(new THREE.HemisphereLight(0xbfd9ff, 0x223044, 1.0));
+const sun = new THREE.DirectionalLight(0xffffff, 1.4);
+sun.position.set(40, 60, 30);
+scene.add(sun);
+
+// 地面
+{
+  const g = new THREE.Mesh(new THREE.PlaneGeometry(300,300), new THREE.MeshLambertMaterial({color:0x16243a}));
+  g.rotation.x = -Math.PI/2; g.position.y = -0.05; scene.add(g);
+  const grid = new THREE.GridHelper(300, 60, 0x24364f, 0x1b2a40);
+  grid.position.y = 0.0; scene.add(grid);
+}
+
+function box(w,h,d,color,opacity=1){
+  const m = new THREE.Mesh(new THREE.BoxGeometry(w,h,d),
+    new THREE.MeshLambertMaterial({color, transparent:opacity<1, opacity}));
+  return m;
+}
+function makeTextSprite(text, cssColor='#e2e8f0', scale=9){
+  const cv = document.createElement('canvas'); cv.width=512; cv.height=128;
+  const ctx = cv.getContext('2d');
+  const tex = new THREE.CanvasTexture(cv);
+  const sp = new THREE.Sprite(new THREE.SpriteMaterial({map:tex, depthTest:false}));
+  sp.scale.set(scale, scale/4, 1);
+  const draw = (t, c)=>{
+    ctx.clearRect(0,0,512,128);
+    ctx.font = 'bold 56px "Microsoft JhengHei", sans-serif';
+    ctx.textAlign='center'; ctx.textBaseline='middle';
+    ctx.fillStyle = c; ctx.fillText(t, 256, 64);
+    tex.needsUpdate = true;
+  };
+  draw(text, cssColor);
+  sp.userData.draw = draw;
+  return sp;
+}
+
+const floorGroups = [];      // 1..5
+const floorSlabs = [];
+const floorLabels = [];
+const stampDeskMeshes = {};  // f -> [3 meshes]
+const stampFlagMeshes = {};  // f -> 旗子(顏色=處方類型)
+const W = 46, D = 15;        // 建築外框
+
+for (let f=1; f<=FLOORS; f++){
+  const grp = new THREE.Group(); grp.position.y = fy(f);
+  // 樓板
+  const slab = box(W, 0.3, D, f===1?0x32465f:0x2c3e57);
+  slab.position.y = -0.15; slab.userData.floor = f;
+  grp.add(slab); floorSlabs.push(slab);
+  // 背牆與側牆(半透明)
+  const wallMat = {color:0x4a6280, op:0.16};
+  const back = box(W, FLOOR_H-0.4, 0.2, wallMat.color, wallMat.op); back.position.set(0, FLOOR_H/2-0.2, -D/2); grp.add(back);
+  const left = box(0.2, FLOOR_H-0.4, D, wallMat.color, wallMat.op); left.position.set(-W/2, FLOOR_H/2-0.2, 0); grp.add(left);
+  const right = box(0.2, FLOOR_H-0.4, D, wallMat.color, wallMat.op); right.position.set(W/2, FLOOR_H/2-0.2, 0); grp.add(right);
+  // 前緣矮欄
+  const rail = box(W, 0.5, 0.12, 0x4a6280, 0.5); rail.position.set(0, 0.25, D/2); grp.add(rail);
+  // 角柱
+  for (const [cx,cz] of [[-W/2,-D/2],[W/2,-D/2],[-W/2,D/2],[W/2,D/2]]){
+    const c = box(0.5, FLOOR_H, 0.5, 0x55708f); c.position.set(cx, FLOOR_H/2-0.2, cz); grp.add(c);
+  }
+  // 樓梯示意(中央)
+  const stair = box(3.4, 0.25, 3.4, 0x7a8ba3);
+  stair.position.set(STAIR.x, 0.15, STAIR.z); grp.add(stair);
+  if (f < FLOORS){
+    const ramp = box(0.8, 0.15, 4.4, 0x9aa9bd);
+    ramp.position.set(STAIR.x, FLOOR_H/2, STAIR.z);
+    ramp.rotation.x = Math.atan2(FLOOR_H, 4.2); grp.add(ramp);
+  }
+  // 電梯門框
+  const ed = box(2.2, 3, 0.25, 0x38bdf8, 0.55); ed.position.set(ELEV.x, 1.5, ELEV.z+1.1); grp.add(ed);
+
+  if (f === 1){
+    // 分隔板(可移動,前側留通道)
+    const div = box(0.25, 2.2, D-5.2, 0xfacc15, 0.85);
+    div.position.set(DIVIDER_X, 1.1, -2.6); grp.add(div);
+    // 文宣發放台
+    const pt = box(3.4, 1, 1.6, 0xf59e0b); pt.position.set(PAMPHLET.x, 0.5, PAMPHLET.z+1.4); grp.add(pt);
+    const ptl = makeTextSprite('文宣/禮券', '#fbbf24', 7); ptl.position.set(PAMPHLET.x, 2.4, PAMPHLET.z+1.4); grp.add(ptl);
+    // 衛教攤位(理事長+PGY)
+    const booth = box(4, 1.1, 1.8, 0x10b981); booth.position.set(-21, 0.55, 4.5); booth.rotation.y = Math.PI/2; grp.add(booth);
+    const bl = makeTextSprite('衛教攤位', '#34d399', 6.5); bl.position.set(-20.5, 2.5, 4.5); grp.add(bl);
+    // 大門
+    const doorM = box(3, 2.8, 0.2, 0x38bdf8, 0.5); doorM.position.set(DOOR.x, 1.4, D/2); grp.add(doorM);
+    const dl = makeTextSprite('大門入口', '#7dd3fc', 7); dl.position.set(DOOR.x, 3.6, D/2+0.5); grp.add(dl);
+    const el2 = makeTextSprite('側門出口', '#7dd3fc', 6); el2.position.set(EXIT.x, 3.2, D/2+0.5); grp.add(el2);
+    const zl = makeTextSprite('分流發卡區', '#38bdf8', 8); zl.position.set(-12, 3.4, 0); grp.add(zl);
+    const zr = makeTextSprite('獎勵發放區', '#a78bfa', 8); zr.position.set(10, 3.4, 0); grp.add(zr);
+  } else {
+    // 蓋章窗口桌(最多 3,依人力顯示)
+    stampDeskMeshes[f] = [];
+    for (const [dx,dz] of STAMP_DESK(f)){
+      const dm = box(2, 0.95, 1.2, 0x64748b); dm.position.set(dx, 0.5, dz); grp.add(dm);
+      stampDeskMeshes[f].push(dm);
+    }
+    // 處方類型旗
+    const flag = box(2.6, 1.6, 0.15, 0xf97316);
+    flag.position.set(-9.5, 2.6, -4.6); grp.add(flag);
+    stampFlagMeshes[f] = flag;
+    // 教室地毯
+    const rug = box(11, 0.06, 8, 0x3b5273); rug.position.set(9, 0.06, 0); grp.add(rug);
+    const cl = makeTextSprite('課程區', '#7c93b3', 6); cl.position.set(9, 1.6, 0); grp.add(cl);
+  }
+  // 樓層標籤
+  const lbl = makeTextSprite(`${f}F`, '#cbd5e1', 10);
+  lbl.position.set(-W/2-3.5, 2, 0); grp.add(lbl);
+  floorLabels.push(lbl);
+  scene.add(grp);
+  floorGroups.push(grp);
+}
+// 屋頂薄板
+{
+  const roof = box(W, 0.25, D, 0x2c3e57, 0.35); roof.position.y = fy(6)-0.1; scene.add(roof);
+  floorGroups.roof = roof;
+}
+// 電梯車廂(視覺示意)
+const elevCar = box(2, 2.6, 2, 0x60a5fa, 0.8);
+elevCar.position.set(ELEV.x, 1.4, ELEV.z); scene.add(elevCar);
+
+// 左右區電腦桌(6 台,依分配移動位置)
+const pcMeshes = [];
+for (let i=0;i<6;i++){
+  const g2 = new THREE.Group();
+  const desk = box(1.8, 0.9, 1, 0x475569); desk.position.y = 0.45; g2.add(desk);
+  const scr = box(1, 0.7, 0.12, 0x38bdf8); scr.position.set(0, 1.3, 0); g2.add(scr);
+  const staff = new THREE.Mesh(new THREE.CylinderGeometry(0.28,0.34,1.3,10), new THREE.MeshLambertMaterial({color:0x3b82f6}));
+  staff.position.set(0, 0.65, -1); g2.add(staff);
+  scene.add(g2); pcMeshes.push(g2);
+}
+function layoutPCs(nLeft, nRight){
+  for (let i=0;i<6;i++){
+    let slot;
+    if (i < nLeft) slot = LEFT_SLOTS[i];
+    else if (i < nLeft + nRight) slot = RIGHT_SLOTS[i - nLeft];
+    else slot = null;
+    if (slot){ pcMeshes[i].visible = true; pcMeshes[i].position.set(slot[0], 0, slot[1]); }
+    else pcMeshes[i].visible = false;
+  }
+}
+layoutPCs(4,2);
+
+// 臨時人員(橘色小柱)
+const tempStaffMeshes = [];
+for (let i=0;i<20;i++){
+  const m = new THREE.Mesh(new THREE.CylinderGeometry(0.24,0.3,1.2,8), new THREE.MeshLambertMaterial({color:0xfb923c}));
+  m.visible = false; scene.add(m); tempStaffMeshes.push(m);
+}
+function layoutTempStaff(){
+  const spots = [];
+  const put = (f,x,z,n)=>{ for(let i=0;i<n;i++) spots.push([f, x + (i%4)*0.9, z + Math.floor(i/4)*0.9]); };
+  put(2, -14, -4.5, staffAlloc.f2); put(3, -14, -4.5, staffAlloc.f3);
+  put(4, -14, -4.5, staffAlloc.f4); put(5, -14, -4.5, staffAlloc.f5);
+  put(1, -2, 2.5, staffAlloc.lobby);
+  put(1, 3, -4.5, staffAlloc.stairs);
+  put(1, 21, 0, staffAlloc.mobile);
+  for (let i=0;i<20;i++){
+    if (i < spots.length){
+      const [f,x,z] = spots[i];
+      tempStaffMeshes[i].visible = true;
+      tempStaffMeshes[i].position.set(x, fy(f)+0.6, z);
+      tempStaffMeshes[i].userData.floor = f;
+    } else tempStaffMeshes[i].visible = false;
+  }
+}
+
+// 民眾 InstancedMesh
+const agentGeo = new THREE.SphereGeometry(0.34, 10, 8);
+const agentMesh = new THREE.InstancedMesh(agentGeo, new THREE.MeshLambertMaterial(), MAX_AGENTS);
+agentMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+scene.add(agentMesh);
+const _m4 = new THREE.Matrix4(), _zero = new THREE.Matrix4().makeScale(0,0,0);
+const CARD_COLORS = {none:new THREE.Color(0x94a3b8), green:new THREE.Color(0x22c55e), yellow:new THREE.Color(0xfacc15), red:new THREE.Color(0xef4444)};
+
+// 樓層透視
+let isoFloor = 0;
+function setIso(f){
+  isoFloor = f;
+  document.querySelectorAll('#floorBtns button').forEach(b=>b.classList.toggle('on', +b.dataset.f===f));
+  for (let i=0;i<FLOORS;i++) floorGroups[i].visible = (f===0) || (i+1 <= f);
+  floorGroups.roof.visible = (f===0);
+  pcMeshes.forEach(m=>{ /* 1F 物件 */ });
+}
+document.querySelectorAll('#floorBtns button').forEach(b=> b.onclick = ()=> setIso(+b.dataset.f));
+// 點擊樓板透視
+const ray = new THREE.Raycaster(), mouse = new THREE.Vector2();
+let downXY = null;
+renderer.domElement.addEventListener('pointerdown', e=> downXY=[e.clientX,e.clientY]);
+renderer.domElement.addEventListener('pointerup', e=>{
+  if (!downXY || Math.hypot(e.clientX-downXY[0], e.clientY-downXY[1]) > 5) return;
+  const r = renderer.domElement.getBoundingClientRect();
+  mouse.x = ((e.clientX-r.left)/r.width)*2-1; mouse.y = -((e.clientY-r.top)/r.height)*2+1;
+  ray.setFromCamera(mouse, camera);
+  const hits = ray.intersectObjects(floorSlabs.filter(s=>s.parent.visible));
+  if (hits.length) setIso(hits[0].object.userData.floor);
+});
+
+function resize(){
+  const w = view.clientWidth, h = view.clientHeight;
+  camera.aspect = w/h; camera.updateProjectionMatrix();
+  renderer.setSize(w, h);
+}
+new ResizeObserver(resize).observe(view);
+
+// ======================= 參數讀取 =======================
+const bindVal = (id, vid, fmt = v=>v) => {
+  const el = $(id); const upd = ()=> $(vid).textContent = fmt(el.value);
+  el.addEventListener('input', upd); upd();
+};
+bindVal('iTotal','vTotal');
+bindVal('iSpecial','vSpecial', v=>v+'%');
+bindVal('iTriageT','vTriageT', v=>(+v).toFixed(2).replace(/0$/,''));
+bindVal('iStampT','vStampT', v=>(+v).toFixed(2).replace(/0$/,''));
+bindVal('iRewardT','vRewardT', v=>(+v).toFixed(2).replace(/0$/,''));
+bindVal('iStairT','vStairT', v=>(+v).toFixed(2));
+bindVal('iElevT','vElevT', v=>(+v).toFixed(1));
+bindVal('iElevP','vElevP', v=>v+'%');
+bindVal('iLeftPC','vLeftPC', v=>v+' 台');
+bindVal('iThresh','vThresh', v=>v+' 人');
+['iW1','iW2','iW3','iW4'].forEach((id,i)=> bindVal(id, 'vW'+(i+1)));
+function syncRatios(){
+  let g = +$('iGreen').value, y = +$('iYellow').value;
+  if (g + y > 100){ y = 100 - g; $('iYellow').value = y; }
+  $('vGreen').textContent = g+'%'; $('vYellow').textContent = y+'%';
+  $('vRed').textContent = (100-g-y)+'%';
+}
+$('iGreen').addEventListener('input', syncRatios);
+$('iYellow').addEventListener('input', syncRatios);
+syncRatios();
+$('iArrival').addEventListener('change', e=> $('customW').classList.toggle('show', e.target.value==='custom'));
+
+// 教室下拉
+const roomDefaults = {2:'exercise',3:'nutrition',4:'social',5:'emotion'};
+for (let f=2; f<=5; f++){
+  const sel = $('iRoom'+f);
+  for (const [k,v] of Object.entries(RX_TYPES)){
+    const o = document.createElement('option'); o.value=k; o.textContent=v.name; sel.appendChild(o);
+  }
+  sel.value = roomDefaults[f];
+  sel.addEventListener('change', ()=> applyRooms());
+}
+function applyRooms(){
+  for (let f=2; f<=5; f++){
+    const t = RX_TYPES[$('iRoom'+f).value];
+    stampFlagMeshes[f].material.color.setHex(t.color);
+    floorLabels[f-1].userData.draw(`${f}F ${t.name}`, t.css);
+  }
+}
+applyRooms();
+floorLabels[0].userData.draw('1F 穿堂', '#cbd5e1');
+
+// 臨時人員配置
+const staffAlloc = {f2:2, f3:2, f4:2, f5:2, lobby:4, stairs:4, mobile:4};
+const staffDefs = [
+  ['f2','2F 蓋章站引導'],['f3','3F 蓋章站引導'],['f4','4F 蓋章站引導'],['f5','5F 蓋章站引導'],
+  ['lobby','穿堂排隊引導'],['stairs','樓梯/電梯引導'],['mobile','機動支援'],
+];
+function staffTotal(){ return Object.values(staffAlloc).reduce((a,b)=>a+b,0); }
+{
+  const wrap = $('staffRows');
+  for (const [k,name] of staffDefs){
+    const row = document.createElement('div'); row.className='staffrow';
+    row.innerHTML = `<span class="nm">${name}</span><button data-k="${k}" data-d="-1">−</button><span class="cnt" id="st_${k}">${staffAlloc[k]}</span><button data-k="${k}" data-d="1">＋</button>`;
+    wrap.appendChild(row);
+  }
+  wrap.addEventListener('click', e=>{
+    const b = e.target.closest('button'); if(!b) return;
+    const k = b.dataset.k, d = +b.dataset.d;
+    if (d>0 && staffTotal()>=20) return;
+    if (staffAlloc[k]+d < 0) return;
+    staffAlloc[k]+=d;
+    $('st_'+k).textContent = staffAlloc[k];
+    $('staffRemain').textContent = 20-staffTotal();
+    layoutTempStaff();
+    if (sim) sim.refreshStampWindows();
+  });
+  $('staffRemain').textContent = 20-staffTotal();
+}
+layoutTempStaff();
+
+const cfgLive = {
+  triageT: ()=> +$('iTriageT').value * (staffAlloc.lobby>=2 ? 0.9 : 1),
+  rewardT: ()=> +$('iRewardT').value * (staffAlloc.lobby>=2 ? 0.9 : 1),
+  stampT: ()=> +$('iStampT').value,
+  stairT: ()=> +$('iStairT').value * (staffAlloc.stairs>=2 ? 0.85 : 1),
+  elevT: ()=> +$('iElevT').value,
+  elevP: ()=> +$('iElevP').value/100,
+  moveFactor: ()=> staffAlloc.stairs>=2 ? 0.85 : 1,
+  strategy: ()=> $('iStrategy').value,
+  realloc: ()=> $('iRealloc').checked,
+  thresh: ()=> +$('iThresh').value,
+  stampWindows: f => Math.min(3, 1 + Math.floor(staffAlloc['f'+f]/2)),
+};
+
+// ======================= 模擬引擎 =======================
+class Q {
+  constructor(anchor, dir, perRow, rowOff, floor){
+    this.list=[]; this.anchor=anchor; this.dir=dir; this.perRow=perRow; this.rowOff=rowOff; this.floor=floor;
+  }
+  slot(i){
+    const r = Math.floor(i/this.perRow), c = i%this.perRow;
+    return {x:this.anchor.x + this.dir.x*c*0.85 + this.rowOff.x*r,
+            z:this.anchor.z + this.dir.z*c*0.85 + this.rowOff.z*r};
+  }
+  push(a){ this.list.push(a); a.qIndex = this.list.length-1; this.place(a); }
+  shift(){ const a = this.list.shift(); this.list.forEach((b,i)=>{ if(b.qIndex!==i){ b.qIndex=i; this.place(b);} }); return a; }
+  place(a){
+    const s = this.slot(a.qIndex);
+    walkTo(a, this.floor, s.x, s.z, null, true);
+  }
+}
+class Stations {
+  // positions: i => [x,z]; onDone(agent)
+  constructor(name, count, floor, posFn, timeFn, onDone){
+    this.name=name; this.floor=floor; this.posFn=posFn; this.timeFn=timeFn; this.onDone=onDone;
+    this.st=[]; this.setCount(count);
+    this.q=null; this.busyInt=0; this.capInt=0;
+  }
+  setCount(n){ this.desired = n; this._adjust(); }
+  _adjust(){
+    while (this.st.length < this.desired) this.st.push({busy:null, t:0});
+    if (this.st.length > this.desired){
+      for (let i=this.st.length-1; i>=0 && this.st.length>this.desired; i--)
+        if (!this.st[i].busy) this.st.splice(i,1);
+    }
+  }
+  tick(dt, now){
+    this._adjust();
+    for (const s of this.st){
+      if (s.busy){
+        s.t -= dt;
+        if (s.t <= 0){ const a = s.busy; s.busy=null; this.onDone(a, now); }
+      }
+    }
+    if (this.q){
+      for (let i=0;i<this.st.length;i++){
+        const s = this.st[i];
+        if (!s.busy && this.q.list.length){
+          const a = this.q.shift();
+          recordWait(a, this.name, now);
+          s.busy = a; s.t = this.timeFn(a);
+          a.state = 'service';
+          const p = this.posFn(i);
+          walkTo(a, this.floor, p[0], p[1], null, true);
+        }
+      }
+    }
+    const busy = this.st.filter(s=>s.busy).length;
+    this.busyInt += busy*dt; this.capInt += this.st.length*dt;
+  }
+  busyCount(){ return this.st.filter(s=>s.busy).length; }
+}
+
+let sim = null;
+let running = false, speed = 2;
+
+function recordWait(a, seg, now){
+  if (a.enqT == null) return;
+  const w = now - a.enqT;
+  a.enqT = null;
+  const k = seg.startsWith('stamp') ? 'stamp' : seg;
+  const st = sim.waits[k] || sim.waits.stamp;
+  st.sum += w; st.n += 1; st.max = Math.max(st.max, w);
+  if (k==='triage') a.wTriage = w; else if (k==='reward') a.wReward = w; else a.wStamp += w;
+}
+
+// 移動系統:waypoints = [{x,y,z}...]
+function setMove(a, pts, totalDur, cb){
+  const segs = []; let dist = 0;
+  for (let i=1;i<pts.length;i++){
+    const d = Math.hypot(pts[i].x-pts[i-1].x, pts[i].y-pts[i-1].y, pts[i].z-pts[i-1].z);
+    segs.push(d); dist += d;
+  }
+  if (dist < 1e-6){ a.move=null; if(cb) cb(a); return; }
+  const dur = totalDur != null ? totalDur : dist / (WALK * cfgLive.moveFactor());
+  a.move = {pts, segs, dist, dur, el:0, cb};
+}
+// 同樓步行(自動繞過 1F 分隔板)
+function walkTo(a, floor, x, z, cb, quick){
+  const from = {x:a.pos.x, y:a.pos.y, z:a.pos.z};
+  const to = {x, y:ay(floor), z};
+  const pts = [from];
+  if (floor===1 && a.floor===1 && (from.x-DIVIDER_X)*(x-DIVIDER_X) < 0)
+    pts.push({x:GAP.x, y:ay(1), z:GAP.z});
+  pts.push(to);
+  setMove(a, pts, null, cb);
+  if (quick && a.move) a.move.dur = Math.min(a.move.dur, 0.3); // 排隊挪動加快
+}
+// 跨樓層移動
+function travelTo(a, destF, x, z, cb){
+  if (a.floor === destF){ walkTo(a, destF, x, z, cb); return; }
+  const useElev = Math.random() < cfgLive.elevP();
+  if (useElev){
+    a.pendDest = {f:destF, x, z, cb};
+    a.state = 'queued'; a.enqT = sim.now;
+    sim.elevQ[a.floor === 1 ? 0 : 1].push(a); // 0=上行(1F), 1=下行(其他樓)
+    // 實際排在電梯等候區
+    walkTo(a, a.floor, ELEV_WAIT.x + Math.random()*1.5, ELEV_WAIT.z + Math.random()*1.5, null, false);
+    return;
+  }
+  // 樓梯
+  const df = Math.abs(destF - a.floor);
+  const climbT = df * cfgLive.stairT();
+  const fromF = a.floor;
+  a.state = 'moving';
+  // 先走到樓梯口
+  walkTo(a, fromF, STAIR_WAIT.x, STAIR_WAIT.z, (ag)=>{
+    ag.floor = destF;
+    setMove(ag, [
+      {x:STAIR.x, y:ay(fromF), z:STAIR.z},
+      {x:STAIR.x, y:ay(destF), z:STAIR.z},
+    ], climbT, (ag2)=>{
+      walkTo(ag2, destF, x, z, cb);
+    });
+  });
+}
+
+// ---------- 到達時間 ----------
+function genArrivals(n, mode, w){
+  const buckets = mode==='uniform' ? [25,25,25,25]
+    : mode==='front' ? [40,20,20,20]
+    : mode==='double' ? [30,20,20,30]
+    : w;
+  const tot = buckets.reduce((a,b)=>a+b,0) || 1;
+  const ts = [];
+  for (let i=0;i<n;i++){
+    let r = Math.random()*tot, h=0;
+    while (r > buckets[h] && h<3){ r -= buckets[h]; h++; }
+    ts.push(h*60 + Math.random()*60);
+  }
+  return ts.sort((a,b)=>a-b);
+}
+
+// ---------- 建立新模擬 ----------
+function newSim(){
+  const n = +$('iTotal').value;
+  const gP = +$('iGreen').value/100, yP = +$('iYellow').value/100;
+  const spP = +$('iSpecial').value/100;
+  const arrivals = genArrivals(n, $('iArrival').value, [+$('iW1').value,+$('iW2').value,+$('iW3').value,+$('iW4').value]);
+  const agents = [];
+  for (let i=0;i<n;i++){
+    const r = Math.random();
+    const card = r < gP ? 'green' : r < gP+yP ? 'yellow' : 'red';
+    let stamps = [], special = null;
+    if (card === 'green') stamps = [2,3,4,5];
+    else if (card === 'yellow'){
+      const k = 1 + Math.floor(Math.random()*3);
+      stamps = [2,3,4,5].sort(()=>Math.random()-0.5).slice(0,k).sort();
+    } else {
+      if (Math.random() < spP) special = Math.random()<0.6 ? 'pamphlet' : 'class';
+      else special = 'wander';
+    }
+    agents.push({
+      id:i, card, stamps, special, arriveT: arrivals[i],
+      state:'pre', floor:1, pos:{x:SPAWN.x, y:ay(1), z:SPAWN.z},
+      move:null, qIndex:0, enqT:null, dwell:0,
+      wTriage:0, wStamp:0, wReward:0, inside:false, exited:false,
+    });
+  }
+  agentMesh.count = n;
+
+  const s = {
+    now:0, agents, ptr:0, arrived:0, exited:0, completedGY:0,
+    waits:{triage:{sum:0,n:0,max:0}, stamp:{sum:0,n:0,max:0}, reward:{sum:0,n:0,max:0}},
+    samples:[], lastSample:-1, lastRealloc:-10, reported:false, pendXfer:null,
+    elevQ:[[],[]], elevSlots:[], // 8 個併行名額
+  };
+
+  // 隊伍
+  s.triageQ = new Q({x:-19.5, z:0.3}, {x:1,z:0}, 15, {x:0,z:1.05}, 1);
+  s.rewardQ = new Q({x:4.8, z:0.3}, {x:1,z:0}, 12, {x:0,z:1.05}, 1);
+  s.pamQ   = new Q({x:15.5, z:4}, {x:-1,z:0}, 10, {x:0,z:1.05}, 1);
+  s.stampQ = {};
+  for (let f=2; f<=5; f++) s.stampQ[f] = new Q({x:-14.5, z:0.5}, {x:1,z:0}, 12, {x:0,z:1.05}, f);
+
+  // 服務站
+  const leftN = +$('iLeftPC').value;
+  s.triage = new Stations('triage', leftN, 1, i=>{const p=LEFT_SLOTS[i]; return [p[0], p[1]+(p[1]<0?2:-2)];},
+    ()=> cfgLive.triageT(), (a,now)=> afterTriage(a));
+  s.triage.q = s.triageQ;
+  s.reward = new Stations('reward', 6-leftN, 1, i=>{const p=RIGHT_SLOTS[i]; return [p[0], p[1]+(p[1]<0?2:-2)];},
+    ()=> cfgLive.rewardT(), (a,now)=> exitBuilding(a));
+  s.reward.q = s.rewardQ;
+  s.pam = new Stations('reward', 2, 1, i=>[PAMPHLET.x - 1 + i*1.6, PAMPHLET.z],
+    ()=> 0.4, (a,now)=> exitBuilding(a));
+  s.pam.q = s.pamQ;
+  s.stamp = {};
+  for (let f=2; f<=5; f++){
+    s.stamp[f] = new Stations('stamp'+f, cfgLive.stampWindows(f), f,
+      (i)=>{const p=STAMP_DESK(f)[i]; return [p[0], p[1]+1.8];},
+      ()=> cfgLive.stampT(), (a,now)=> afterStamp(a, f));
+    s.stamp[f].q = s.stampQ[f];
+  }
+  // 電梯:8 個併行名額近似(等候+乘梯 = elevT)
+  for (let i=0;i<8;i++) s.elevSlots.push({busy:null, t:0});
+
+  s.refreshStampWindows = ()=>{ for (let f=2;f<=5;f++){ s.stamp[f].setCount(cfgLive.stampWindows(f)); updateStampDesks(f); } };
+  return s;
+}
+function updateStampDesks(f){
+  const n = cfgLive.stampWindows(f);
+  stampDeskMeshes[f].forEach((m,i)=> m.visible = i < n);
+}
+
+// ---------- 狀態機 ----------
+function spawn(a){
+  a.inside = true; sim.arrived++;
+  a.state = 'queued'; a.enqT = sim.now;
+  a.pos = {x:SPAWN.x + (Math.random()-0.5)*2, y:ay(1), z:SPAWN.z};
+  sim.triageQ.push(a);
+}
+function afterTriage(a){
+  a.cardGiven = true; // 發卡完成,顯示卡色
+  if (a.card === 'red'){
+    if (a.special === 'pamphlet') return goPamphlet(a);
+    if (a.special === 'class'){
+      const f = 2 + Math.floor(Math.random()*4);
+      a.state = 'moving';
+      return travelTo(a, f, 6 + Math.random()*7, -2 + Math.random()*4, (ag)=>{
+        ag.state = 'dwelling'; ag.dwell = 60; // 上 1 小時正課
+      });
+    }
+    // wander:逛 1–3 層
+    a.wanderPlan = [2,3,4,5].sort(()=>Math.random()-0.5).slice(0, 1+Math.floor(Math.random()*3));
+    return wanderNext(a);
+  }
+  goNextStamp(a);
+}
+function pickNextFloor(a){
+  const st = cfgLive.strategy();
+  if (st === 'low') return a.stamps[0];
+  if (st === 'random') return a.stamps[Math.floor(Math.random()*a.stamps.length)];
+  // smart:選(排隊+在途)最少的樓層
+  let best = a.stamps[0], bestN = Infinity;
+  for (const f of a.stamps){
+    const nq = sim.stampQ[f].list.length + sim.stamp[f].busyCount();
+    if (nq < bestN){ bestN = nq; best = f; }
+  }
+  return best;
+}
+function goNextStamp(a){
+  if (!a.stamps.length) return goReward(a);
+  const f = pickNextFloor(a);
+  a.state = 'moving';
+  travelTo(a, f, -13, 1.5, (ag)=>{
+    ag.state = 'queued'; ag.enqT = sim.now;
+    sim.stampQ[f].push(ag);
+  });
+}
+function afterStamp(a, f){
+  a.stamps = a.stamps.filter(x=>x!==f);
+  goNextStamp(a);
+}
+function goReward(a){
+  a.state = 'moving';
+  travelTo(a, 1, 5.5, 0.8, (ag)=>{
+    ag.state = 'queued'; ag.enqT = sim.now;
+    sim.rewardQ.push(ag);
+  });
+}
+function goPamphlet(a){
+  a.state = 'moving';
+  travelTo(a, 1, 16, 4, (ag)=>{
+    ag.state = 'queued'; ag.enqT = sim.now;
+    sim.pamQ.push(ag);
+  });
+}
+function wanderNext(a){
+  if (!a.wanderPlan.length) return goPamphlet(a);
+  const f = a.wanderPlan.shift();
+  a.state = 'moving';
+  travelTo(a, f, 4 + Math.random()*9, -2.5 + Math.random()*5, (ag)=>{
+    ag.state = 'dwelling'; ag.dwell = 3 + Math.random()*5;
+  });
+}
+function exitBuilding(a){
+  if (a.card !== 'red') sim.completedGY++;
+  a.state = 'leaving';
+  walkTo(a, 1, EXIT.x, EXIT.z, (ag)=>{
+    setMove(ag, [{x:ag.pos.x,y:ag.pos.y,z:ag.pos.z},{x:EXIT.x+2, y:ay(1), z:12}], null, (ag2)=>{
+      ag2.state='done'; ag2.exited=true; ag2.inside=false; ag2.doneT = sim.now; sim.exited++;
+    });
+  });
+}
+
+// ---------- 主迴圈 step ----------
+function step(dt){
+  const s = sim; s.now += dt;
+  // 1. 到達
+  while (s.ptr < s.agents.length && s.agents[s.ptr].arriveT <= s.now && s.now <= EVENT_MIN){
+    spawn(s.agents[s.ptr]); s.ptr++;
+  }
+  // 2. 服務站
+  s.triage.tick(dt, s.now); s.reward.tick(dt, s.now); s.pam.tick(dt, s.now);
+  for (let f=2; f<=5; f++) s.stamp[f].tick(dt, s.now);
+  // 3. 電梯(8 名額)
+  for (const slot of s.elevSlots){
+    if (slot.busy){
+      slot.t -= dt;
+      if (slot.t <= 0){
+        const a = slot.busy; slot.busy = null;
+        const d = a.pendDest; a.pendDest = null;
+        walkTo(a, d.f, d.x, d.z, d.cb);
+      }
+    }
+    if (!slot.busy){
+      const qq = s.elevQ[0].length ? s.elevQ[0] : s.elevQ[1];
+      if (qq.length){
+        const a = qq.shift();
+        a.enqT = null; // 電梯等候不計入服務等候統計
+        slot.busy = a; slot.t = cfgLive.elevT();
+        const d = a.pendDest;
+        const fromF = a.floor; a.floor = d.f; a.state = 'moving';
+        setMove(a, [
+          {x:a.pos.x, y:ay(fromF), z:a.pos.z},
+          {x:ELEV.x, y:ay(fromF), z:ELEV.z},
+          {x:ELEV.x, y:ay(d.f), z:ELEV.z},
+        ], cfgLive.elevT(), null); // 移動結束後停在電梯口等 slot 計時到
+      }
+    }
+  }
+  // 4. 移動與停留
+  for (const a of s.agents){
+    if (a.move){
+      const mv = a.move;
+      mv.el += dt;
+      const t = Math.min(1, mv.el/mv.dur);
+      let target = t * mv.dist, acc = 0, done = true;
+      for (let i=0;i<mv.segs.length;i++){
+        if (target <= acc + mv.segs[i] || i === mv.segs.length-1){
+          const lt = mv.segs[i] ? Math.min(1,(target-acc)/mv.segs[i]) : 1;
+          const p0 = mv.pts[i], p1 = mv.pts[i+1];
+          a.pos.x = p0.x + (p1.x-p0.x)*lt;
+          a.pos.y = p0.y + (p1.y-p0.y)*lt;
+          a.pos.z = p0.z + (p1.z-p0.z)*lt;
+          done = false; break;
+        }
+        acc += mv.segs[i];
+      }
+      if (t >= 1){
+        const last = mv.pts[mv.pts.length-1];
+        a.pos.x=last.x; a.pos.y=last.y; a.pos.z=last.z;
+        const cb = mv.cb; a.move = null;
+        if (cb) cb(a);
+      }
+    } else if (a.state === 'dwelling'){
+      a.dwell -= dt;
+      if (a.dwell <= 0){
+        if (a.special === 'class' || !a.wanderPlan || !a.wanderPlan.length) goPamphlet(a);
+        else wanderNext(a);
+      }
+    }
+  }
+  // 5. 動態調配電腦(先縮編,實際釋出後才轉移,確保總數恆為 6)
+  if (s.pendXfer){
+    const {from, to} = s.pendXfer;
+    if (from.st.length <= from.desired){ to.setCount(to.desired+1); s.pendXfer = null; }
+  }
+  if (!s.pendXfer && cfgLive.realloc() && s.now - s.lastRealloc >= 5){
+    const th = cfgLive.thresh();
+    const L = s.triageQ.list.length, R = s.rewardQ.list.length;
+    if (L > th && R <= th && s.reward.desired > 1 && s.triage.desired < 5){
+      s.reward.setCount(s.reward.desired-1);
+      s.pendXfer = {from:s.reward, to:s.triage};
+      s.lastRealloc = s.now; logEvent(`左區排隊 ${L} 人 > ${th},調 1 台電腦到分流區`);
+    } else if (R > th && L <= th && s.triage.desired > 1){
+      s.triage.setCount(s.triage.desired-1);
+      s.pendXfer = {from:s.triage, to:s.reward};
+      s.lastRealloc = s.now; logEvent(`右區排隊 ${R} 人 > ${th},調 1 台電腦到領獎區`);
+    }
+  }
+  // 6. 每分鐘取樣
+  if (Math.floor(s.now) > s.lastSample){
+    s.lastSample = Math.floor(s.now);
+    let stampTot = 0; const perF = [];
+    for (let f=2; f<=5; f++){ const v = s.stampQ[f].list.length; stampTot += v; perF.push(v); }
+    s.samples.push({t:s.lastSample, tri:s.triageQ.list.length, rew:s.rewardQ.list.length + s.pamQ.list.length, perF});
+    chartDirty = true;
+  }
+  // 7. 17:00 報告
+  if (s.now >= EVENT_MIN && !s.reported){
+    s.reported = true;
+    running = false; updPlayBtn();
+    showReport();
+  }
+  // 全部離場 → 結束
+  if (s.ptr >= s.agents.length && s.exited >= s.arrived && s.arrived > 0 && s.now > EVENT_MIN){
+    running = false; updPlayBtn();
+  }
+}
+
+// ======================= 渲染同步 =======================
+const _color = new THREE.Color();
+function syncAgents(){
+  if (!sim) { agentMesh.count = 0; return; }
+  const s = sim;
+  for (let i=0;i<s.agents.length;i++){
+    const a = s.agents[i];
+    if (a.state==='pre' || a.state==='done' || (isoFloor>0 && a.floor>isoFloor)){
+      agentMesh.setMatrixAt(i, _zero);
+    } else {
+      _m4.makeTranslation(a.pos.x, a.pos.y, a.pos.z);
+      agentMesh.setMatrixAt(i, _m4);
+    }
+    // 顏色:分流完成前灰色,之後依卡色
+    const key = a.cardGiven ? a.card : 'none';
+    if (a._ck !== key){
+      a._ck = key;
+      agentMesh.setColorAt(i, CARD_COLORS[key]);
+      agentMesh.instanceColor.needsUpdate = true;
+    }
+  }
+  agentMesh.instanceMatrix.needsUpdate = true;
+}
+
+// ======================= 圖表與面板 =======================
+const chart = new Chart($('qchart'), {
+  type:'line',
+  data:{labels:[], datasets:[
+    {label:'分流區', data:[], borderColor:'#38bdf8', backgroundColor:'#38bdf8', pointRadius:0, borderWidth:2, tension:.3},
+    {label:'領獎區', data:[], borderColor:'#a78bfa', backgroundColor:'#a78bfa', pointRadius:0, borderWidth:2, tension:.3},
+    {label:'2F', data:[], borderColor:'#f97316', pointRadius:0, borderWidth:1, tension:.3, hidden:false},
+    {label:'3F', data:[], borderColor:'#14b8a6', pointRadius:0, borderWidth:1, tension:.3},
+    {label:'4F', data:[], borderColor:'#8b5cf6', pointRadius:0, borderWidth:1, tension:.3},
+    {label:'5F', data:[], borderColor:'#ec4899', pointRadius:0, borderWidth:1, tension:.3},
+  ]},
+  options:{
+    responsive:true, maintainAspectRatio:false, animation:false,
+    interaction:{mode:'index', intersect:false},
+    scales:{
+      x:{ticks:{color:'#94a3b8', maxTicksLimit:9, font:{size:10}}, grid:{color:'#27354d'}},
+      y:{ticks:{color:'#94a3b8', font:{size:10}}, grid:{color:'#27354d'}, beginAtZero:true, title:{display:true,text:'排隊人數',color:'#94a3b8',font:{size:10}}},
+    },
+    plugins:{legend:{labels:{color:'#cbd5e1', boxWidth:14, font:{size:10}}}},
+  }
+});
+let chartDirty = false;
+function fmtClock(min){
+  const m = Math.floor(13*60 + min);
+  return `${String(Math.floor(m/60)).padStart(2,'0')}:${String(m%60).padStart(2,'0')}`;
+}
+function updChart(){
+  if (!sim || !chartDirty) return;
+  chartDirty = false;
+  chart.data.labels = sim.samples.map(x=>fmtClock(x.t));
+  chart.data.datasets[0].data = sim.samples.map(x=>x.tri);
+  chart.data.datasets[1].data = sim.samples.map(x=>x.rew);
+  for (let f=0; f<4; f++) chart.data.datasets[2+f].data = sim.samples.map(x=>x.perF[f]);
+  chart.update('none');
+}
+
+// 樓層熱度
+const FLOOR_CAP = {1:200, 2:90, 3:90, 4:90, 5:90};
+{
+  const h = $('heat');
+  for (let f=5; f>=1; f--){
+    const row = document.createElement('div'); row.className='heatrow';
+    row.innerHTML = `<span class="fl" id="hf_n${f}">${f}F</span><div class="heatbar"><div class="heatfill" id="hf_b${f}"></div></div><span class="n" id="hf_v${f}">0</span>`;
+    h.appendChild(row);
+  }
+}
+function updPanels(){
+  const s = sim;
+  $('clock').textContent = s ? fmtClock(Math.min(s.now, 999)) : '13:00';
+  $('timefill').style.width = s ? Math.min(100, s.now/EVENT_MIN*100)+'%' : '0%';
+  if (!s) return;
+  const inside = s.arrived - s.exited;
+  const qTri = s.triageQ.list.length;
+  const qRew = s.rewardQ.list.length + s.pamQ.list.length;
+  let qStamp = 0; for (let f=2;f<=5;f++) qStamp += s.stampQ[f].list.length;
+  $('hInside').textContent = inside; $('hDone').textContent = s.exited;
+  $('sInside').textContent = inside; $('sDone').textContent = s.exited;
+  $('sQueue').textContent = qTri+qRew+qStamp;
+  $('sQTriage').textContent = qTri; $('sQReward').textContent = qRew; $('sQStamp').textContent = qStamp;
+  const avg = w => w.n ? (w.sum/w.n).toFixed(1) : '–';
+  $('sWTriage').textContent = avg(s.waits.triage);
+  $('sWStamp').textContent = avg(s.waits.stamp);
+  $('sWReward').textContent = avg(s.waits.reward);
+  $('sWTriage').classList.toggle('warn', s.waits.triage.n && s.waits.triage.sum/s.waits.triage.n > 10);
+  // 樓層熱度
+  const cnt = {1:0,2:0,3:0,4:0,5:0};
+  for (const a of s.agents) if (a.inside) cnt[a.floor]++;
+  for (let f=1;f<=5;f++){
+    const pct = Math.min(100, cnt[f]/FLOOR_CAP[f]*100);
+    const bar = $('hf_b'+f);
+    bar.style.width = pct+'%';
+    bar.classList.toggle('hot', pct > 80);
+    $('hf_v'+f).textContent = `${cnt[f]} 人`;
+  }
+  // 人力
+  $('pcL').textContent = s.triage.st.length; $('pcR').textContent = s.reward.st.length;
+  const busy = s.triage.busyCount()+s.reward.busyCount();
+  $('pcBusy').textContent = `${busy}/${s.triage.st.length + s.reward.st.length}`;
+  layoutPCs(s.triage.st.length, s.reward.st.length);
+}
+const evlog = [];
+function logEvent(msg){
+  evlog.unshift(`[${fmtClock(sim?sim.now:0)}] ${msg}`);
+  if (evlog.length>6) evlog.pop();
+  $('evlog').innerHTML = evlog.map(e=>`<div>⚡ ${e}</div>`).join('');
+}
+
+// ======================= 報告 =======================
+function showReport(){
+  const s = sim;
+  const inside = s.arrived - s.exited;
+  const notArrived = s.agents.length - s.ptr;
+  const avg = w => w.n ? (w.sum/w.n).toFixed(1) : '0';
+  const mx = w => w.n ? w.max.toFixed(1) : '0';
+  const util = g => g.capInt ? Math.round(g.busyInt/g.capInt*100) : 0;
+  let stampUtil = 0, su=0, sc=0;
+  for (let f=2;f<=5;f++){ su += s.stamp[f].busyInt; sc += s.stamp[f].capInt; }
+  stampUtil = sc ? Math.round(su/sc*100) : 0;
+  // 瓶頸
+  const segs = [
+    ['分流發卡(左區電腦)', +avg(s.waits.triage)],
+    ['樓層蓋章', +avg(s.waits.stamp)],
+    ['領獎核銷(右區電腦)', +avg(s.waits.reward)],
+  ].sort((a,b)=>b[1]-a[1]);
+  const bottleneck = segs[0];
+
+  const sugg = [];
+  const triCap = Math.round(60/cfgLive.triageT()*s.triage.st.length);
+  const arrRate = Math.round(s.arrived / Math.max(1, Math.min(s.now,EVENT_MIN)/60));
+  if (bottleneck[1] > 8 && bottleneck[0].includes('分流'))
+    sugg.push(`分流是最大瓶頸(平均等 ${bottleneck[1]} 分)。目前左區處理力約 ${triCap} 人/時,到達約 ${arrRate} 人/時。建議:分流時間壓到 2 分內,或開場時 5 台電腦全做分流。`);
+  if (bottleneck[1] > 8 && bottleneck[0].includes('蓋章'))
+    sugg.push(`蓋章站是最大瓶頸(平均等 ${bottleneck[1]} 分)。建議:每樓配 2–4 名臨時人員增開窗口,或改用「智慧路徑」分散人流。`);
+  if (bottleneck[1] > 8 && bottleneck[0].includes('領獎'))
+    sugg.push(`領獎核銷是最大瓶頸(平均等 ${bottleneck[1]} 分)。建議:活動後半段把電腦往右區調(降低調配閾值),或簡化核銷流程。`);
+  if (inside > 0)
+    sugg.push(`17:00 時尚有 ${inside} 人在場內未完成。建議:16:00 後停止發綠卡改發紅卡、或提早 30 分鐘截止入場。`);
+  if (+avg(s.waits.stamp) < 3 && +avg(s.waits.triage) > 6)
+    sugg.push(`樓上很順但 1F 塞車 —— 典型「入口瓶頸」。考慮報到前先在戶外預填資料、QR code 預先查詢,縮短電腦操作時間。`);
+  if (util(s.triage) > 85) sugg.push(`左區電腦利用率 ${util(s.triage)}%,已接近滿載,人力沒有閒置問題,瓶頸在容量本身。`);
+  if (util(s.reward) < 40 && util(s.triage) > 80) sugg.push(`右區電腦利用率僅 ${util(s.reward)}%,初始配置可改為左 5 / 右 1,靠動態調配支援領獎尖峰。`);
+  if (!sugg.length) sugg.push('整體流程順暢,目前配置可行。可嘗試提高總人數或縮短時間參數做更嚴格的壓力測試。');
+
+  $('reportContent').innerHTML = `
+    <h3>整體結果(模擬時刻 ${fmtClock(s.now)})</h3>
+    <table>
+      <tr><th>總目標人數</th><td>${s.agents.length} 人</td><th>實際入場</th><td>${s.arrived} 人</td></tr>
+      <tr><th>已完成離場</th><td>${s.exited} 人</td><th class="bn">17:00 未完成</th><td class="bn">${inside} 人${notArrived?`(另有 ${notArrived} 人未入場)`:''}</td></tr>
+      <tr><th>完成集章領獎</th><td>${s.completedGY} 人</td><th>處理速率</th><td>約 ${arrRate} 人/時</td></tr>
+    </table>
+    <h3>等候時間(分鐘)</h3>
+    <table>
+      <tr><th>環節</th><th>平均</th><th>最長</th><th>服務人次</th></tr>
+      <tr><td>分流發卡</td><td>${avg(s.waits.triage)}</td><td>${mx(s.waits.triage)}</td><td>${s.waits.triage.n}</td></tr>
+      <tr><td>樓層蓋章</td><td>${avg(s.waits.stamp)}</td><td>${mx(s.waits.stamp)}</td><td>${s.waits.stamp.n}</td></tr>
+      <tr><td>領獎核銷</td><td>${avg(s.waits.reward)}</td><td>${mx(s.waits.reward)}</td><td>${s.waits.reward.n}</td></tr>
+    </table>
+    <h3>人力利用率</h3>
+    <table>
+      <tr><th>左區電腦(分流)</th><td>${util(s.triage)}%</td><th>右區電腦(領獎)</th><td>${util(s.reward)}%</td><th>蓋章站</th><td>${stampUtil}%</td></tr>
+    </table>
+    <h3>🔍 瓶頸分析</h3>
+    <p style="font-size:12px; line-height:1.6;">排隊最久的環節:<span class="bn">${bottleneck[0]}</span>(平均等候 ${bottleneck[1]} 分鐘)</p>
+    <h3>💡 建議</h3>
+    <ul>${sugg.map(x=>`<li>${x}</li>`).join('')}</ul>`;
+  $('report').classList.add('show');
+}
+$('btnCloseReport').onclick = ()=> $('report').classList.remove('show');
+$('btnContinue').onclick = ()=>{ $('report').classList.remove('show'); running = true; updPlayBtn(); };
+
+// ======================= 控制 =======================
+function updPlayBtn(){
+  $('btnPlay').textContent = running ? '⏸ 暫停' : '▶ 播放';
+  $('hState').textContent = running ? '▶ 模擬中' : (sim && sim.now>0 ? '⏸ 暫停' : '⏹ 待開始');
+}
+$('btnPlay').onclick = ()=>{
+  if (!sim) sim = newSim();
+  running = !running; updPlayBtn();
+};
+document.querySelectorAll('.spd').forEach(b=> b.onclick = ()=>{
+  speed = +b.dataset.s;
+  document.querySelectorAll('.spd').forEach(x=>x.classList.toggle('on', x===b));
+});
+$('btnStart').onclick = ()=>{
+  sim = newSim();
+  sim.refreshStampWindows();
+  evlog.length = 0; $('evlog').innerHTML='';
+  chartDirty = true;
+  running = true; updPlayBtn();
+  logEvent(`模擬開始:${sim.agents.length} 人,左 ${sim.triage.st.length} 台 / 右 ${sim.reward.st.length} 台`);
+};
+$('btnReset').onclick = ()=>{
+  running = false; sim = newSim(); sim.refreshStampWindows();
+  chartDirty = true; updChart(); updPanels(); updPlayBtn();
+  evlog.length = 0; $('evlog').innerHTML='';
+};
+
+// ======================= 主迴圈 =======================
+let lastT = performance.now(), domT = 0;
+function loop(now){
+  requestAnimationFrame(loop);
+  const realDt = Math.min(0.1, (now-lastT)/1000); lastT = now;
+  if (running && sim){
+    let simDt = realDt * speed; // 1 秒 = speed 分鐘
+    while (simDt > 0){
+      const d = Math.min(simDt, 0.05);
+      step(d);
+      simDt -= d;
+      if (!running) break;
+    }
+  }
+  syncAgents();
+  controls.update();
+  renderer.render(scene, camera);
+  domT += realDt;
+  if (domT > 0.25){ domT = 0; updPanels(); updChart(); }
+}
+resize();
+sim = newSim(); // 預載一場(待開始)
+updPanels(); updPlayBtn();
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>
