@@ -666,6 +666,21 @@ body.is-loading .chart-wrap::after {
 .fill-bar { width: 44px; height: 6px; border-radius: 3px; background: #e4f0ea; overflow: hidden; flex-shrink: 0; }
 .fill-bar i { display: block; height: 100%; border-radius: 3px; }
 
+/* ── 區塊收合鈕 ── */
+.sec-toggle {
+  width: 28px; height: 28px; border-radius: 8px; flex-shrink: 0;
+  border: 1.5px solid var(--border); background: var(--surface);
+  color: var(--text-muted); cursor: pointer; margin-left: 8px;
+  display: inline-flex; align-items: center; justify-content: center;
+  transition: all 0.15s;
+}
+.sec-toggle:hover { border-color: var(--teal); color: var(--teal); background: #f0fbf7; }
+.sec-toggle .ic { width: 15px; height: 15px; transition: transform 0.2s; }
+.chart-section.collapsed .sec-toggle .ic { transform: rotate(-90deg); }
+.chart-section.collapsed > *:not(.chart-header) { display: none !important; }
+.chart-section.collapsed .chart-header { margin-bottom: 0; padding-bottom: 0; border-bottom: none; }
+.chart-section.collapsed #slotsFilterBar { display: none; }
+
 /* ── 單日課表（活動日檢視） ── */
 .day-summary {
   display: flex; gap: 20px; flex-wrap: wrap; align-items: baseline;
@@ -1177,23 +1192,29 @@ footer {
   </div>
 
   <!-- ── 單日課表(查詢區間選到單一日期時顯示,供活動日追蹤) ── -->
-  <div id="daySchedule" class="chart-section" style="margin:14px 36px;display:none">
+  <div id="daySchedule" class="chart-section" data-collapse-key="daySchedule" style="margin:14px 36px;display:none">
     <div class="chart-header" style="flex-wrap:wrap;gap:10px">
       <h2 id="dayScheduleTitle">單日課表</h2>
-      <span style="font-size:0.78rem;color:var(--text-muted)">跟隨下方「處方類型／地區／搜尋」篩選；含所有狀態</span>
+      <div style="display:flex;align-items:center;gap:4px">
+        <span style="font-size:0.78rem;color:var(--text-muted)">跟隨下方「處方類型／地區／搜尋」篩選</span>
+        <button class="sec-toggle" onclick="toggleSection(this)" title="收合 / 展開"><svg class="ic" viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg></button>
+      </div>
     </div>
     <div id="dayScheduleBody"></div>
   </div>
 
   <!-- ── 場次明細(主要交互區,放最上) ── -->
-  <div class="chart-section" style="margin:14px 36px;">
+  <div class="chart-section" data-collapse-key="slotsTable" style="margin:14px 36px;">
     <div class="chart-header" style="flex-wrap:wrap;gap:10px">
       <h2 style="white-space:nowrap">場次明細(點日期列 📌 置頂、點課程列展開預約)</h2>
-      <div id="slotsFilterBar" style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
-        <button class="pdf-tab-btn active" data-filter="all" onclick="filterSlotsTable('all',this)">全部(未完成)</button>
-        <button class="pdf-tab-btn" data-filter="scheduled" onclick="filterSlotsTable('scheduled',this)">即將舉辦</button>
-        <button class="pdf-tab-btn" data-filter="cancelled" onclick="filterSlotsTable('cancelled',this)">已取消</button>
-        <button class="pdf-tab-btn" data-filter="completed" onclick="filterSlotsTable('completed',this)">已完成</button>
+      <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+        <div id="slotsFilterBar" style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
+          <button class="pdf-tab-btn active" data-filter="all" onclick="filterSlotsTable('all',this)">全部(未完成)</button>
+          <button class="pdf-tab-btn" data-filter="scheduled" onclick="filterSlotsTable('scheduled',this)">即將舉辦</button>
+          <button class="pdf-tab-btn" data-filter="cancelled" onclick="filterSlotsTable('cancelled',this)">已取消</button>
+          <button class="pdf-tab-btn" data-filter="completed" onclick="filterSlotsTable('completed',this)">已完成</button>
+        </div>
+        <button class="sec-toggle" onclick="toggleSection(this)" title="收合 / 展開"><svg class="ic" viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg></button>
       </div>
     </div>
     <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-top:8px;padding-top:8px;border-top:1px dashed var(--border)">
@@ -3650,9 +3671,13 @@ function renderDaySchedule(){
     <span>滿座率 <b>${sumCap > 0 ? Math.round(sumBk/sumCap*100) : 0}%</b></span>
     <span>出席率 <b>${sumBk > 0 ? Math.round(sumCk/sumBk*100) : 0}%</b></span>
   </div>`;
+  // 同時段卡片固定順序:運動 → 營養 → 情緒調適 → 社會 → 其他
+  const TYPE_ORDER = { exercise:0, nutrition:1, mental:2, social:3 };
   html += times.map(t => {
     const cards = byTime[t]
-      .slice().sort((a,b)=>(a.course_name||'').localeCompare(b.course_name||'','zh-Hant'))
+      .slice().sort((a,b)=>
+        ((TYPE_ORDER[a.course_type] ?? 4) - (TYPE_ORDER[b.course_type] ?? 4)) ||
+        (a.course_name||'').localeCompare(b.course_name||'','zh-Hant'))
       .map(s => {
         const cap = s.capacity || 0, bk = s.booked_count || 0;
         const ck = s.checked_count != null ? s.checked_count : '—';
@@ -4697,6 +4722,18 @@ function updateTabControls(name){
   });
   updateTabControls('weekly');
 })();
+
+// ── 區塊收合(單日課表/場次明細),狀態記在 localStorage ──
+function toggleSection(btn){
+  const sec = btn.closest('.chart-section');
+  if(!sec) return;
+  sec.classList.toggle('collapsed');
+  const key = sec.dataset.collapseKey;
+  if(key){ try{ localStorage.setItem('secCollapsed_' + key, sec.classList.contains('collapsed') ? '1' : '0'); }catch(e){} }
+}
+document.querySelectorAll('.chart-section[data-collapse-key]').forEach(sec=>{
+  try{ if(localStorage.getItem('secCollapsed_' + sec.dataset.collapseKey) === '1') sec.classList.add('collapsed'); }catch(e){}
+});
 
 // ── 初始化 ──
 document.getElementById('tab-weekly').classList.add('tab-anim');
