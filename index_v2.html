@@ -1206,7 +1206,7 @@ footer {
     <div class="chart-header" style="flex-wrap:wrap;gap:10px">
       <h2 id="dayScheduleTitle">單日課表</h2>
       <div style="display:flex;align-items:center;gap:4px">
-        <span style="font-size:0.78rem;color:var(--text-muted)">跟隨下方「處方類型／地區／搜尋」篩選</span>
+        <span style="font-size:0.78rem;color:var(--text-muted)">跟隨頂部「區域篩選」與下方「處方類型／地區／搜尋」</span>
         <button class="sec-toggle" onclick="toggleSection(this)" title="收合 / 展開"><svg class="ic" viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg></button>
       </div>
     </div>
@@ -3656,6 +3656,8 @@ function renderDaySchedule(){
   const q = (document.getElementById('slotsFilterSearch')?.value || '').toLowerCase().trim();
   let slots = courseSlots.filter(s => s.slot_date === from);
   slots = applySlotsTypeFilter(applySlotsRegionFilter(slots));
+  // 也跟著頂部「區域篩選」下拉一起過濾(北投/士林/中山)
+  if(currentRegion !== 'all') slots = slots.filter(s => getSlotRegion(s) === currentRegion);
   if(q) slots = slots.filter(s => (((s.course_name||'') + ' ' + (s.course_location||'')).toLowerCase().includes(q)));
   if(!slots.length){
     body.innerHTML = '<div style="padding:18px;text-align:center;color:var(--text-muted)">這天沒有符合篩選的場次</div>';
