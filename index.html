@@ -34,6 +34,8 @@
   --shadow-lg:    0 8px 36px rgba(26,120,90,0.16);
   --radius:       14px;
   --radius-sm:    8px;
+  --sidebar-w:    224px;
+  --sidebar-w-collapsed: 64px;
 }
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -46,6 +48,96 @@ body {
     radial-gradient(ellipse at 90% 100%, rgba(26,159,190,0.10) 0%, transparent 55%);
 }
 
+/* ── inline SVG icon ── */
+.ic {
+  width: 18px; height: 18px; flex-shrink: 0;
+  stroke: currentColor; fill: none;
+  stroke-width: 2; stroke-linecap: round; stroke-linejoin: round;
+  vertical-align: -3px;
+}
+
+/* ── 側邊欄（預設收合,滑鼠移入展開） ── */
+#sidebar {
+  position: fixed; top: 0; left: 0; bottom: 0;
+  width: var(--sidebar-w-collapsed); z-index: 100;
+  background: linear-gradient(170deg, #1c6f5a 0%, #21876f 55%, #1f7f93 100%);
+  color: #e6f5ef;
+  display: flex; flex-direction: column;
+  transition: width 0.22s ease, box-shadow 0.22s ease;
+  box-shadow: 4px 0 24px rgba(10,40,32,0.22);
+  overflow: hidden;
+}
+#sidebar:hover {
+  width: var(--sidebar-w);
+  box-shadow: 10px 0 42px rgba(26,120,90,0.38);
+}
+.brand {
+  display: flex; align-items: center; gap: 11px;
+  padding: 18px 13px 16px;
+  border-bottom: 1px solid rgba(255,255,255,0.12);
+}
+.brand-logo {
+  width: 38px; height: 38px; border-radius: 11px; flex-shrink: 0;
+  background: var(--grad-main);
+  display: flex; align-items: center; justify-content: center;
+  color: #fff; box-shadow: 0 3px 10px rgba(42,172,138,0.4);
+}
+.brand-logo .ic { width: 21px; height: 21px; }
+.brand-text { line-height: 1.3; overflow: hidden; white-space: nowrap; }
+.brand-text b { font-size: 0.95rem; font-weight: 800; letter-spacing: 0.04em; display: block; text-shadow: 0 1px 3px rgba(0,0,0,0.15); }
+.brand-text small { font-size: 0.68rem; opacity: 0.85; letter-spacing: 0.06em; }
+.nav { flex: 1; padding: 14px 10px; display: flex; flex-direction: column; gap: 4px; overflow-y: auto; }
+.tab-btn {
+  display: flex; align-items: center; gap: 11px;
+  padding: 10px 13px; border-radius: 10px;
+  border: none; background: transparent;
+  color: rgba(230,245,239,0.78); font-size: 0.88rem; font-weight: 600;
+  font-family: inherit; cursor: pointer; transition: all 0.16s;
+  text-align: left; white-space: nowrap; position: relative;
+}
+.tab-btn:hover { background: rgba(255,255,255,0.10); color: #fff; }
+.tab-btn.active {
+  background: rgba(255,255,255,0.94); color: #14745c;
+  box-shadow: 0 2px 10px rgba(0,20,14,0.3);
+}
+.tab-btn.active::before {
+  content: ''; position: absolute; left: -10px; top: 9px; bottom: 9px;
+  width: 4px; border-radius: 0 4px 4px 0;
+  background: linear-gradient(180deg, #8fba2e, #2aac8a);
+}
+.nav-lbl {
+  overflow: hidden; text-overflow: ellipsis;
+  opacity: 0; transition: opacity 0.18s ease 0.04s;
+}
+#sidebar:hover .nav-lbl { opacity: 1; }
+.brand-text { opacity: 0; transition: opacity 0.18s ease 0.04s; }
+#sidebar:hover .brand-text { opacity: 1; }
+.sidebar-foot {
+  padding: 12px 14px; border-top: 1px solid rgba(255,255,255,0.12);
+  font-size: 0.68rem; color: rgba(230,245,239,0.55); line-height: 1.6;
+  white-space: nowrap; overflow: hidden;
+  opacity: 0; transition: opacity 0.18s ease 0.04s;
+}
+#sidebar:hover .sidebar-foot { opacity: 1; }
+
+/* ── 主內容區（側欄為收合寬度,展開時飄出覆蓋,不推擠內容） ── */
+#main { margin-left: var(--sidebar-w-collapsed); min-height: 100vh; }
+
+/* ── 骨架載入（首次讀取雲端時） ── */
+@keyframes shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+body.is-loading .card .val,
+body.is-loading .card .delta {
+  color: transparent !important; border-radius: 8px; user-select: none;
+  background: linear-gradient(90deg, #e4f0ea 25%, #f4faf7 50%, #e4f0ea 75%);
+  background-size: 200% 100%; animation: shimmer 1.2s linear infinite;
+}
+body.is-loading .chart-wrap { position: relative; }
+body.is-loading .chart-wrap::after {
+  content: ''; position: absolute; inset: 0; border-radius: 10px; z-index: 5;
+  background: linear-gradient(90deg, #eef6f1 25%, #f8fcfa 50%, #eef6f1 75%);
+  background-size: 200% 100%; animation: shimmer 1.2s linear infinite;
+}
+
 /* ── 設定提示 ── */
 #setup-banner {
   background: #fffbeb; border-bottom: 3px solid #f6c90e;
@@ -55,52 +147,99 @@ body {
 #setup-banner code { background: #fff; border: 1px solid #e2c200; border-radius: 4px; padding: 1px 7px; font-size: 0.82rem; }
 #setup-banner.hidden { display: none; }
 
-/* ── Header ── */
-header {
+/* ── 頂部工具列（sticky,原版漸層標題背景） ── */
+#topbar {
+  position: sticky; top: 0; z-index: 90;
   background: var(--grad-main);
-  color: white; padding: 26px 36px;
+  padding: 14px 36px;
+  display: flex; align-items: center; gap: 16px; flex-wrap: wrap;
   box-shadow: 0 4px 24px rgba(26,120,90,0.25);
-  position: relative; overflow: hidden;
+  overflow: hidden;
 }
-header::before {
-  content: ''; position: absolute; top: -50px; right: -30px;
-  width: 220px; height: 220px; border-radius: 50%;
-  background: rgba(255,255,255,0.07);
+#topbar::before {
+  content: ''; position: absolute; top: -60px; right: -30px;
+  width: 200px; height: 200px; border-radius: 50%;
+  background: rgba(255,255,255,0.08); pointer-events: none;
 }
-header::after {
-  content: ''; position: absolute; bottom: -70px; right: 150px;
-  width: 160px; height: 160px; border-radius: 50%;
-  background: rgba(255,255,255,0.05);
+#topbar::after {
+  content: ''; position: absolute; bottom: -80px; right: 220px;
+  width: 150px; height: 150px; border-radius: 50%;
+  background: rgba(255,255,255,0.06); pointer-events: none;
 }
-header h1 {
-  font-size: 1.6rem; font-weight: 800; letter-spacing: 0.05em;
-  text-shadow: 0 1px 4px rgba(0,0,0,0.15);
+.topbar-title { min-width: 0; }
+.topbar-title h1 { font-size: 1.1rem; font-weight: 800; letter-spacing: 0.04em; color: #fff; text-shadow: 0 1px 4px rgba(0,0,0,0.18); }
+.topbar-title p { font-size: 0.76rem; color: rgba(255,255,255,0.88); margin-top: 2px; }
+.topbar-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; flex-basis: 100%; justify-content: flex-start; }
+.act-btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 7px 14px; border-radius: 9px;
+  border: 1.5px solid var(--border); background: var(--surface);
+  color: var(--text-muted); font-family: inherit; font-size: 0.82rem;
+  font-weight: 700; cursor: pointer; transition: all 0.16s; white-space: nowrap;
 }
-header p { font-size: 0.86rem; opacity: 0.88; margin-top: 5px; letter-spacing: 0.01em; }
+.act-btn .ic { width: 15px; height: 15px; }
+.act-btn:hover { border-color: var(--teal); color: var(--teal); background: #f0fbf7; }
+.act-btn.cyan   { border-color: #a8dff0; color: var(--cyan); }
+.act-btn.cyan:hover   { border-color: var(--cyan); background: #ecf8fc; color: var(--cyan); }
+.act-btn.orange { border-color: #f2d9ae; color: #b3620a; }
+.act-btn.orange:hover { border-color: #e8930a; background: #fff8ec; color: #b3620a; }
+.act-btn:disabled { opacity: 0.55; cursor: not-allowed; }
+#pdf-export-btn {
+  display: inline-flex; align-items: center; gap: 7px;
+  padding: 7px 16px; border-radius: 9px;
+  background: var(--surface); border: 1.5px solid var(--border);
+  color: var(--teal); font-size: 0.82rem; font-family: inherit;
+  font-weight: 700; cursor: pointer;
+  transition: all 0.18s; white-space: nowrap;
+}
+#pdf-export-btn .ic { width: 15px; height: 15px; }
+#pdf-export-btn:hover { border-color: var(--teal); background: #f0fbf7; transform: translateY(-1px); }
+#pdf-export-btn:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
+#view-counter { font-size: 0.74rem; color: rgba(255,255,255,0.88); white-space: nowrap; margin-left: auto; }
 
-/* ── 雲端狀態列 ── */
+/* ── 雲端狀態膠囊 ── */
 #cloud-bar {
-  padding: 8px 36px; font-size: 0.8rem; display: flex; align-items: center; gap: 10px;
-  background: #e8f8f2; border-bottom: 1px solid #b3e8d4; color: #1a6e50;
-  font-weight: 500;
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 5px 13px; border-radius: 20px;
+  font-size: 0.76rem; font-weight: 600;
+  background: rgba(255,255,255,0.92); border: 1px solid rgba(255,255,255,0.6); color: #1a6e50;
+  max-width: 460px; box-shadow: 0 1px 6px rgba(10,50,38,0.15);
 }
+#cloud-bar #cloud-msg { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 #cloud-bar.loading { background: #e6f5fa; border-color: #a8dff0; color: #1a6880; }
 #cloud-bar.error   { background: #fef2f2; border-color: #fccfcf; color: #b91c1c; }
 #cloud-bar .dot {
-  width: 9px; height: 9px; border-radius: 50%; background: var(--teal); flex-shrink: 0;
-  box-shadow: 0 0 0 3px rgba(42,172,138,0.25);
+  width: 8px; height: 8px; border-radius: 50%; background: var(--teal); flex-shrink: 0;
+  box-shadow: 0 0 0 3px rgba(42,172,138,0.22);
 }
-#cloud-bar.loading .dot { background: var(--cyan); box-shadow: 0 0 0 3px rgba(26,159,190,0.25); animation: blink 1.2s infinite; }
+#cloud-bar.loading .dot { background: var(--cyan); box-shadow: 0 0 0 3px rgba(26,159,190,0.22); animation: blink 1.2s infinite; }
 #cloud-bar.error .dot   { background: #e53e3e; box-shadow: 0 0 0 3px rgba(229,62,62,0.2); }
 @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.2} }
 
-/* ── 上傳區 ── */
-.upload-bar {
-  background: var(--surface); border-bottom: 1px solid var(--border);
-  padding: 13px 36px; display: flex; align-items: center; gap: 16px; flex-wrap: wrap;
-  box-shadow: var(--shadow-sm);
+/* ── 資料工具（上傳 / 分區，收合面板） ── */
+#data-tools {
+  margin: 14px 36px 0;
+  border: 1px solid var(--border); border-radius: var(--radius);
+  background: var(--surface); box-shadow: var(--shadow-sm);
+  overflow: hidden;
 }
-.upload-bar label { font-size: 0.87rem; font-weight: 700; color: var(--teal); white-space: nowrap; }
+#data-tools > summary {
+  list-style: none; cursor: pointer; user-select: none;
+  padding: 11px 18px; display: flex; align-items: center; gap: 9px;
+  font-size: 0.84rem; font-weight: 700; color: var(--text-muted);
+  transition: background 0.15s;
+}
+#data-tools > summary::-webkit-details-marker { display: none; }
+#data-tools > summary:hover { background: #f6fcf9; color: var(--teal); }
+#data-tools > summary .chev { margin-left: auto; transition: transform 0.2s; }
+#data-tools[open] > summary .chev { transform: rotate(180deg); }
+#data-tools[open] > summary { border-bottom: 1px dashed var(--border); }
+.tools-body { padding: 14px 18px; display: flex; flex-direction: column; gap: 12px; }
+.tools-row { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+.tools-row > label:first-child, .tools-label {
+  font-size: 0.84rem; font-weight: 700; color: var(--teal); white-space: nowrap;
+  display: inline-flex; align-items: center; gap: 6px;
+}
 .upload-drop {
   flex: 1; min-width: 240px; border: 2px dashed #7dd4b8; border-radius: var(--radius-sm);
   padding: 10px 20px; text-align: center; cursor: pointer; transition: all 0.2s;
@@ -111,31 +250,6 @@ header p { font-size: 0.86rem; opacity: 0.88; margin-top: 5px; letter-spacing: 0
 .upload-status { font-size: 0.81rem; color: var(--teal); font-weight: 600; max-width: 420px; }
 .upload-status.error { color: #c53030; }
 .upload-hint { font-size: 0.77rem; color: var(--text-muted); }
-
-/* ══════════════════════════════════
-   ★ PDF 工具列
-══════════════════════════════════ */
-#pdf-toolbar {
-  background: #f8fffe;
-  border-bottom: 2px solid var(--border);
-  padding: 10px 36px;
-  display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
-}
-#pdf-toolbar .pdf-label {
-  font-size: 0.85rem; font-weight: 700; color: var(--text-muted); white-space: nowrap;
-}
-#pdf-export-btn {
-  display: flex; align-items: center; gap: 7px;
-  padding: 8px 20px; border-radius: var(--radius-sm);
-  background: linear-gradient(135deg, #2aac8a, #1a9fbe);
-  color: white; font-size: 0.88rem; font-family: inherit;
-  font-weight: 700; border: none; cursor: pointer;
-  box-shadow: 0 2px 8px rgba(26,159,190,0.30);
-  transition: all 0.18s; white-space: nowrap;
-}
-#pdf-export-btn:hover { transform: translateY(-1px); box-shadow: 0 4px 14px rgba(26,159,190,0.40); }
-#pdf-export-btn:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
-#pdf-export-btn .pdf-icon { font-size: 1rem; }
 
 /* ── PDF 勾選面板 (Modal) ── */
 #pdf-modal-overlay {
@@ -322,8 +436,18 @@ header p { font-size: 0.86rem; opacity: 0.88; margin-top: 5px; letter-spacing: 0
 .card.orange::after { background: #e8930a; }
 .card.purple::after { background: var(--cyan); }
 .card.violet::after { background: #7c3aed; }
-.card .icon { font-size: 1.5rem; margin-bottom: 8px; display: block; }
-.card .val { font-size: 2.2rem; font-weight: 800; line-height: 1; letter-spacing: -0.02em; }
+.card .icon {
+  width: 38px; height: 38px; border-radius: 11px;
+  margin: 0 auto 10px; display: flex; align-items: center; justify-content: center;
+  color: #fff;
+}
+.card .icon .ic { width: 19px; height: 19px; }
+.card.blue .icon   { background: var(--grad-card-1); box-shadow: 0 3px 9px rgba(143,186,46,0.35); }
+.card.green .icon  { background: var(--grad-card-2); box-shadow: 0 3px 9px rgba(42,172,138,0.35); }
+.card.orange .icon { background: var(--grad-card-3); box-shadow: 0 3px 9px rgba(232,147,10,0.35); }
+.card.purple .icon { background: var(--grad-card-4); box-shadow: 0 3px 9px rgba(26,126,160,0.35); }
+.card.violet .icon { background: var(--grad-card-5); box-shadow: 0 3px 9px rgba(124,58,237,0.35); }
+.card .val { font-size: 2.2rem; font-weight: 800; line-height: 1; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
 .card.blue .val   { color: #5a8a1a; }
 .card.green .val  { color: var(--teal); }
 .card.orange .val { color: #c07010; }
@@ -333,34 +457,16 @@ header p { font-size: 0.86rem; opacity: 0.88; margin-top: 5px; letter-spacing: 0
 .card .delta { font-size: 0.72rem; color: var(--teal); margin-top: 4px; font-weight: 700; letter-spacing: 0.02em; }
 .card .delta.zero { color: var(--text-muted); font-weight: 500; }
 
-/* ── 頁籤 ── */
-.tabs {
-  display: flex; gap: 6px; padding: 20px 36px 0; flex-wrap: wrap;
-  border-bottom: 2px solid var(--border); margin: 6px 36px 0;
-}
-.tab-btn {
-  padding: 9px 22px; border-radius: var(--radius-sm) var(--radius-sm) 0 0;
-  border: 1.5px solid var(--border); border-bottom: none;
-  background: #eef7f4; color: var(--text-muted); font-size: 0.88rem;
-  font-family: inherit; cursor: pointer; transition: all 0.18s; font-weight: 600;
-  margin-bottom: -2px;
-}
-.tab-btn.active {
-  background: var(--surface); color: var(--teal);
-  border-color: var(--border); border-bottom: 2px solid var(--surface);
-}
-.tab-btn:hover:not(.active) { background: #d8f2ea; color: var(--teal); }
-
 /* ── 圖表類型選擇 ── */
 .chart-type-bar {
-  display: flex; align-items: center; gap: 8px;
+  display: flex; align-items: center; gap: 9px;
   padding: 16px 36px 0; flex-wrap: wrap;
 }
-.chart-type-bar .ct-label { font-size: 0.8rem; font-weight: 700; color: var(--text-muted); margin-right: 4px; white-space: nowrap; }
+.chart-type-bar .ct-label { font-size: 0.95rem; font-weight: 700; color: var(--text-muted); margin-right: 4px; white-space: nowrap; }
 .ct-btn {
   display: flex; align-items: center; gap: 5px;
-  padding: 5px 14px; border-radius: 20px; border: 1.5px solid var(--border);
-  background: var(--surface); color: var(--text-muted); font-size: 0.8rem;
+  padding: 7px 18px; border-radius: 22px; border: 1.5px solid var(--border);
+  background: var(--surface); color: var(--text-muted); font-size: 0.92rem;
   font-family: inherit; cursor: pointer; transition: all 0.15s; font-weight: 600;
 }
 .ct-btn.active { background: #e0f7ef; border-color: var(--teal); color: var(--teal); }
@@ -368,18 +474,97 @@ header p { font-size: 0.86rem; opacity: 0.88; margin-top: 5px; letter-spacing: 0
 
 /* ── 統計單位切換 ── */
 .period-bar {
-  display: flex; align-items: center; gap: 8px;
+  display: flex; align-items: center; gap: 9px;
   padding: 6px 36px 0; flex-wrap: wrap;
 }
-.period-bar .ct-label { font-size: 0.8rem; font-weight: 700; color: var(--text-muted); margin-right: 4px; white-space: nowrap; }
+.period-bar .ct-label { font-size: 0.95rem; font-weight: 700; color: var(--text-muted); margin-right: 4px; white-space: nowrap; }
 .period-btn {
   display: flex; align-items: center; gap: 5px;
-  padding: 5px 14px; border-radius: 20px; border: 1.5px solid var(--border);
-  background: var(--surface); color: var(--text-muted); font-size: 0.8rem;
+  padding: 7px 18px; border-radius: 22px; border: 1.5px solid var(--border);
+  background: var(--surface); color: var(--text-muted); font-size: 0.92rem;
   font-family: inherit; cursor: pointer; transition: all 0.15s; font-weight: 600;
 }
 .period-btn.active { background: #e6f5fa; border-color: var(--cyan); color: var(--cyan); }
 .period-btn:hover:not(.active) { border-color: #7dc7dd; background: #f0fbfd; }
+
+/* ── 整合篩選面板 ── */
+#filter-panel {
+  margin: 14px 36px 0; padding: 12px 18px;
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius); box-shadow: var(--shadow-sm);
+  display: flex; flex-direction: column; gap: 10px;
+}
+.fp-row { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+#dateFilterBar { align-items: center; gap: 8px; flex-wrap: wrap; }
+#tabControlsHost {
+  display: flex; flex-direction: column; gap: 8px;
+  border-top: 1px dashed var(--border); padding-top: 10px;
+}
+#tabControlsHost .period-bar,
+#tabControlsHost .chart-type-bar,
+#tabControlsHost .clinic-sort-bar { padding: 0; margin: 0; }
+
+/* ── 進場動畫 ── */
+@keyframes riseIn { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: translateY(0); } }
+.summary-grid .card { animation: riseIn 0.5s cubic-bezier(.22,.8,.36,1) backwards; }
+.summary-grid .card:nth-child(1) { animation-delay: 0.03s; }
+.summary-grid .card:nth-child(2) { animation-delay: 0.09s; }
+.summary-grid .card:nth-child(3) { animation-delay: 0.15s; }
+.summary-grid .card:nth-child(4) { animation-delay: 0.21s; }
+.summary-grid .card:nth-child(5) { animation-delay: 0.27s; }
+.tab-anim .chart-section { animation: riseIn 0.45s cubic-bezier(.22,.8,.36,1) backwards; }
+.tab-anim .chart-section:nth-of-type(2) { animation-delay: 0.08s; }
+.tab-anim .chart-section:nth-of-type(3) { animation-delay: 0.16s; }
+.tab-anim .type-grid .chart-section:nth-child(2) { animation-delay: 0.08s; }
+.tab-anim .type-grid .chart-section:nth-child(3) { animation-delay: 0.16s; }
+.tab-anim .type-grid .chart-section:nth-child(4) { animation-delay: 0.24s; }
+
+/* ── 數值更新脈衝 ── */
+@keyframes cardPulse {
+  0%   { box-shadow: var(--shadow-md), 0 0 0 0 rgba(42,172,138,0.45); }
+  100% { box-shadow: var(--shadow-md), 0 0 0 16px rgba(42,172,138,0); }
+}
+.card.pulse { animation: cardPulse 0.9s ease-out 2; }
+
+/* ── 動畫無障礙 ── */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* ── 區域篩選下拉清單 ── */
+#region-filter-bar { position: relative; display: inline-block; margin: 0; }
+#region-filter-bar > summary {
+  list-style: none; cursor: pointer; user-select: none;
+  display: inline-flex; align-items: center; gap: 9px;
+  padding: 10px 18px; border-radius: 12px;
+  background: #f0fbf7; border: 1px solid #b3e8d4;
+  font-size: 0.98rem; font-weight: 700; color: var(--teal);
+  transition: all 0.15s;
+}
+#region-filter-bar > summary::-webkit-details-marker { display: none; }
+#region-filter-bar > summary:hover { background: #e0f7ef; border-color: var(--teal); }
+#region-filter-bar > summary b { color: #0f6a52; }
+#region-filter-bar > summary .chev { transition: transform 0.2s; width: 16px; height: 16px; }
+#region-filter-bar[open] > summary .chev { transform: rotate(180deg); }
+.region-menu {
+  position: absolute; left: 0; top: calc(100% + 6px); z-index: 80;
+  min-width: 190px; padding: 8px;
+  background: var(--surface); border: 1px solid var(--border); border-radius: 12px;
+  box-shadow: var(--shadow-lg);
+  display: flex; flex-direction: column; gap: 4px;
+}
+.region-menu .region-btn { width: 100%; text-align: left; border-radius: 9px; }
+.region-btn {
+  padding: 9px 16px; border-radius: 22px;
+  border: 1.5px solid var(--border); background: var(--surface);
+  color: var(--text-muted); font-size: 0.95rem;
+  font-family: inherit; cursor: pointer; transition: all 0.15s; font-weight: 600;
+  white-space: nowrap;
+}
 
 /* ── 鑽取(drill-down)區 ── */
 .drill-box {
@@ -463,6 +648,110 @@ header p { font-size: 0.86rem; opacity: 0.88; margin-top: 5px; letter-spacing: 0
 .rate-bar-cell { min-width: 120px; }
 .rate-bar-bg { background: #e8f8f2; border-radius: 4px; height: 8px; overflow: hidden; }
 .rate-bar-fill { height: 100%; border-radius: 4px; background: linear-gradient(90deg, #2aac8a, #1a9fbe); }
+.clinic-table tbody tr:nth-child(even) { background: #f7fcf9; }
+
+/* ── 場次明細表 ── */
+.data-table { border-collapse: collapse; }
+.data-table thead th {
+  position: sticky; top: 0; z-index: 1;
+  background: #f0fbf7; color: var(--teal);
+  font-weight: 700; font-size: 0.8rem; letter-spacing: 0.02em;
+  padding: 9px 10px; text-align: left; white-space: nowrap;
+  border-bottom: 2px solid var(--border);
+  box-shadow: 0 2px 6px rgba(26,120,90,0.06);
+}
+.data-table thead th.num { text-align: right; }
+.data-table td {
+  padding: 8px 10px; border-bottom: 1px solid #ecf5f0;
+  vertical-align: middle;
+}
+.data-table td.num { text-align: right; font-variant-numeric: tabular-nums; }
+.data-table tbody tr:nth-child(even) { background: #f8fcfa; }
+.data-table tbody tr:hover { background: #eefaf4; }
+.fill-cell { display: flex; align-items: center; gap: 7px; justify-content: flex-end; min-width: 86px; }
+.fill-cell span { font-weight: 700; font-variant-numeric: tabular-nums; font-size: 0.82rem; }
+.fill-bar { width: 44px; height: 6px; border-radius: 3px; background: #e4f0ea; overflow: hidden; flex-shrink: 0; }
+.fill-bar i { display: block; height: 100%; border-radius: 3px; }
+
+/* ── 區塊收合鈕 ── */
+.sec-toggle {
+  width: 28px; height: 28px; border-radius: 8px; flex-shrink: 0;
+  border: 1.5px solid var(--border); background: var(--surface);
+  color: var(--text-muted); cursor: pointer; margin-left: 8px;
+  display: inline-flex; align-items: center; justify-content: center;
+  transition: all 0.15s;
+}
+.sec-toggle:hover { border-color: var(--teal); color: var(--teal); background: #f0fbf7; }
+.sec-toggle .ic { width: 15px; height: 15px; transition: transform 0.2s; }
+.chart-section.collapsed .sec-toggle .ic { transform: rotate(-90deg); }
+.chart-section.collapsed > *:not(.chart-header) { display: none !important; }
+.chart-section.collapsed .chart-header { margin-bottom: 0; padding-bottom: 0; border-bottom: none; }
+.chart-section.collapsed #slotsFilterBar { display: none; }
+
+/* ── 單日課表（活動日檢視） ── */
+.day-summary {
+  display: flex; gap: 20px; flex-wrap: wrap; align-items: baseline;
+  padding: 10px 16px; margin-bottom: 6px;
+  background: #f0fbf7; border: 1px solid #b3e8d4; border-radius: 10px;
+  font-size: 0.88rem; color: var(--text-muted);
+}
+.day-summary b { color: var(--teal); font-size: 1.12rem; font-variant-numeric: tabular-nums; }
+.day-time-row { display: flex; gap: 14px; padding: 13px 0; border-bottom: 1px dashed var(--border); }
+.day-time-row:last-child { border-bottom: none; }
+.day-time {
+  width: 58px; flex-shrink: 0; padding-top: 7px;
+  font-weight: 800; font-size: 0.95rem; color: var(--cyan);
+  font-variant-numeric: tabular-nums;
+}
+.day-cards { display: flex; gap: 10px; flex-wrap: wrap; flex: 1; align-items: flex-start; }
+.day-type-col { display: flex; flex-direction: column; gap: 10px; width: 248px; flex-shrink: 0; }
+.day-type-col.empty { visibility: hidden; }
+.day-type-col .day-card { width: 100%; }
+.day-card {
+  width: 248px; padding: 10px 12px;
+  border: 1px solid var(--border); border-left: 4px solid #9aa5b1; border-radius: 10px;
+  background: #fcfffe; cursor: pointer;
+  transition: box-shadow 0.15s, transform 0.15s;
+}
+.day-card:hover { box-shadow: var(--shadow-md); transform: translateY(-2px); }
+.day-card.cancelled { opacity: 0.5; }
+.dc-top { display: flex; align-items: center; gap: 6px; margin-bottom: 5px; flex-wrap: wrap; }
+.dc-type { padding: 1px 8px; border-radius: 10px; font-size: 0.72rem; font-weight: 700; white-space: nowrap; }
+.dc-region { font-size: 0.72rem; font-weight: 700; }
+.dc-status { margin-left: auto; font-size: 0.7rem; font-weight: 700; color: #9aa5b1; border: 1px solid #cfd8d3; padding: 0 7px; border-radius: 9px; white-space: nowrap; }
+.dc-status.done { color: var(--teal); border-color: #9adfc8; }
+.dc-name { font-weight: 700; font-size: 0.88rem; line-height: 1.35; margin-bottom: 3px; color: var(--text); }
+.dc-loc { font-size: 0.74rem; color: var(--text-muted); margin-bottom: 7px; }
+.dc-meta { display: flex; align-items: center; gap: 7px; font-size: 0.78rem; color: var(--text-muted); flex-wrap: wrap; }
+.dc-meta b { color: var(--text); font-size: 0.94rem; font-variant-numeric: tabular-nums; }
+.day-card-entries {
+  margin-top: 8px; padding-top: 7px; border-top: 1px dashed var(--border);
+  font-size: 0.76rem; color: var(--text-muted);
+  max-height: 170px; overflow-y: auto;
+}
+.dce-row { display: flex; justify-content: space-between; gap: 8px; padding: 2px 0; }
+.dce-row .mono { font-family: monospace; }
+
+/* ── 場次明細:日期群組列 ── */
+.date-sep td {
+  background: #e9f6f0 !important; color: #15735a;
+  font-weight: 800; font-size: 0.9rem;
+  padding: 9px 12px; border-top: 2px solid var(--border); border-bottom: 1px solid var(--border);
+}
+.date-sep.pinned td { background: #fff6dc !important; color: #9a6308; border-color: #efdda8; }
+.pin-toggle {
+  cursor: pointer; margin-right: 9px; font-size: 0.95rem;
+  display: inline-block; transition: transform 0.15s;
+}
+.pin-toggle:hover { transform: scale(1.25); }
+.date-sep:not(.pinned) .pin-toggle { opacity: 0.4; }
+.pin-tag {
+  margin-left: 9px; font-size: 0.7rem; font-weight: 700;
+  background: #e8930a; color: #fff; padding: 1px 9px; border-radius: 10px;
+  vertical-align: 1px;
+}
+.data-table tbody tr.in-pinned { background: #fffdf0; }
+.data-table tbody tr.row-cancelled td { opacity: 0.5; }
 
 /* ── 診所排序控制 ── */
 .clinic-sort-bar { padding: 14px 36px 0; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
@@ -470,13 +759,13 @@ header p { font-size: 0.86rem; opacity: 0.88; margin-top: 5px; letter-spacing: 0
 
 /* ── 週次說明列 ── */
 #week-note-bar {
-  background: #fffdf0; border-bottom: 1px solid #e8dfa0;
-  padding: 7px 36px; font-size: 0.82rem; color: #7a6a10;
+  margin: 12px 36px 0;
+  background: #fffdf0; border: 1px solid #ede3aa; border-radius: 10px;
+  padding: 7px 16px; font-size: 0.8rem; color: #7a6a10;
   display: flex; align-items: center; gap: 8px; font-weight: 500;
 }
 #week-note-bar strong { color: #5a4d08; }
-.week-note-icon { font-size: 1rem; flex-shrink: 0; }
-@media (max-width: 700px) { #week-note-bar { padding: 7px 16px; } }
+.week-note-icon { flex-shrink: 0; display: inline-flex; }
 
 /* ── Footer ── */
 footer {
@@ -485,30 +774,37 @@ footer {
 }
 
 /* ── RWD ── */
+@media (max-width: 980px) {
+  #sidebar {
+    position: sticky; top: 0; bottom: auto; width: 100% !important;
+    flex-direction: row; align-items: center; gap: 4px;
+    box-shadow: 0 3px 16px rgba(10,40,32,0.2);
+  }
+  .brand { padding: 10px 12px; border-bottom: none; }
+  .brand-text { display: none; }
+  .nav { flex-direction: row; padding: 8px 6px; overflow-x: auto; overflow-y: hidden; gap: 2px; }
+  .tab-btn { padding: 8px 11px; font-size: 0.8rem; gap: 7px; }
+  .tab-btn.active::before { display: none; }
+  .nav-lbl { opacity: 1; }
+  .sidebar-foot, #sidebar-toggle { display: none; }
+  #main { margin-left: 0 !important; }
+  #topbar { padding: 10px 16px; }
+  #cloud-bar { max-width: 100%; }
+}
 @media (max-width: 700px) {
   .type-grid, .side-by-side { grid-template-columns: 1fr; }
   .summary-grid { padding: 16px; }
   .chart-section { margin: 12px; }
   .type-grid, .side-by-side { margin: 0 12px 12px; }
-  .tabs { padding: 12px 12px 0; margin: 0 12px; }
-  .upload-bar, .chart-type-bar { padding: 12px 16px; }
-  header { padding: 20px; }
-  #cloud-bar { padding: 8px 16px; }
+  .chart-type-bar { padding: 12px 16px; }
   .clinic-sort-bar { padding: 12px 16px 0; }
-  #pdf-toolbar { padding: 10px 16px; }
+  #data-tools, #week-note-bar { margin: 10px 12px 0; }
   .pdf-check-grid { grid-template-columns: 1fr; }
 }
 
 .hidden { display: none; }
 
-/* ── 區域篩選按鈕 ── */
-.region-btn {
-  padding: 5px 16px; border-radius: 20px;
-  border: 1.5px solid var(--border); background: var(--surface);
-  color: var(--text-muted); font-size: 0.82rem;
-  font-family: inherit; cursor: pointer; transition: all 0.15s; font-weight: 600;
-  white-space: nowrap;
-}
+/* ── 區域篩選按鈕 active/hover ── */
 .region-btn.active { background: linear-gradient(135deg,#2aac8a,#1a9fbe); border-color: var(--teal); color: #fff; box-shadow:0 2px 8px rgba(42,172,138,0.25); }
 .region-btn:hover:not(.active) { border-color: #7dd4b8; background: #e8f8f2; color: var(--teal); }
 
@@ -533,123 +829,138 @@ footer {
 </head>
 <body>
 
+<!-- ═══ 側邊欄導覽 ═══ -->
+<aside id="sidebar">
+  <div class="brand">
+    <div class="brand-logo"><svg class="ic" viewBox="0 0 24 24"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg></div>
+    <div class="brand-text"><b>健康處方儀表板</b><small>HEALTH RX STATISTICS</small></div>
+  </div>
+  <nav class="nav">
+    <button class="tab-btn active" onclick="showTab('weekly',this)"><svg class="ic" viewBox="0 0 24 24"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg><span class="nav-lbl">每週趨勢</span></button>
+    <button class="tab-btn" onclick="showTab('daily',this)"><svg class="ic" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg><span class="nav-lbl">單月每日</span></button>
+    <button class="tab-btn" onclick="showTab('type',this)"><svg class="ic" viewBox="0 0 24 24"><path d="M21.21 15.89A10 10 0 1 1 8 2.83"/><path d="M22 12A10 10 0 0 0 12 2v10z"/></svg><span class="nav-lbl">處方開立分析</span></button>
+    <button class="tab-btn" onclick="showTab('typeweekly',this)"><svg class="ic" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg><span class="nav-lbl">各類型週趨勢</span></button>
+    <button class="tab-btn" onclick="showTab('clinic',this)"><svg class="ic" viewBox="0 0 24 24"><rect x="4" y="2" width="16" height="20" rx="2"/><path d="M12 6v4"/><path d="M10 8h4"/><path d="M8 22v-4h8v4"/></svg><span class="nav-lbl">診所分析</span></button>
+    <button class="tab-btn" onclick="showTab('prescday',this)"><svg class="ic" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/><path d="m9 16 2 2 4-4"/></svg><span class="nav-lbl">處方日執行數</span></button>
+    <button class="tab-btn" onclick="showTab('course',this)"><svg class="ic" viewBox="0 0 24 24"><path d="M22 10v6M2 10l10-5 10 5-10 5z"/><path d="M6 12v5c3 3 9 3 12 0v-5"/></svg><span class="nav-lbl">課程選課</span></button>
+  </nav>
+  <div class="sidebar-foot">資料儲存於 Supabase<br>圖表由 Chart.js 製作</div>
+</aside>
+
+<!-- ═══ 主內容 ═══ -->
+<div id="main">
+
 <div id="setup-banner">
   ⚠️ <strong>首次使用請先完成 Supabase 設定：</strong>
   請打開這個 HTML 檔案，找到最上方 <code>SUPABASE_URL</code> 和 <code>SUPABASE_ANON_KEY</code> 兩行，
   填入您在 Supabase 取得的 Project URL 和 anon key，儲存後重新開啟即可。
 </div>
 
-<header>
-  <h1>◈ 健康處方開立統計儀表板</h1>
-  <p id="headerDesc">載入中…</p>
-</header>
-
-<div id="cloud-bar" class="loading" style="justify-content:space-between;">
-  <div style="display:flex;align-items:center;gap:8px;">
+<!-- 頂部工具列 -->
+<div id="topbar">
+  <div class="topbar-title">
+    <h1>健康處方開立統計儀表板</h1>
+    <p id="headerDesc">載入中…</p>
+  </div>
+  <div id="cloud-bar" class="loading">
     <div class="dot"></div>
     <span id="cloud-msg">正在從雲端讀取最新資料…</span>
   </div>
-  <div style="display:flex;align-items:center;gap:14px;">
-    <button id="manualSyncBtn" onclick="triggerManualSync()" style="padding:6px 14px;border-radius:18px;border:1.5px solid var(--cyan);background:#fff;color:var(--cyan);font-family:inherit;font-size:0.82rem;font-weight:700;cursor:pointer;white-space:nowrap" title="立即從健康處方管理系統抓最新資料(平常每天 09:30 / 15:00 自動跑)">🔄 立即同步</button>
-    <button onclick="openNotesEditor()" style="padding:6px 14px;border-radius:18px;border:1.5px solid #e8930a;background:#fff;color:#b3620a;font-family:inherit;font-size:0.82rem;font-weight:700;cursor:pointer;white-space:nowrap">📝 編輯備註並重新產出</button>
-    <button id="weeklyReportBtn" onclick="downloadLatestWeeklyReport()" style="display:none;padding:6px 14px;border-radius:18px;border:1.5px solid var(--teal);background:#fff;color:var(--teal);font-family:inherit;font-size:0.82rem;font-weight:700;cursor:pointer;white-space:nowrap">📥 下載最新週報</button>
-    <div id="view-counter" style="font-size:0.8rem;opacity:0.8;white-space:nowrap;"></div>
+  <div class="topbar-actions">
+    <button id="manualSyncBtn" class="act-btn cyan" onclick="triggerManualSync()" title="立即從健康處方管理系統抓最新資料(平常每天 09:30 / 15:00 自動跑)">立即同步</button>
+    <button class="act-btn orange" onclick="openNotesEditor()" title="編輯各診所備註並立即重新產出週報"><svg class="ic" viewBox="0 0 24 24"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>編輯備註</button>
+    <button id="weeklyReportBtn" class="act-btn" onclick="downloadLatestWeeklyReport()" style="display:none">下載最新週報</button>
+    <button id="pdf-export-btn" onclick="openPdfModal()" title="勾選想要的圖表，每張圖表獨立一頁，合併下載"><svg class="ic" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>匯出 PDF</button>
+    <div id="view-counter"></div>
   </div>
 </div>
 
-<div class="upload-bar">
-  <label>📤 更新資料：</label>
-  <div class="upload-drop" id="dropZone">
-    <input type="file" id="fileInput" accept=".xlsx,.xls" />
-    點此選擇或拖曳 Excel 檔案（.xlsx / .xls）
+<!-- 資料工具（收合面板） -->
+<details id="data-tools">
+  <summary>
+    <svg class="ic" viewBox="0 0 24 24"><line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/><line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/><line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/><line x1="1" y1="14" x2="7" y2="14"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="17" y1="16" x2="23" y2="16"/></svg>
+    資料工具：上傳 Excel、診所分區設定
+    <svg class="ic chev" viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg>
+  </summary>
+  <div class="tools-body">
+    <div class="tools-row">
+      <span class="tools-label"><svg class="ic" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>更新資料：</span>
+      <div class="upload-drop" id="dropZone">
+        <input type="file" id="fileInput" accept=".xlsx,.xls" />
+        點此選擇或拖曳 Excel 檔案（.xlsx / .xls）
+      </div>
+      <span class="upload-status hidden" id="uploadStatus"></span>
+    </div>
+    <div class="tools-row"><span class="upload-hint">欄位需包含：處方類型、開立日期、診所名稱（選填）、執行日期或執行狀態</span></div>
+    <div class="tools-row">
+      <span class="tools-label"><svg class="ic" viewBox="0 0 24 24"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg>診所分區：</span>
+      <button id="region-setup-btn" type="button" onclick="openRegionModal()" style="display:inline-flex;align-items:center;gap:7px;padding:7px 16px;border-radius:var(--radius-sm);background:linear-gradient(135deg,#8fba2e,#2aac8a);color:#fff;font-size:0.85rem;font-family:inherit;font-weight:700;border:none;cursor:pointer;box-shadow:0 2px 8px rgba(42,172,138,0.25);white-space:nowrap">
+        設定診所分區
+      </button>
+      <span id="region-setup-badge" style="font-size:0.82rem;color:var(--text-muted);font-weight:600">尚未設定</span>
+      <span class="upload-hint">上傳含「北投／士林／中山」三工作表的 Excel 即可建立對照表</span>
+    </div>
   </div>
-  <span class="upload-status hidden" id="uploadStatus"></span>
-  <span class="upload-hint">欄位需包含：處方類型、開立日期、診所名稱（選填）、執行日期或執行狀態</span>
-</div>
-
-<!-- ══════════════════════════════════
-     ★ PDF 工具列
-══════════════════════════════════ -->
-<div id="pdf-toolbar">
-  <span class="pdf-label">📄 匯出報告：</span>
-  <button id="pdf-export-btn" onclick="openPdfModal()">
-    <span class="pdf-icon">📑</span> 選擇圖表並匯出 PDF
-  </button>
-  <span style="font-size:0.78rem;color:var(--text-muted);">勾選想要的圖表，每張圖表獨立一頁，合併下載</span>
-</div>
-
-<!-- 診所分區設定列 -->
-<div id="region-setup-bar" style="background:#f0fbf7;border-bottom:2px solid #b3e8d4;padding:10px 36px;display:flex;align-items:center;gap:12px;flex-wrap:wrap">
-  <span style="font-size:0.85rem;font-weight:700;color:var(--teal);white-space:nowrap">📍 診所分區：</span>
-  <button id="region-setup-btn" type="button" onclick="openRegionModal()" style="display:inline-flex;align-items:center;gap:7px;padding:7px 16px;border-radius:var(--radius-sm);background:linear-gradient(135deg,#8fba2e,#2aac8a);color:#fff;font-size:0.85rem;font-family:inherit;font-weight:700;border:none;cursor:pointer;box-shadow:0 2px 8px rgba(42,172,138,0.25);white-space:nowrap">
-    設定診所分區
-  </button>
-  <span id="region-setup-badge" style="font-size:0.82rem;color:var(--text-muted);font-weight:600">尚未設定</span>
-  <span style="font-size:0.76rem;color:var(--text-muted)">上傳含「北投／士林／中山」三工作表的 Excel 即可建立對照表</span>
-</div>
+</details>
 
 <!-- 週次說明列 -->
 <div id="week-note-bar">
-  <span class="week-note-icon">🗓️</span>
+  <span class="week-note-icon"><svg class="ic" viewBox="0 0 24 24" style="width:15px;height:15px"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg></span>
   <span>週次定義：每週<strong>週六</strong>起算至<strong>下週五</strong>結束（例：2026W12 = 03/21～03/27）</span>
 </div>
 
 <!-- 摘要卡片（5 張） -->
 <div class="summary-grid">
-  <div class="card blue">  <span class="icon">📁</span><div class="val" id="sumTotal">—</div><div class="lbl">總開立數</div><div class="delta" id="sumTotalToday"></div></div>
-  <div class="card green"> <span class="icon">☑️</span><div class="val" id="sumExec">—</div><div class="lbl">總執行數</div><div class="delta" id="sumExecToday"></div></div>
-  <div class="card orange"><span class="icon">📈</span><div class="val" id="sumRate">—</div><div class="lbl">整體執行率</div></div>
-  <div class="card purple"><span class="icon">🗓️</span><div class="val" id="sumWeeks">—</div><div class="lbl">統計週數</div></div>
-  <div class="card violet"><span class="icon">🎓</span><div class="val" id="sumEnroll">—</div><div class="lbl">總選課人次</div><div class="delta" id="sumEnrollToday"></div></div>
+  <div class="card blue">  <span class="icon"><svg class="ic" viewBox="0 0 24 24"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg></span><div class="val" id="sumTotal">—</div><div class="lbl">總開立數</div><div class="delta" id="sumTotalToday"></div></div>
+  <div class="card green"> <span class="icon"><svg class="ic" viewBox="0 0 24 24"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg></span><div class="val" id="sumExec">—</div><div class="lbl">總執行數</div><div class="delta" id="sumExecToday"></div></div>
+  <div class="card orange"><span class="icon"><svg class="ic" viewBox="0 0 24 24"><line x1="19" y1="5" x2="5" y2="19"/><circle cx="6.5" cy="6.5" r="2.5"/><circle cx="17.5" cy="17.5" r="2.5"/></svg></span><div class="val" id="sumRate">—</div><div class="lbl">整體執行率</div></div>
+  <div class="card purple"><span class="icon"><svg class="ic" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg></span><div class="val" id="sumWeeks">—</div><div class="lbl">統計週數</div></div>
+  <div class="card violet"><span class="icon"><svg class="ic" viewBox="0 0 24 24"><path d="M22 10v6M2 10l10-5 10 5-10 5z"/><path d="M6 12v5c3 3 9 3 12 0v-5"/></svg></span><div class="val" id="sumEnroll">—</div><div class="lbl">總選課人次</div><div class="delta" id="sumEnrollToday"></div></div>
 </div>
 
-<!-- 頁籤 -->
-<div class="tabs">
-  <button class="tab-btn active" onclick="showTab('weekly',this)">📂 每週趨勢</button>
-  <button class="tab-btn" onclick="showTab('daily',this)">📆 單月每日</button>
-  <button class="tab-btn" onclick="showTab('type',this)">📊 處方開立分析</button>
-  <button class="tab-btn" onclick="showTab('typeweekly',this)">🔎 各類型週趨勢細項</button>
-  <button class="tab-btn" onclick="showTab('clinic',this)">🏥 診所分析</button>
-  <button class="tab-btn" onclick="showTab('prescday',this)">📅 處方日執行數</button>
-  <button class="tab-btn" onclick="showTab('course',this)">🎓 課程選課</button>
-</div>
-
-<!-- 區域篩選列 -->
-<div id="region-filter-bar" style="margin:12px 36px 0;padding:10px 16px;background:#f0fbf7;border-radius:10px;border:1px solid #b3e8d4;display:flex;align-items:center;gap:10px;flex-wrap:wrap">
-  <span style="font-size:0.88rem;font-weight:700;color:var(--teal);white-space:nowrap">🏘️ 區域篩選：</span>
-  <button class="region-btn active" onclick="setRegionFilter('all',this)">全部</button>
-  <button class="region-btn" onclick="setRegionFilter('北投區',this)">北投區</button>
-  <button class="region-btn" onclick="setRegionFilter('士林區',this)">士林區</button>
-  <button class="region-btn" onclick="setRegionFilter('中山區',this)">中山區</button>
-</div>
-
-<!-- 日期篩選列 -->
-<div id="dateFilterBar" style="display:none;margin:12px 36px;padding:10px 16px;background:var(--card);border-radius:10px;border:1px solid var(--border);align-items:center;gap:12px;flex-wrap:wrap">
-  <span style="font-size:0.88rem;font-weight:700;color:var(--teal);white-space:nowrap">📅 篩選開立日期：</span>
-  <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
-    <input type="date" id="filterFrom" style="padding:5px 10px;border-radius:7px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:0.85rem;font-family:inherit">
-    <span style="color:var(--muted);font-size:0.85rem">至</span>
-    <input type="date" id="filterTo" style="padding:5px 10px;border-radius:7px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:0.85rem;font-family:inherit">
+<!-- ═══ 整合篩選面板（區域 / 日期 / 各分頁顯示控制） ═══ -->
+<div id="filter-panel">
+  <div class="fp-row">
+    <details id="region-filter-bar">
+      <summary>
+        <svg class="ic" viewBox="0 0 24 24" style="width:16px;height:16px"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg>
+        區域篩選：<b id="regionDropdownLabel">全部</b>
+        <svg class="ic chev" viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg>
+      </summary>
+      <div class="region-menu">
+        <button class="region-btn active" onclick="setRegionFilter('all',this)">全部</button>
+        <button class="region-btn" onclick="setRegionFilter('北投區',this)">北投區</button>
+        <button class="region-btn" onclick="setRegionFilter('士林區',this)">士林區</button>
+        <button class="region-btn" onclick="setRegionFilter('中山區',this)">中山區</button>
+      </div>
+    </details>
+    <div id="dateFilterBar" style="display:none">
+      <span style="font-size:0.95rem;font-weight:700;color:var(--teal);white-space:nowrap">開立日期：</span>
+      <input type="date" id="filterFrom" style="padding:7px 12px;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:0.94rem;font-family:inherit">
+      <span style="color:var(--text-muted);font-size:0.94rem">至</span>
+      <input type="date" id="filterTo" style="padding:7px 12px;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:0.94rem;font-family:inherit">
+      <button onclick="applyDateFilter()" style="padding:7px 20px;border-radius:8px;border:none;background:var(--teal);color:#fff;font-size:0.94rem;font-weight:700;cursor:pointer;font-family:inherit">套用</button>
+      <button onclick="clearDateFilter()" style="padding:7px 16px;border-radius:8px;border:1px solid var(--border);background:transparent;color:var(--text-muted);font-size:0.94rem;cursor:pointer;font-family:inherit">清除</button>
+      <span id="filterStatus" style="font-size:0.88rem;color:var(--text-muted)"></span>
+    </div>
   </div>
-  <button onclick="applyDateFilter()" style="padding:5px 16px;border-radius:7px;border:none;background:var(--teal);color:#fff;font-size:0.85rem;font-weight:700;cursor:pointer;font-family:inherit">套用</button>
-  <button onclick="clearDateFilter()" style="padding:5px 14px;border-radius:7px;border:1px solid var(--border);background:transparent;color:var(--muted);font-size:0.85rem;cursor:pointer;font-family:inherit">清除</button>
-  <span id="filterStatus" style="font-size:0.82rem;color:var(--muted)"></span>
+  <div id="tabControlsHost"></div>
 </div>
 
 <!-- ═══ TAB 1 ═══ -->
 <div id="tab-weekly">
   <div class="period-bar">
     <span class="ct-label">統計單位：</span>
-    <button class="period-btn active" onclick="setPeriod('weekly','week',this)"><span>🗓️</span> 週</button>
-    <button class="period-btn" onclick="setPeriod('weekly','month',this)"><span>📆</span> 月</button>
+    <button class="period-btn active" onclick="setPeriod('weekly','week',this)">週</button>
+    <button class="period-btn" onclick="setPeriod('weekly','month',this)">月</button>
     <span id="weekly-drill-hint" style="font-size:0.75rem;color:var(--text-muted);margin-left:8px;display:none">💡 點擊月份可展開該月週統計</span>
   </div>
   <div class="chart-type-bar">
     <span class="ct-label">圖表類型：</span>
-    <button class="ct-btn active" onclick="setChartType('weekly','bar',this)"><span>📊</span> 直條圖</button>
-    <button class="ct-btn" onclick="setChartType('weekly','horizontalBar',this)"><span>📉</span> 橫條圖</button>
-    <button class="ct-btn" onclick="setChartType('weekly','line',this)"><span>📈</span> 折線圖</button>
-    <button class="ct-btn" onclick="setChartType('weekly','area',this)"><span>🏔️</span> 面積圖</button>
+    <button class="ct-btn active" onclick="setChartType('weekly','bar',this)">直條圖</button>
+    <button class="ct-btn" onclick="setChartType('weekly','horizontalBar',this)">橫條圖</button>
+    <button class="ct-btn" onclick="setChartType('weekly','line',this)">折線圖</button>
+    <button class="ct-btn" onclick="setChartType('weekly','area',this)">面積圖</button>
   </div>
   <div class="chart-section" data-pdf-id="weekly-pres" data-pdf-label="每週處方開立數">
     <div class="chart-header"><h2 id="w1-title">每週處方開立數</h2><button class="dl-btn" onclick="downloadChart(this)">↓ 下載 JPG</button></div>
@@ -672,18 +983,18 @@ footer {
   </div>
   <div class="chart-type-bar">
     <span class="ct-label">圖表類型：</span>
-    <button class="ct-btn active" onclick="setChartType('daily','bar',this)"><span>📊</span> 直條圖</button>
-    <button class="ct-btn" onclick="setChartType('daily','line',this)"><span>📈</span> 折線圖</button>
-    <button class="ct-btn" onclick="setChartType('daily','area',this)"><span>🏔️</span> 面積圖</button>
+    <button class="ct-btn active" onclick="setChartType('daily','bar',this)">直條圖</button>
+    <button class="ct-btn" onclick="setChartType('daily','line',this)">折線圖</button>
+    <button class="ct-btn" onclick="setChartType('daily','area',this)">面積圖</button>
   </div>
   <div id="daily-no-data" class="chart-section hidden" style="text-align:center;color:var(--text-muted);padding:40px;">
-    <div style="font-size:2.5rem;margin-bottom:12px;">📆</div>
+    <div style="margin-bottom:12px;color:#9dbfb2"><svg class="ic" viewBox="0 0 24 24" style="width:42px;height:42px;stroke-width:1.5"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg></div>
     <div style="font-weight:700;font-size:1rem;margin-bottom:8px;">尚無可用的每日資料</div>
     <div style="font-size:0.85rem;">請先上傳含「開立日期」的 Excel，或等待雲端資料同步。</div>
   </div>
   <div id="daily-content">
     <div class="chart-section" style="margin:18px 36px">
-      <div class="chart-header"><h2>⏱️ 今日更新時間軸<span id="dailyFeedTodayLabel" style="font-size:0.78rem;font-weight:400;color:var(--text-muted);margin-left:10px"></span></h2><button onclick="clearDailyUpdateLog()" style="border:1.5px solid var(--border);background:transparent;color:var(--text-muted);border-radius:14px;padding:4px 14px;font-size:0.78rem;cursor:pointer;font-family:inherit">清空紀錄</button></div>
+      <div class="chart-header"><h2>今日更新時間軸<span id="dailyFeedTodayLabel" style="font-size:0.78rem;font-weight:400;color:var(--text-muted);margin-left:10px"></span></h2><button onclick="clearDailyUpdateLog()" style="border:1.5px solid var(--border);background:transparent;color:var(--text-muted);border-radius:14px;padding:4px 14px;font-size:0.78rem;cursor:pointer;font-family:inherit">清空紀錄</button></div>
       <div id="dailyUpdateFeed" style="display:flex;flex-wrap:wrap;gap:8px;max-height:200px;overflow-y:auto;padding:6px 2px"></div>
       <div style="margin-top:8px;font-size:0.72rem;color:var(--text-muted)">資料每 5 分鐘自動同步,此處紀錄頁面開啟期間偵測到的當日新增。重新整理瀏覽器不影響本機紀錄。</div>
     </div>
@@ -702,16 +1013,16 @@ footer {
 <div id="tab-type" class="hidden">
   <div class="period-bar">
     <span class="ct-label">統計單位：</span>
-    <button class="period-btn active" onclick="setPeriod('type','week',this)"><span>🗓️</span> 週</button>
-    <button class="period-btn" onclick="setPeriod('type','month',this)"><span>📆</span> 月</button>
+    <button class="period-btn active" onclick="setPeriod('type','week',this)">週</button>
+    <button class="period-btn" onclick="setPeriod('type','month',this)">月</button>
     <span style="font-size:0.72rem;color:var(--text-muted);margin-left:8px">（僅影響「折線累積」圖）</span>
   </div>
   <div class="chart-type-bar">
     <span class="ct-label">圖表類型：</span>
-    <button class="ct-btn active" onclick="setChartType('type','line',this)"><span>📈</span> 折線（累積）</button>
-    <button class="ct-btn" onclick="setChartType('type','pie',this)"><span>🥧</span> 圓餅圖</button>
-    <button class="ct-btn" onclick="setChartType('type','doughnut',this)"><span>⭕</span> 甜甜圈</button>
-    <button class="ct-btn" onclick="setChartType('type','hbar',this)"><span>📉</span> 橫條對比</button>
+    <button class="ct-btn active" onclick="setChartType('type','line',this)">折線（累積）</button>
+    <button class="ct-btn" onclick="setChartType('type','pie',this)">圓餅圖</button>
+    <button class="ct-btn" onclick="setChartType('type','doughnut',this)">甜甜圈</button>
+    <button class="ct-btn" onclick="setChartType('type','hbar',this)">橫條對比</button>
   </div>
   <div id="type-line-view">
     <div class="chart-section" data-pdf-id="cum-pres" data-pdf-label="處方開立數累積趨勢"><div class="chart-header"><h2 id="cum-pres-title">處方開立數累積趨勢（依週）</h2><button class="dl-btn" onclick="downloadChart(this)">↓ 下載 JPG</button></div><div class="chart-wrap"><canvas id="cumPrescribeChart"></canvas></div></div>
@@ -733,16 +1044,16 @@ footer {
 <div id="tab-typeweekly" class="hidden">
   <div class="period-bar">
     <span class="ct-label">統計單位：</span>
-    <button class="period-btn active" onclick="setPeriod('typeweekly','week',this)"><span>🗓️</span> 週</button>
-    <button class="period-btn" onclick="setPeriod('typeweekly','month',this)"><span>📆</span> 月</button>
+    <button class="period-btn active" onclick="setPeriod('typeweekly','week',this)">週</button>
+    <button class="period-btn" onclick="setPeriod('typeweekly','month',this)">月</button>
     <span id="typeweekly-drill-hint" style="font-size:0.75rem;color:var(--text-muted);margin-left:8px;display:none">💡 點擊月份可展開該月週統計</span>
   </div>
   <div class="chart-type-bar">
     <span class="ct-label">圖表類型：</span>
-    <button class="ct-btn active" onclick="setChartType('typeweekly','line',this)"><span>📈</span> 折線圖</button>
-    <button class="ct-btn" onclick="setChartType('typeweekly','bar',this)"><span>📊</span> 直條群組</button>
-    <button class="ct-btn" onclick="setChartType('typeweekly','area',this)"><span>🏔️</span> 面積圖</button>
-    <button class="ct-btn" onclick="setChartType('typeweekly','hbar',this)"><span>📉</span> 橫條對比</button>
+    <button class="ct-btn active" onclick="setChartType('typeweekly','line',this)">折線圖</button>
+    <button class="ct-btn" onclick="setChartType('typeweekly','bar',this)">直條群組</button>
+    <button class="ct-btn" onclick="setChartType('typeweekly','area',this)">面積圖</button>
+    <button class="ct-btn" onclick="setChartType('typeweekly','hbar',this)">橫條對比</button>
   </div>
   <div id="tw-multi-view">
     <div class="type-grid">
@@ -765,17 +1076,17 @@ footer {
 <!-- ═══ TAB 4：診所分析 ═══ -->
 <div id="tab-clinic" class="hidden">
   <div id="clinic-no-data" class="chart-section" style="text-align:center;color:var(--text-muted);padding:40px;">
-    <div style="font-size:2.5rem;margin-bottom:12px;">🏥</div>
+    <div style="margin-bottom:12px;color:#9dbfb2"><svg class="ic" viewBox="0 0 24 24" style="width:42px;height:42px;stroke-width:1.5"><rect x="4" y="2" width="16" height="20" rx="2"/><path d="M12 6v4"/><path d="M10 8h4"/><path d="M8 22v-4h8v4"/></svg></div>
     <div style="font-weight:700;font-size:1rem;margin-bottom:8px;">尚無診所資料</div>
     <div style="font-size:0.85rem;">請確認 Excel 中有「診所名稱」相關欄位（例如：診所、院所、診所名稱），並重新上傳。</div>
   </div>
   <div id="clinic-content" class="hidden">
     <div class="clinic-sort-bar">
       <span class="ct-label">排序依據：</span>
-      <button class="ct-btn active" onclick="setClinicSort('prescribe',this)"><span>📋</span> 開立數↓</button>
-      <button class="ct-btn" onclick="setClinicSort('enroll',this)"><span>🎓</span> 選課或執行↓</button>
-      <button class="ct-btn" onclick="setClinicSort('rate',this)"><span>📈</span> 比率↓</button>
-      <button class="ct-btn" onclick="setClinicSort('name',this)"><span>🔤</span> 名稱↑</button>
+      <button class="ct-btn active" onclick="setClinicSort('prescribe',this)">開立數↓</button>
+      <button class="ct-btn" onclick="setClinicSort('enroll',this)">選課或執行↓</button>
+      <button class="ct-btn" onclick="setClinicSort('rate',this)">比率↓</button>
+      <button class="ct-btn" onclick="setClinicSort('name',this)">名稱↑</button>
     </div>
     <div class="chart-section" data-pdf-id="clinic-enroll" data-pdf-label="各診所選課或執行筆數">
       <div class="chart-header"><h2>各診所選課或執行筆數（依處方類型堆疊）</h2><button class="dl-btn" onclick="downloadChart(this)">↓ 下載 JPG</button></div>
@@ -858,7 +1169,7 @@ footer {
   <!-- ── 頂層查詢區間(影響:處方類型未完成圖 / 場次狀態圖 / 場次明細表)── -->
   <div style="margin:20px 36px 0;padding:14px 18px;background:linear-gradient(135deg,#f7fbf9,#fff);border-radius:14px;border:1px solid var(--border);box-shadow:var(--shadow-sm)">
     <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;font-size:0.85rem">
-      <span style="font-weight:700;color:var(--teal);white-space:nowrap">🗓️ 查詢區間:</span>
+      <span style="font-weight:700;color:var(--teal);white-space:nowrap">查詢區間:</span>
       <input type="date" id="courseGlobalFrom" oninput="onGlobalDateChange()" style="padding:6px 10px;border-radius:6px;border:1.5px solid var(--border);font-family:inherit;font-size:0.84rem;background:var(--surface);color:var(--text)">
       <span style="color:var(--text-muted)">~</span>
       <input type="date" id="courseGlobalTo" oninput="onGlobalDateChange()" style="padding:6px 10px;border-radius:6px;border:1.5px solid var(--border);font-family:inherit;font-size:0.84rem;background:var(--surface);color:var(--text)">
@@ -872,7 +1183,7 @@ footer {
     <div style="margin-top:10px;padding-top:10px;border-top:1px dashed var(--border);display:flex;gap:14px;align-items:flex-start;flex-wrap:wrap">
       <div id="miniCalendar" style="max-width:340px;flex:1;min-width:280px"></div>
       <div style="flex:1;min-width:200px;font-size:0.78rem;color:var(--text-muted);line-height:1.7;padding-top:4px">
-        <div style="font-weight:700;color:var(--text);margin-bottom:4px">📅 點日曆任一日</div>
+        <div style="font-weight:700;color:var(--text);margin-bottom:4px">點日曆任一日</div>
         <div>· 數字 = 該日 scheduled 場次數</div>
         <div>· <span style="background:var(--teal);color:#fff;padding:1px 6px;border-radius:3px">綠底</span> = 當前選中</div>
         <div>· <span style="border:1.5px solid var(--teal);padding:1px 6px;border-radius:3px">綠框</span> = 今天</div>
@@ -883,22 +1194,37 @@ footer {
 
   <!-- ── KPIs(維持累積總計)── -->
   <div class="summary-grid" style="margin-top:20px">
-    <div class="card blue">  <span class="icon">📅</span><div class="val" id="csTotalSlots">—</div><div class="lbl">總場次</div></div>
-    <div class="card green"> <span class="icon">📝</span><div class="val" id="csTotalEnroll">—</div><div class="lbl">總報名人次</div></div>
-    <div class="card orange"><span class="icon">✅</span><div class="val" id="csTotalAttend">—</div><div class="lbl">總出席人次</div></div>
-    <div class="card purple"><span class="icon">📈</span><div class="val" id="csAttendRate">—</div><div class="lbl">出席率</div></div>
-    <div class="card violet"><span class="icon">🔥</span><div class="val" id="csFullSlots">—</div><div class="lbl">滿座場次</div></div>
+    <div class="card blue">  <span class="icon"><svg class="ic" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg></span><div class="val" id="csTotalSlots">—</div><div class="lbl">總場次</div></div>
+    <div class="card green"> <span class="icon"><svg class="ic" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></span><div class="val" id="csTotalEnroll">—</div><div class="lbl">總報名人次</div></div>
+    <div class="card orange"><span class="icon"><svg class="ic" viewBox="0 0 24 24"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/><polyline points="17 11 19 13 23 9"/></svg></span><div class="val" id="csTotalAttend">—</div><div class="lbl">總出席人次</div></div>
+    <div class="card purple"><span class="icon"><svg class="ic" viewBox="0 0 24 24"><line x1="19" y1="5" x2="5" y2="19"/><circle cx="6.5" cy="6.5" r="2.5"/><circle cx="17.5" cy="17.5" r="2.5"/></svg></span><div class="val" id="csAttendRate">—</div><div class="lbl">出席率</div></div>
+    <div class="card violet"><span class="icon"><svg class="ic" viewBox="0 0 24 24"><path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z"/></svg></span><div class="val" id="csFullSlots">—</div><div class="lbl">滿座場次</div></div>
+  </div>
+
+  <!-- ── 單日課表(查詢區間選到單一日期時顯示,供活動日追蹤) ── -->
+  <div id="daySchedule" class="chart-section" data-collapse-key="daySchedule" style="margin:14px 36px;display:none">
+    <div class="chart-header" style="flex-wrap:wrap;gap:10px">
+      <h2 id="dayScheduleTitle">單日課表</h2>
+      <div style="display:flex;align-items:center;gap:4px">
+        <span style="font-size:0.78rem;color:var(--text-muted)">跟隨頂部「區域篩選」與下方「處方類型／地區／搜尋」</span>
+        <button class="sec-toggle" onclick="toggleSection(this)" title="收合 / 展開"><svg class="ic" viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg></button>
+      </div>
+    </div>
+    <div id="dayScheduleBody"></div>
   </div>
 
   <!-- ── 場次明細(主要交互區,放最上) ── -->
-  <div class="chart-section" style="margin:14px 36px;">
+  <div class="chart-section" data-collapse-key="slotsTable" style="margin:14px 36px;">
     <div class="chart-header" style="flex-wrap:wrap;gap:10px">
-      <h2 style="white-space:nowrap">📋 場次明細(點 📌 置頂、點列展開預約)</h2>
-      <div id="slotsFilterBar" style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
-        <button class="pdf-tab-btn active" data-filter="all" onclick="filterSlotsTable('all',this)">全部(未完成)</button>
-        <button class="pdf-tab-btn" data-filter="scheduled" onclick="filterSlotsTable('scheduled',this)">即將舉辦</button>
-        <button class="pdf-tab-btn" data-filter="cancelled" onclick="filterSlotsTable('cancelled',this)">已取消</button>
-        <button class="pdf-tab-btn" data-filter="completed" onclick="filterSlotsTable('completed',this)">已完成</button>
+      <h2 style="white-space:nowrap">場次明細(點日期列 📌 置頂、點課程列展開預約)</h2>
+      <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+        <div id="slotsFilterBar" style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
+          <button class="pdf-tab-btn active" data-filter="all" onclick="filterSlotsTable('all',this)">全部(未完成)</button>
+          <button class="pdf-tab-btn" data-filter="scheduled" onclick="filterSlotsTable('scheduled',this)">即將舉辦</button>
+          <button class="pdf-tab-btn" data-filter="cancelled" onclick="filterSlotsTable('cancelled',this)">已取消</button>
+          <button class="pdf-tab-btn" data-filter="completed" onclick="filterSlotsTable('completed',this)">已完成</button>
+        </div>
+        <button class="sec-toggle" onclick="toggleSection(this)" title="收合 / 展開"><svg class="ic" viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg></button>
       </div>
     </div>
     <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-top:8px;padding-top:8px;border-top:1px dashed var(--border)">
@@ -923,14 +1249,14 @@ footer {
       </div>
     </div>
     <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-top:8px;margin-bottom:12px">
-      <input type="text" id="slotsFilterSearch" placeholder="🔍 搜尋課程名稱或地點…" oninput="renderSlotsTable()" style="flex:1;min-width:240px;padding:7px 12px;border-radius:8px;border:1.5px solid var(--border);font-family:inherit;font-size:0.86rem;background:var(--surface);color:var(--text);outline:none">
+      <input type="text" id="slotsFilterSearch" placeholder="搜尋課程名稱或地點…" oninput="renderSlotsTable()" style="flex:1;min-width:240px;padding:7px 12px;border-radius:8px;border:1.5px solid var(--border);font-family:inherit;font-size:0.86rem;background:var(--surface);color:var(--text);outline:none">
       <button onclick="clearSlotsAllFilters()" style="padding:6px 10px;border-radius:6px;border:1.5px solid var(--border);background:var(--surface);color:var(--text-muted);font-size:0.78rem;cursor:pointer">清除所有篩選</button>
       <span id="slotsCountBadge" style="margin-left:auto;font-size:0.82rem;color:var(--text-muted)"></span>
     </div>
     <div style="overflow-x:auto;max-height:560px;overflow-y:auto">
       <table class="data-table" style="width:100%;font-size:0.86rem">
-        <thead style="position:sticky;top:0;background:var(--surface);z-index:1">
-          <tr><th style="width:32px"></th><th style="width:38px">📌</th><th>日期</th><th>時間</th><th>課程</th><th>類型</th><th>地點</th><th class="num">已報名</th><th class="num">已到</th><th class="num">容量</th><th class="num">滿座率</th><th class="num">狀態</th></tr>
+        <thead>
+          <tr><th style="width:30px"></th><th style="width:108px">時間</th><th>課程</th><th>類型</th><th>地點</th><th class="num">報名 / 容量</th><th class="num" style="min-width:112px">滿座率</th><th class="num">已到</th><th class="num">狀態</th></tr>
         </thead>
         <tbody id="allSlotsBody"></tbody>
       </table>
@@ -941,7 +1267,7 @@ footer {
   <!-- ── 分析圖表(放下方作為補充) ── -->
   <div class="side-by-side">
     <div class="chart-section" data-pdf-id="course-type-seats" data-pdf-label="各處方類型剩餘可預訂人次">
-      <div class="chart-header"><h2>📊 各處方類型剩餘可預訂(人次)</h2><button class="dl-btn" onclick="downloadChart(this)">↓ 下載 JPG</button></div>
+      <div class="chart-header"><h2>各處方類型剩餘可預訂(人次)</h2><button class="dl-btn" onclick="downloadChart(this)">↓ 下載 JPG</button></div>
       <div class="chart-wrap"><canvas id="courseTypeFillChart"></canvas></div>
     </div>
     <div class="chart-section" data-pdf-id="course-status-pie" data-pdf-label="場次狀態分布">
@@ -951,7 +1277,7 @@ footer {
   </div>
 
   <div class="chart-section" data-pdf-id="course-per-course-seats" data-pdf-label="各課程場次剩餘可預訂人次">
-    <div class="chart-header"><h2>📊 各課程場次剩餘可預訂(人次)</h2><button class="dl-btn" onclick="downloadChart(this)">↓ 下載 JPG</button></div>
+    <div class="chart-header"><h2>各課程場次剩餘可預訂(人次)</h2><button class="dl-btn" onclick="downloadChart(this)">↓ 下載 JPG</button></div>
     <div class="chart-wrap" id="coursePerCourseWrap" style="height:auto"><canvas id="coursePerCourseChart"></canvas></div>
     <div id="coursePerCourseEmpty" style="display:none;padding:24px;text-align:center;color:var(--text-muted)">此區間沒有即將舉辦的場次</div>
   </div>
@@ -961,7 +1287,7 @@ footer {
 <div id="notes-modal-overlay" onclick="closeNotesEditorOutside(event)" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:100;align-items:flex-start;justify-content:center;padding:40px 20px;overflow-y:auto">
   <div style="background:var(--surface);border-radius:14px;max-width:760px;width:100%;box-shadow:var(--shadow-lg);max-height:calc(100vh - 80px);display:flex;flex-direction:column">
     <div style="display:flex;justify-content:space-between;align-items:center;padding:18px 24px;border-bottom:1.5px solid var(--border)">
-      <h3 style="font-size:1.08rem;font-weight:800;color:var(--text);display:flex;align-items:center;gap:8px;margin:0">📝 編輯各診所備註</h3>
+      <h3 style="font-size:1.08rem;font-weight:800;color:var(--text);display:flex;align-items:center;gap:8px;margin:0"><svg class="ic" viewBox="0 0 24 24" style="color:#b3620a"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>編輯各診所備註</h3>
       <button onclick="closeNotesEditor()" style="background:none;border:none;font-size:1.4rem;color:var(--text-muted);cursor:pointer;line-height:1">✕</button>
     </div>
     <div style="padding:14px 24px 0;font-size:0.82rem;color:var(--text-muted);line-height:1.5">
@@ -977,7 +1303,7 @@ footer {
   </div>
 </div>
 
-<footer>健康處方開立統計儀表板 &nbsp;·&nbsp; ⬡ 資料儲存於 Supabase &nbsp;·&nbsp; ◈ 圖表由 Chart.js 製作</footer>
+<footer>健康處方開立統計儀表板 &nbsp;·&nbsp; 資料儲存於 Supabase &nbsp;·&nbsp; 圖表由 Chart.js 製作</footer>
 
 <!-- ══════════════════════════════════
      ★ PDF Modal
@@ -985,13 +1311,13 @@ footer {
 <div id="pdf-modal-overlay" onclick="closePdfModalOutside(event)">
   <div id="pdf-modal">
     <div class="pdf-modal-header">
-      <h3>📑 選擇要匯出的圖表</h3>
+      <h3><svg class="ic" viewBox="0 0 24 24" style="color:var(--teal)"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>選擇要匯出的圖表</h3>
       <button class="pdf-modal-close" onclick="closePdfModal()">✕</button>
     </div>
     <div class="pdf-modal-body">
       <!-- 區域選擇（多選）-->
       <div id="pdf-region-filter" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px;padding-bottom:12px;border-bottom:1.5px solid var(--border);align-items:center">
-        <span style="font-size:0.82rem;font-weight:700;color:var(--teal);margin-right:4px;white-space:nowrap">🏘️ 包含區域：</span>
+        <span style="font-size:0.82rem;font-weight:700;color:var(--teal);margin-right:4px;white-space:nowrap">包含區域：</span>
         <button type="button" class="pdf-tab-btn active" data-region="all" onclick="togglePdfRegion('all',this)">全部</button>
         <button type="button" class="pdf-tab-btn" data-region="北投區" onclick="togglePdfRegion('北投區',this)">北投區</button>
         <button type="button" class="pdf-tab-btn" data-region="士林區" onclick="togglePdfRegion('士林區',this)">士林區</button>
@@ -1001,26 +1327,26 @@ footer {
       <!-- 頁籤篩選列 -->
       <div class="pdf-tab-filter" id="pdf-tab-filter">
         <button class="pdf-tab-btn active" onclick="setPdfFilter('all',this)">全部</button>
-        <button class="pdf-tab-btn" onclick="setPdfFilter('weekly',this)">📂 每週趨勢</button>
-        <button class="pdf-tab-btn" onclick="setPdfFilter('daily',this)">📆 單月每日</button>
-        <button class="pdf-tab-btn" onclick="setPdfFilter('type',this)">📊 開立分析</button>
-        <button class="pdf-tab-btn" onclick="setPdfFilter('typeweekly',this)">🔎 週趨勢細項</button>
-        <button class="pdf-tab-btn" onclick="setPdfFilter('clinic',this)">🏥 診所分析</button>
-        <button class="pdf-tab-btn" onclick="setPdfFilter('prescday',this)">📅 處方日執行數</button>
+        <button class="pdf-tab-btn" onclick="setPdfFilter('weekly',this)">每週趨勢</button>
+        <button class="pdf-tab-btn" onclick="setPdfFilter('daily',this)">單月每日</button>
+        <button class="pdf-tab-btn" onclick="setPdfFilter('type',this)">開立分析</button>
+        <button class="pdf-tab-btn" onclick="setPdfFilter('typeweekly',this)">週趨勢細項</button>
+        <button class="pdf-tab-btn" onclick="setPdfFilter('clinic',this)">診所分析</button>
+        <button class="pdf-tab-btn" onclick="setPdfFilter('prescday',this)">處方日執行數</button>
       </div>
       <!-- 全選 / 全不選（針對目前篩選範圍） -->
       <div class="pdf-select-all-row">
-        <button class="pdf-sel-btn" onclick="pdfSelectFiltered(true)">✅ 全選（此分類）</button>
-        <button class="pdf-sel-btn" onclick="pdfSelectFiltered(false)">☐ 全不選（此分類）</button>
-        <button class="pdf-sel-btn" onclick="pdfSelectAll(false)">🗑 清空所有</button>
-        <button class="pdf-sel-btn" onclick="pdfLoadLastSelection()">🔁 帶入前次選擇</button>
+        <button class="pdf-sel-btn" onclick="pdfSelectFiltered(true)">全選（此分類）</button>
+        <button class="pdf-sel-btn" onclick="pdfSelectFiltered(false)">全不選（此分類）</button>
+        <button class="pdf-sel-btn" onclick="pdfSelectAll(false)">清空所有</button>
+        <button class="pdf-sel-btn" onclick="pdfLoadLastSelection()">帶入前次選擇</button>
       </div>
       <div id="pdf-checklist"></div>
     </div>
     <div class="pdf-modal-footer">
       <div class="pdf-selected-count">已選 <span id="pdf-sel-count">0</span> 張圖表</div>
       <button class="pdf-confirm-btn" id="pdf-confirm-btn" onclick="startPdfExport()">
-        📥 開始匯出 PDF
+        <svg class="ic" viewBox="0 0 24 24" style="width:15px;height:15px"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg> 開始匯出 PDF
       </button>
     </div>
   </div>
@@ -1032,12 +1358,12 @@ footer {
 <div id="region-modal-overlay" onclick="closeRegionModalOutside(event)">
   <div id="region-modal">
     <div style="padding:20px 24px 16px;border-bottom:1.5px solid var(--border);display:flex;align-items:center;justify-content:space-between;background:linear-gradient(135deg,#f0fbf7,#e8f6fd)">
-      <h3 style="font-size:1.05rem;font-weight:800;color:var(--text);display:flex;align-items:center;gap:8px">📍 設定診所分區</h3>
+      <h3 style="font-size:1.05rem;font-weight:800;color:var(--text);display:flex;align-items:center;gap:8px"><svg class="ic" viewBox="0 0 24 24" style="color:var(--teal)"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg>設定診所分區</h3>
       <button onclick="closeRegionModal()" style="width:30px;height:30px;border-radius:50%;border:1.5px solid var(--border);background:var(--surface);color:var(--text-muted);font-size:1.1rem;cursor:pointer">✕</button>
     </div>
     <div id="region-modal-body" style="padding:18px 24px;overflow-y:auto;flex:1"></div>
     <div style="padding:14px 24px;border-top:1.5px solid var(--border);display:flex;align-items:center;justify-content:space-between;gap:12px;background:#f8fffe">
-      <button onclick="clearRegionMap()" style="padding:8px 16px;border-radius:var(--radius-sm);border:1.5px solid #fca5a5;background:#fff;color:#dc2626;font-size:0.85rem;font-family:inherit;font-weight:700;cursor:pointer">🗑 清除對照表</button>
+      <button onclick="clearRegionMap()" style="padding:8px 16px;border-radius:var(--radius-sm);border:1.5px solid #fca5a5;background:#fff;color:#dc2626;font-size:0.85rem;font-family:inherit;font-weight:700;cursor:pointer">清除對照表</button>
       <button onclick="closeRegionModal()" style="padding:8px 22px;border-radius:var(--radius-sm);background:linear-gradient(135deg,#2aac8a,#1a9fbe);color:#fff;font-size:0.88rem;font-family:inherit;font-weight:700;border:none;cursor:pointer">完成</button>
     </div>
   </div>
@@ -1046,7 +1372,7 @@ footer {
 <!-- PDF 進度遮罩 -->
 <div id="pdf-progress-overlay">
   <div class="pdf-progress-box">
-    <span class="spin">⚙️</span>
+    <span class="spin" style="color:var(--teal);display:inline-flex;justify-content:center"><svg class="ic" viewBox="0 0 24 24" style="width:36px;height:36px"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg></span>
     <p id="pdf-progress-msg">準備中…</p>
     <small id="pdf-progress-sub">請稍候，正在擷取圖表</small>
     <div class="pdf-prog-bar-wrap">
@@ -1054,6 +1380,8 @@ footer {
     </div>
   </div>
 </div>
+
+</div><!-- /main -->
 
 <script>
 // ══════════════════════════════════════════════
@@ -1072,10 +1400,23 @@ if (isConfigured) {
   document.getElementById("setup-banner").style.display = "none";
 }
 
-// 全域關閉 Chart.js 動畫（確保截圖時圖表完整渲染）
+// Chart.js 統一視覺主題 + 生長動畫（PDF 匯出/自動同步時暫時關閉）
 if (typeof Chart !== 'undefined') {
-  Chart.defaults.animation = false;
+  Chart.defaults.animation = { duration: 700, easing: 'easeOutQuart' };
+  Chart.defaults.font.family = "'Noto Sans TC','Noto Sans TC','Microsoft JhengHei',sans-serif";
+  Chart.defaults.color = '#56716a';
+  Chart.defaults.plugins.tooltip.backgroundColor = 'rgba(15,38,31,0.92)';
+  Chart.defaults.plugins.tooltip.titleColor = '#ffffff';
+  Chart.defaults.plugins.tooltip.bodyColor = '#d9efe6';
+  Chart.defaults.plugins.tooltip.cornerRadius = 9;
+  Chart.defaults.plugins.tooltip.padding = 10;
+  Chart.defaults.plugins.tooltip.boxPadding = 5;
+  Chart.defaults.plugins.tooltip.titleFont = { weight: '700' };
+  Chart.defaults.plugins.legend.labels.usePointStyle = true;
+  Chart.defaults.plugins.legend.labels.pointStyleWidth = 10;
 }
+// 首次載入顯示骨架動畫,等雲端資料回來後移除
+if (isConfigured) document.body.classList.add('is-loading');
 
 // ══════════════════════════════════════════════
 //  色彩常數
@@ -1086,7 +1427,7 @@ const PIE_COLORS    = ['#8fba2e','#2aac8a','#1a9fbe','#1a7ea0'];
 const CLINIC_COLORS = ['#2aac8a','#1a9fbe','#8fba2e','#1a7ea0','#e8930a','#7c3aed','#db2777','#0891b2','#65a30d','#b45309','#6366f1','#14b8a6','#f59e0b','#ef4444','#84cc16','#06b6d4','#8b5cf6','#f97316','#10b981','#3b82f6'];
 const DATE_COLORS   = ['#2aac8a','#e8930a','#7c3aed','#db2777','#0891b2','#65a30d','#b45309','#6366f1','#1a9fbe','#8fba2e'];
 const DATE_COLORS_A = ['rgba(42,172,138,0.72)','rgba(232,147,10,0.72)','rgba(124,58,237,0.72)','rgba(219,39,119,0.72)','rgba(8,145,178,0.72)','rgba(101,163,13,0.72)','rgba(180,83,9,0.72)','rgba(99,102,241,0.72)','rgba(26,159,190,0.72)','rgba(143,186,46,0.72)'];
-const defaultFont = {family:"'Microsoft JhengHei','Noto Sans TC',sans-serif", size:14};
+const defaultFont = {family:"'Noto Sans TC','Microsoft JhengHei',sans-serif", size:13};
 // 註冊 datalabels 插件,但預設不顯示;只有特定 chart 顯式 opt-in 才會顯示數字
 // (避免其他分頁的圖被加上重複的數字)
 if(window.ChartDataLabels){
@@ -1132,12 +1473,14 @@ function setCloudStatus(state, msg) {
   const bar = document.getElementById('cloud-bar');
   bar.className = state;
   document.getElementById('cloud-msg').textContent = msg;
+  bar.title = msg; // 過長時 hover 可看全文
+  if (state !== 'loading') document.body.classList.remove('is-loading');
 }
 
 // ══════════════════════════════════════════════
 //  從 Supabase 讀取資料
 // ══════════════════════════════════════════════
-async function loadFromCloud() {
+async function loadFromCloud(auto) {
   if (!sbClient) {
     setCloudStatus('error', '⚠️ 尚未設定 Supabase，請參考設定教學填入 URL 和 Key');
     return;
@@ -1197,8 +1540,12 @@ async function loadFromCloud() {
     document.getElementById('headerDesc').textContent =
       `資料區間：${dr}　｜　共 ${weeklyData.reduce((s,d)=>s+d.開立數,0).toLocaleString()} 筆處方紀錄`;
     setCloudStatus('', `✦ 已載入最新資料　來源：${fn}　上傳時間：${at}`);
+    // 自動背景同步時不重播圖表生長動畫,避免每 5 分鐘晃一次
+    const _prevAnim = (typeof Chart !== 'undefined') ? Chart.defaults.animation : null;
+    if (auto && typeof Chart !== 'undefined') Chart.defaults.animation = false;
     updateSummary();
     buildAllCharts();
+    if (auto && typeof Chart !== 'undefined') Chart.defaults.animation = _prevAnim;
     trackDailyUpdate();
   } catch(e) {
     setCloudStatus('error', '❌ 連線失敗，請確認網路及 Supabase 設定');
@@ -1217,9 +1564,9 @@ async function triggerManualSync() {
   const btn = document.getElementById('manualSyncBtn');
   if (!btn || btn.disabled) return;
 
-  const origLabel = '🔄 立即同步';
+  const origLabel = '立即同步';
   btn.disabled = true;
-  btn.textContent = '⏳ 送出中…';
+  btn.textContent = '送出中…';
 
   // 先看看有沒有人「最近 90 秒內」按過,有就跟著輪詢同一筆
   // (時間下限是為了避免跟到 n8n 沒啟動時遺留的 stale pending,否則會一直等到 timeout)
@@ -1285,8 +1632,8 @@ async function triggerManualSync() {
         setCloudStatus('error', '❌ 同步失敗:' + (data.error_message || '未知錯誤,請查 n8n executions'));
       } else {
         btn.textContent = data.status === 'running'
-          ? `⏳ 抓取中…(${elapsed}s)`
-          : `⏳ 等待 n8n…(${elapsed}s)`;
+          ? `抓取中…(${elapsed}s)`
+          : `等待 n8n…(${elapsed}s)`;
       }
     } catch (e) { /* 連線抖動就下次再試 */ }
   }, 3000);
@@ -1378,7 +1725,7 @@ const barLabelPlugin = {
       meta.data.forEach((bar,i) => {
         const val = ds.data[i]; if(!val) return;
         ctx.save();
-        ctx.font = `600 13px 'Microsoft JhengHei',sans-serif`;
+        ctx.font = `600 13px 'Noto Sans TC','Microsoft JhengHei',sans-serif`;
         ctx.fillStyle = '#4a5568';
         const isH = chart.options.indexAxis === 'y';
         if(isH){ ctx.textAlign='left'; ctx.textBaseline='middle'; ctx.fillText(val, bar.x+4, bar.y); }
@@ -1398,7 +1745,7 @@ const lineLabelPlugin = {
       meta.data.forEach((pt,i) => {
         const val = ds.data[i]; if(!val) return;
         ctx.save();
-        ctx.font = `600 13px 'Microsoft JhengHei',sans-serif`;
+        ctx.font = `600 13px 'Noto Sans TC','Microsoft JhengHei',sans-serif`;
         ctx.fillStyle = ds.borderColor || '#4a5568';
         ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
         ctx.fillText(val, pt.x, pt.y-7);
@@ -1414,13 +1761,50 @@ const lineLabelPlugin = {
 function destroyChart(key){ if(chartInstances[key]){ try{chartInstances[key].destroy();}catch(e){} delete chartInstances[key]; } }
 function xyScales(isH=false){
   return isH
-    ? {x:{ticks:{font:defaultFont},beginAtZero:true,grid:{color:'#e2e8f0'}}, y:{ticks:{font:defaultFont},grid:{display:false}}}
-    : {x:{ticks:{font:defaultFont},grid:{display:false}}, y:{ticks:{font:defaultFont},beginAtZero:true,grid:{color:'#e2e8f0'}}};
+    ? {x:{ticks:{font:defaultFont},beginAtZero:true,grid:{color:'#e3eee8'}}, y:{ticks:{font:defaultFont},grid:{display:false}}}
+    : {x:{ticks:{font:defaultFont},grid:{display:false}}, y:{ticks:{font:defaultFont},beginAtZero:true,grid:{color:'#e3eee8'}}};
 }
 function getRegionOfClinic(name){
   if(!name) return '未分區';
   const key = name.toString().trim();
   return clinicRegionMap[key] || '未分區';
+}
+
+// ══════════════════════════════════════════════
+//  數字 count-up 動畫（值沒變就不重播）
+// ══════════════════════════════════════════════
+const _animTimers = {};
+function setAnimatedText(id, finalText){
+  const el = document.getElementById(id);
+  if(!el) return;
+  finalText = String(finalText);
+  if(el.dataset.prevText === finalText) return;
+  const isUpdate = el.dataset.prevText !== undefined; // 非首次,代表資料有變
+  el.dataset.prevText = finalText;
+  if(_animTimers[id]) cancelAnimationFrame(_animTimers[id]);
+  // 資料更新時讓所屬卡片發出脈衝光圈
+  if(isUpdate){
+    const card = el.closest('.card');
+    if(card){ card.classList.remove('pulse'); void card.offsetWidth; card.classList.add('pulse'); }
+  }
+  const m = finalText.match(/^([^0-9]*)([0-9][0-9,]*(?:\.[0-9]+)?)(.*)$/);
+  if(!m){ el.textContent = finalText; delete el.dataset.prevNum; return; }
+  const target = parseFloat(m[2].replace(/,/g,''));
+  if(!isFinite(target)){ el.textContent = finalText; return; }
+  const fromVal = parseFloat(el.dataset.prevNum || '0') || 0; // 從上次的值滾動,首次從 0
+  el.dataset.prevNum = target;
+  const decimals = (m[2].split('.')[1]||'').length;
+  const useGrouping = m[2].includes(',');
+  const start = performance.now(), dur = 650;
+  const frame = (now)=>{
+    const t = Math.min(1, (now-start)/dur);
+    const eased = 1 - Math.pow(1-t, 3);
+    const v = fromVal + (target - fromVal) * eased;
+    el.textContent = m[1] + v.toLocaleString('en-US',{minimumFractionDigits:decimals,maximumFractionDigits:decimals,useGrouping}) + m[3];
+    if(t < 1) _animTimers[id] = requestAnimationFrame(frame);
+    else { el.textContent = finalText; delete _animTimers[id]; }
+  };
+  _animTimers[id] = requestAnimationFrame(frame);
 }
 
 // ══════════════════════════════════════════════
@@ -1431,9 +1815,9 @@ function updateSummary(){
   const exec    = weeklyData.reduce((s,d)=>s+d.執行數,0);
   const rate    = total>0?(exec/total*100).toFixed(1):0;
   const enroll  = clinicStats.reduce((s,d)=>s+(d.選課或執行||0),0);
-  document.getElementById('sumTotal').textContent   = total.toLocaleString();
-  document.getElementById('sumExec').textContent    = exec.toLocaleString();
-  document.getElementById('sumRate').textContent    = rate+'%';
+  setAnimatedText('sumTotal', total.toLocaleString());
+  setAnimatedText('sumExec',  exec.toLocaleString());
+  setAnimatedText('sumRate',  rate+'%');
   // 統計週/月數：依當前分頁選擇的單位顯示;非時間相關分頁維持週
   const activePeriod = (currentActiveTab && currentPeriod[currentActiveTab]) || 'week';
   const useMonth = activePeriod === 'month';
@@ -1443,7 +1827,7 @@ function updateSummary(){
     const lbl = countCard.parentElement && countCard.parentElement.querySelector('.lbl');
     if(lbl) lbl.textContent = useMonth ? '統計月數' : '統計週數';
   }
-  document.getElementById('sumEnroll').textContent  = enroll > 0 ? enroll.toLocaleString() : '—';
+  setAnimatedText('sumEnroll', enroll > 0 ? enroll.toLocaleString() : '—');
   // 今日增量(從 rawRows 算當日 prescDate / execDate,不受任何 UI 篩選影響)
   const t = new Date();
   const todayStr = `${t.getFullYear()}-${String(t.getMonth()+1).padStart(2,'0')}-${String(t.getDate()).padStart(2,'0')}`;
@@ -1757,7 +2141,7 @@ function buildTypeCharts(mode){
         plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>` ${label}：${c.parsed.y} 筆`}}},
         scales:{
           x:{ticks:{font:defaultFont},grid:{display:false}},
-          y:{ticks:{font:defaultFont},min:0,beginAtZero:true,grid:{color:'#e2e8f0'}}
+          y:{ticks:{font:defaultFont},min:0,beginAtZero:true,grid:{color:'#e3eee8'}}
         }
       }
     });
@@ -1773,9 +2157,9 @@ function buildTypeCharts(mode){
         const arcSize=arc.endAngle-arc.startAngle;if(arcSize<0.25)return;
         const angle=(arc.startAngle+arc.endAngle)/2,radius=(arc.innerRadius+arc.outerRadius)/2;
         const x=arc.x+Math.cos(angle)*radius,y=arc.y+Math.sin(angle)*radius;
-        ctx.save();ctx.font=`700 11px 'Microsoft JhengHei',sans-serif`;ctx.fillStyle='#fff';ctx.textAlign='center';ctx.textBaseline='middle';
+        ctx.save();ctx.font=`700 11px 'Noto Sans TC','Microsoft JhengHei',sans-serif`;ctx.fillStyle='#fff';ctx.textAlign='center';ctx.textBaseline='middle';
         ctx.shadowColor='rgba(0,0,0,0.35)';ctx.shadowBlur=3;
-        ctx.fillText(val.toLocaleString(),x,y-7);ctx.font=`600 10px 'Microsoft JhengHei',sans-serif`;
+        ctx.fillText(val.toLocaleString(),x,y-7);ctx.font=`600 10px 'Noto Sans TC','Microsoft JhengHei',sans-serif`;
         ctx.fillText((val/total*100).toFixed(1)+'%',x,y+7);ctx.restore();
       });
     }};
@@ -1794,7 +2178,7 @@ function buildTypeCharts(mode){
     chartInstances['hbarRate']=new Chart(document.getElementById('hbarRateChart').getContext('2d'),{
       type:'bar',plugins:[barLabelPlugin],
       data:{labels:types,datasets:[{label:'執行率%',data:typeStats.map(d=>d.執行率),backgroundColor:TYPE_COLORS_A,borderColor:TYPE_COLORS,borderWidth:1.5,borderRadius:4}]},
-      options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,layout:{padding:{right:52}},plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>` 執行率：${c.parsed.x}%`}}},scales:{x:{ticks:{font:defaultFont,callback:v=>v+'%'},max:100,beginAtZero:true,grid:{color:'#e2e8f0'}},y:{ticks:{font:defaultFont},grid:{display:false}}}}
+      options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,layout:{padding:{right:52}},plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>` 執行率：${c.parsed.x}%`}}},scales:{x:{ticks:{font:defaultFont,callback:v=>v+'%'},max:100,beginAtZero:true,grid:{color:'#e3eee8'}},y:{ticks:{font:defaultFont},grid:{display:false}}}}
     });
   }
 }
@@ -1837,7 +2221,7 @@ function buildTypeWeeklyCharts(mode){
       chartInstances['twHbar'+i]=new Chart(document.getElementById(canvasId).getContext('2d'),{
         type:'bar',plugins:[barLabelPlugin],
         data:{labels:revLabels,datasets:[{label:'開立數',data:[...presData].reverse(),backgroundColor:'rgba(42,172,138,0.85)',borderRadius:4},{label:'執行數',data:[...execData].reverse(),backgroundColor:'rgba(232,147,10,0.85)',borderRadius:4}]},
-        options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,layout:{padding:{right:48}},plugins:{legend:{position:'top',labels:{font:smFont,boxWidth:12,padding:8}},tooltip:{callbacks:{label:c=>` ${c.dataset.label}：${c.parsed.x} 筆`}}},scales:{x:{ticks:{font:smFont},beginAtZero:true,grid:{color:'#e2e8f0'}},y:{ticks:{font:smFont,autoSkip:false,maxTicksLimit:999},grid:{display:false}}},onClick:makeClickHandler(revLabels,i)}
+        options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,layout:{padding:{right:48}},plugins:{legend:{position:'top',labels:{font:smFont,boxWidth:12,padding:8}},tooltip:{callbacks:{label:c=>` ${c.dataset.label}：${c.parsed.x} 筆`}}},scales:{x:{ticks:{font:smFont},beginAtZero:true,grid:{color:'#e3eee8'}},y:{ticks:{font:smFont,autoSkip:false,maxTicksLimit:999},grid:{display:false}}},onClick:makeClickHandler(revLabels,i)}
       });
     });
     return;
@@ -1853,7 +2237,7 @@ function buildTypeWeeklyCharts(mode){
       chartInstances['tw'+i]=new Chart(document.getElementById(canvasId).getContext('2d'),{
         type:'bar',plugins:[barLabelPlugin],
         data:{labels:weeks,datasets:[{label:'開立數',data:presData,backgroundColor:'rgba(42,172,138,0.85)',borderRadius:4},{label:'執行數',data:execData,backgroundColor:'rgba(232,147,10,0.85)',borderRadius:4}]},
-        options:{responsive:true,maintainAspectRatio:false,layout:{padding:{top:20}},plugins:{legend:{position:'top',labels:{font:smFont,boxWidth:12,padding:8}},tooltip:{callbacks:{label:c=>` ${c.dataset.label}：${c.parsed.y} 筆`}}},scales:{x:{ticks:{font:smFont,maxRotation:45,autoSkip:false,maxTicksLimit:999},grid:{display:false}},y:{ticks:{font:smFont},beginAtZero:true,grid:{color:'#e2e8f0'}}},onClick:makeClickHandler(weeks,i)}
+        options:{responsive:true,maintainAspectRatio:false,layout:{padding:{top:20}},plugins:{legend:{position:'top',labels:{font:smFont,boxWidth:12,padding:8}},tooltip:{callbacks:{label:c=>` ${c.dataset.label}：${c.parsed.y} 筆`}}},scales:{x:{ticks:{font:smFont,maxRotation:45,autoSkip:false,maxTicksLimit:999},grid:{display:false}},y:{ticks:{font:smFont},beginAtZero:true,grid:{color:'#e3eee8'}}},onClick:makeClickHandler(weeks,i)}
       });
     } else {
       chartInstances['tw'+i]=new Chart(document.getElementById(canvasId).getContext('2d'),{
@@ -1862,7 +2246,7 @@ function buildTypeWeeklyCharts(mode){
           {label:'開立數',data:presData,borderColor:'#2aac8a',backgroundColor:'rgba(42,172,138,0.10)',pointRadius:4,pointBackgroundColor:'#2aac8a',pointBorderColor:'#fff',pointBorderWidth:2,tension:0,borderWidth:2,fill:isFill},
           {label:'執行數',data:execData,borderColor:'#e8930a',backgroundColor:'rgba(232,147,10,0.10)',pointRadius:4,pointBackgroundColor:'#e8930a',pointBorderColor:'#fff',pointBorderWidth:2,tension:0,borderWidth:2,fill:isFill}
         ]},
-        options:{responsive:true,maintainAspectRatio:false,layout:{padding:{top:24}},plugins:{legend:{position:'top',labels:{font:smFont,boxWidth:12,padding:8}},tooltip:{callbacks:{label:c=>` ${c.dataset.label}：${c.parsed.y} 筆`}}},scales:{x:{ticks:{font:smFont,maxRotation:45,autoSkip:false,maxTicksLimit:999},grid:{display:false}},y:{ticks:{font:smFont},beginAtZero:true,grid:{color:'#e2e8f0'}}},onClick:makeClickHandler(weeks,i)}
+        options:{responsive:true,maintainAspectRatio:false,layout:{padding:{top:24}},plugins:{legend:{position:'top',labels:{font:smFont,boxWidth:12,padding:8}},tooltip:{callbacks:{label:c=>` ${c.dataset.label}：${c.parsed.y} 筆`}}},scales:{x:{ticks:{font:smFont,maxRotation:45,autoSkip:false,maxTicksLimit:999},grid:{display:false}},y:{ticks:{font:smFont},beginAtZero:true,grid:{color:'#e3eee8'}}},onClick:makeClickHandler(weeks,i)}
       });
     }
   });
@@ -1975,7 +2359,7 @@ function buildClinicCharts() {
     chartInstances['clinicEnroll'] = new Chart(document.getElementById('clinicEnrollChart').getContext('2d'), {
       type: 'bar', plugins: [stackedTotalLabelPlugin],
       data: { labels: names, datasets: enrollDatasets },
-      options: { responsive: true, maintainAspectRatio: false, layout: { padding: { top: 30 } }, plugins: { legend: { position:'top', labels:{font:defaultFont, boxWidth:14, padding:10} }, tooltip: { callbacks: { label: c => ` ${c.dataset.label}:${c.parsed.y} 筆` } } }, scales: { y: { stacked:true, ticks:{font:defaultFont}, beginAtZero:true, grid:{color:'#e2e8f0'} }, x: { stacked:true, ticks:{font:Object.assign({}, defaultFont, {size:12}), autoSkip:false, maxRotation:45, minRotation:45}, grid:{display:false} } } }
+      options: { responsive: true, maintainAspectRatio: false, layout: { padding: { top: 30 } }, plugins: { legend: { position:'top', labels:{font:defaultFont, boxWidth:14, padding:10} }, tooltip: { callbacks: { label: c => ` ${c.dataset.label}:${c.parsed.y} 筆` } } }, scales: { y: { stacked:true, ticks:{font:defaultFont}, beginAtZero:true, grid:{color:'#e3eee8'} }, x: { stacked:true, ticks:{font:Object.assign({}, defaultFont, {size:12}), autoSkip:false, maxRotation:45, minRotation:45}, grid:{display:false} } } }
     });
   } else {
     const enrollColors = enrollData.map(v => {
@@ -1986,19 +2370,19 @@ function buildClinicCharts() {
     chartInstances['clinicEnroll'] = new Chart(document.getElementById('clinicEnrollChart').getContext('2d'), {
       type: 'bar', plugins: [barLabelPlugin],
       data: { labels: names, datasets: [{ label: '選課人次', data: enrollData, backgroundColor: enrollColors, borderColor: '#7c3aed', borderWidth: 1, borderRadius: 4 }] },
-      options: { responsive: true, maintainAspectRatio: false, layout: { padding: { top: 30 } }, plugins: { legend: { display: false }, tooltip: { callbacks: { label: c => ` 選課或執行:${c.parsed.y} 筆` } } }, scales: { y: { ticks:{font:defaultFont}, beginAtZero:true, grid:{color:'#e2e8f0'} }, x: { ticks:{font:Object.assign({}, defaultFont, {size:12}), autoSkip:false, maxRotation:45, minRotation:45}, grid:{display:false} } } }
+      options: { responsive: true, maintainAspectRatio: false, layout: { padding: { top: 30 } }, plugins: { legend: { display: false }, tooltip: { callbacks: { label: c => ` 選課或執行:${c.parsed.y} 筆` } } }, scales: { y: { ticks:{font:defaultFont}, beginAtZero:true, grid:{color:'#e3eee8'} }, x: { ticks:{font:Object.assign({}, defaultFont, {size:12}), autoSkip:false, maxRotation:45, minRotation:45}, grid:{display:false} } } }
     });
   }
   chartInstances['clinicBar'] = new Chart(document.getElementById('clinicBarChart').getContext('2d'), {
     type: 'bar', plugins: [barLabelPlugin],
     data: { labels: names, datasets: [ { label:'開立數', data:presData, backgroundColor:'rgba(42,172,138,0.82)', borderRadius:4 }, { label:'選課或執行', data:enrollData, backgroundColor:'rgba(124,58,237,0.75)', borderRadius:4 } ] },
-    options: { responsive: true, maintainAspectRatio: false, layout: { padding: { top: 30 } }, plugins: { legend: { position:'top', labels:{font:defaultFont} }, tooltip: { callbacks: { label: c => ` ${c.dataset.label}：${c.parsed.y} 筆` } } }, scales: { y: { ticks:{font:defaultFont}, beginAtZero:true, grid:{color:'#e2e8f0'} }, x: { ticks:{font:Object.assign({}, defaultFont, {size:12}), autoSkip:false, maxRotation:45, minRotation:45}, grid:{display:false} } } }
+    options: { responsive: true, maintainAspectRatio: false, layout: { padding: { top: 30 } }, plugins: { legend: { position:'top', labels:{font:defaultFont} }, tooltip: { callbacks: { label: c => ` ${c.dataset.label}：${c.parsed.y} 筆` } } }, scales: { y: { ticks:{font:defaultFont}, beginAtZero:true, grid:{color:'#e3eee8'} }, x: { ticks:{font:Object.assign({}, defaultFont, {size:12}), autoSkip:false, maxRotation:45, minRotation:45}, grid:{display:false} } } }
   });
   const bgColors = rateData.map(r => { const alpha = 0.35 + (r / 100) * 0.55; return `rgba(42,172,138,${alpha.toFixed(2)})`; });
   chartInstances['clinicRate'] = new Chart(document.getElementById('clinicRateChart').getContext('2d'), {
     type: 'bar', plugins: [barLabelPlugin],
     data: { labels: names, datasets: [{ label: '執行率%', data: rateData, backgroundColor: bgColors, borderColor: '#2aac8a', borderWidth: 1, borderRadius: 4 }] },
-    options: { responsive: true, maintainAspectRatio: false, layout: { padding: { top: 30 } }, plugins: { legend: { display: false }, tooltip: { callbacks: { label: c => ` 選課或執行比率：${c.parsed.y}%` } } }, scales: { y: { ticks:{font:defaultFont, callback:v=>v+'%'}, max:100, beginAtZero:true, grid:{color:'#e2e8f0'} }, x: { ticks:{font:Object.assign({}, defaultFont, {size:12}), autoSkip:false, maxRotation:45, minRotation:45}, grid:{display:false} } } }
+    options: { responsive: true, maintainAspectRatio: false, layout: { padding: { top: 30 } }, plugins: { legend: { display: false }, tooltip: { callbacks: { label: c => ` 選課或執行比率：${c.parsed.y}%` } } }, scales: { y: { ticks:{font:defaultFont, callback:v=>v+'%'}, max:100, beginAtZero:true, grid:{color:'#e3eee8'} }, x: { ticks:{font:Object.assign({}, defaultFont, {size:12}), autoSkip:false, maxRotation:45, minRotation:45}, grid:{display:false} } } }
   });
   buildClinicTable(sorted);
 }
@@ -2142,12 +2526,12 @@ function openWeeklyDrill(which, monthLbl){
   chartInstances['weeklyDrillPres'] = new Chart(document.getElementById('weeklyDrillPresChart').getContext('2d'),{
     type:'bar', plugins:[barLabelPlugin],
     data:{labels,datasets:[{label:'開立數',data:presData,backgroundColor:'rgba(42,172,138,0.75)',borderColor:'#2aac8a',borderWidth:1.5,borderRadius:5}]},
-    options:{responsive:true,maintainAspectRatio:false,layout:{padding:{top:18}},plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>` 開立數：${c.parsed.y} 筆`}}},scales:{x:{ticks:{font:{size:10}},grid:{display:false}},y:{ticks:{font:{size:10}},beginAtZero:true,grid:{color:'#e2e8f0'}}}}
+    options:{responsive:true,maintainAspectRatio:false,layout:{padding:{top:18}},plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>` 開立數：${c.parsed.y} 筆`}}},scales:{x:{ticks:{font:{size:10}},grid:{display:false}},y:{ticks:{font:{size:10}},beginAtZero:true,grid:{color:'#e3eee8'}}}}
   });
   chartInstances['weeklyDrillExec'] = new Chart(document.getElementById('weeklyDrillExecChart').getContext('2d'),{
     type:'bar', plugins:[barLabelPlugin],
     data:{labels,datasets:[{label:'執行數',data:execData,backgroundColor:'rgba(232,147,10,0.80)',borderColor:'#e8930a',borderWidth:1.5,borderRadius:5}]},
-    options:{responsive:true,maintainAspectRatio:false,layout:{padding:{top:18}},plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>` 執行數：${c.parsed.y} 筆`}}},scales:{x:{ticks:{font:{size:10}},grid:{display:false}},y:{ticks:{font:{size:10}},beginAtZero:true,grid:{color:'#e2e8f0'}}}}
+    options:{responsive:true,maintainAspectRatio:false,layout:{padding:{top:18}},plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>` 執行數：${c.parsed.y} 筆`}}},scales:{x:{ticks:{font:{size:10}},grid:{display:false}},y:{ticks:{font:{size:10}},beginAtZero:true,grid:{color:'#e3eee8'}}}}
   });
 }
 
@@ -2174,7 +2558,7 @@ function openTypeWeeklyDrill(idx, typeName, monthLbl){
       {label:'開立數',data:presData,backgroundColor:'rgba(42,172,138,0.85)',borderRadius:4},
       {label:'執行數',data:execData,backgroundColor:'rgba(232,147,10,0.85)',borderRadius:4}
     ]},
-    options:{responsive:true,maintainAspectRatio:false,layout:{padding:{top:20}},plugins:{legend:{position:'top',labels:{font:{size:10},boxWidth:12,padding:8}},tooltip:{callbacks:{label:c=>` ${c.dataset.label}：${c.parsed.y} 筆`}}},scales:{x:{ticks:{font:{size:10}},grid:{display:false}},y:{ticks:{font:{size:10}},beginAtZero:true,grid:{color:'#e2e8f0'}}}}
+    options:{responsive:true,maintainAspectRatio:false,layout:{padding:{top:20}},plugins:{legend:{position:'top',labels:{font:{size:10},boxWidth:12,padding:8}},tooltip:{callbacks:{label:c=>` ${c.dataset.label}：${c.parsed.y} 筆`}}},scales:{x:{ticks:{font:{size:10}},grid:{display:false}},y:{ticks:{font:{size:10}},beginAtZero:true,grid:{color:'#e3eee8'}}}}
   });
 }
 
@@ -2287,7 +2671,7 @@ function buildPrescDayCourseCharts(){
   const multi = src.length>1;
   const yScales={
     x:{ticks:{font:defaultFont,maxRotation:45,autoSkip:false,maxTicksLimit:999},grid:{display:false}},
-    y:{ticks:{font:defaultFont},beginAtZero:true,grid:{color:'#e2e8f0'}}
+    y:{ticks:{font:defaultFont},beginAtZero:true,grid:{color:'#e3eee8'}}
   };
   const datasets = src.map((ds)=>({
     label:ds.label,
@@ -2395,7 +2779,7 @@ function buildPrescDayCharts(){
   document.getElementById('prescday-line-title').textContent = lineTitle;
   const yScales = {
     x:{ticks:{font:defaultFont},grid:{display:false}},
-    y:{ticks:{font:defaultFont},beginAtZero:true,grid:{color:'#e2e8f0'}}
+    y:{ticks:{font:defaultFont},beginAtZero:true,grid:{color:'#e3eee8'}}
   };
   // ── 直條圖（grouped）
   chartInstances['prescDayBar'] = new Chart(document.getElementById('prescDayBarChart').getContext('2d'),{
@@ -2449,6 +2833,8 @@ function buildAllCharts(){
   buildTypeWeeklyCharts(currentChartType.typeweekly);
   buildClinicCharts();
   buildPrescDayCharts();
+  // 若正停在課程分頁,雲端資料更新後也要重畫(否則停在該頁時載入完成畫面會是空的)
+  if(currentActiveTab === 'course') buildCourseCharts();
 }
 
 // ══════════════════════════════════════════════
@@ -2583,7 +2969,7 @@ function renderRegionModalContent(){
     <div style="margin-bottom:16px">
       <div class="upload-drop" id="regionDropZone" style="padding:18px">
         <input type="file" id="regionFileInput" accept=".xlsx,.xls" />
-        📁 點此選擇或拖曳分區 Excel（需含 3 個工作表：北投、士林、中山）
+        點此選擇或拖曳分區 Excel（需含 3 個工作表：北投、士林、中山）
       </div>
     </div>
     <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:14px">
@@ -2624,14 +3010,26 @@ function renderRegionModalContent(){
 // ══════════════════════════════════════════════
 //  區域 + 日期 綜合篩選
 // ══════════════════════════════════════════════
+function updateRegionDropdownLabel(){
+  const lbl = document.getElementById('regionDropdownLabel');
+  if(lbl) lbl.textContent = currentRegion === 'all' ? '全部' : currentRegion;
+}
 function setRegionFilter(region, btn){
   currentRegion = region;
   if(btn){
     btn.closest('#region-filter-bar').querySelectorAll('.region-btn').forEach(b=>b.classList.remove('active'));
     btn.classList.add('active');
   }
+  updateRegionDropdownLabel();
+  const dd = document.getElementById('region-filter-bar');
+  if(dd && dd.tagName === 'DETAILS') dd.open = false; // 選完自動收合
   rebuildFromFilters();
 }
+// 點下拉清單外面自動收合
+document.addEventListener('click', e => {
+  const dd = document.getElementById('region-filter-bar');
+  if(dd && dd.open && !dd.contains(e.target)) dd.open = false;
+});
 
 function rebuildFromFilters(){
   const from = document.getElementById('filterFrom')?.value || '';
@@ -2946,6 +3344,10 @@ function showTab(name, btn){
   currentActiveTab = name;
   const bar = document.getElementById('dateFilterBar');
   if(bar) bar.style.display = (name!=='prescday' && name!=='course') ? 'flex' : 'none';
+  updateTabControls(name);
+  // 重新觸發該分頁圖卡的進場動畫
+  const tabEl = document.getElementById('tab-'+name);
+  if(tabEl){ tabEl.classList.remove('tab-anim'); void tabEl.offsetWidth; tabEl.classList.add('tab-anim'); }
   if(name==='daily') setTimeout(()=>buildDailyCharts(currentChartType.daily), 50);
   if(name==='clinic') setTimeout(()=>buildClinicCharts(), 50);
   if(name==='prescday') setTimeout(()=>buildPrescDayCharts(), 50);
@@ -2958,7 +3360,7 @@ function showTab(name, btn){
 // ══════════════════════════════════════════════
 function buildCourseCharts(){
   const stats = courseSlotStats || {};
-  const setText = (id,v) => { const el = document.getElementById(id); if(el) el.textContent = v; };
+  const setText = (id,v) => setAnimatedText(id, v);
   setText('csTotalSlots',  (stats.total_slots||0).toLocaleString());
   setText('csTotalEnroll', (stats.total_enrollments||0).toLocaleString());
   setText('csTotalAttend', (stats.total_attendances||0).toLocaleString());
@@ -3115,9 +3517,13 @@ function filteredCourseSlots(){
     return true;
   });
 }
+function _saveCourseDateRange(){
+  try{ localStorage.setItem('courseDateRange', JSON.stringify(getCourseDateRange())); }catch(e){}
+}
 function onGlobalDateChange(){
   // 手動改 input 後 quick 按鈕都不算 active
   document.querySelectorAll('#tab-course .quick-date-btn').forEach(b=>b.classList.remove('active'));
+  _saveCourseDateRange();
   buildCourseCharts();
 }
 function setGlobalDateQuick(type, btn){
@@ -3144,12 +3550,14 @@ function setGlobalDateQuick(type, btn){
   document.getElementById('courseGlobalTo').value   = to;
   document.querySelectorAll('#tab-course .quick-date-btn').forEach(b=>b.classList.remove('active'));
   if(btn) btn.classList.add('active');
+  _saveCourseDateRange();
   buildCourseCharts();
 }
 function setGlobalDateToDay(d){
   document.getElementById('courseGlobalFrom').value = d;
   document.getElementById('courseGlobalTo').value   = d;
   document.querySelectorAll('#tab-course .quick-date-btn').forEach(b=>b.classList.remove('active'));
+  _saveCourseDateRange();
   buildCourseCharts();
 }
 let _calMonth = null; // "YYYY-MM"
@@ -3227,6 +3635,121 @@ function renderPinnedDateChips(){
 }
 
 let _expandedSlot = null;
+
+// ══════════════════════════════════════════════
+//  單日課表(活動日檢視):查詢區間為單一日期時,依開始時間排成課表
+//  套用處方類型/地區/搜尋篩選,但「不套用」狀態篩選(活動日要看全貌)
+// ══════════════════════════════════════════════
+function renderDaySchedule(){
+  const box = document.getElementById('daySchedule');
+  if(!box) return;
+  const {from, to} = getCourseDateRange();
+  if(!from || from !== to){ box.style.display = 'none'; return; }
+  box.style.display = '';
+  const WEEKDAYS = ['日','一','二','三','四','五','六'];
+  const d = new Date(from + 'T00:00:00');
+  const wd = isNaN(d) ? '' : `（${WEEKDAYS[d.getDay()]}）`;
+  const titleEl = document.getElementById('dayScheduleTitle');
+  if(titleEl) titleEl.textContent = `單日課表 · ${from}${wd}`;
+  const body = document.getElementById('dayScheduleBody');
+
+  const q = (document.getElementById('slotsFilterSearch')?.value || '').toLowerCase().trim();
+  let slots = courseSlots.filter(s => s.slot_date === from);
+  slots = applySlotsTypeFilter(applySlotsRegionFilter(slots));
+  // 也跟著頂部「區域篩選」下拉一起過濾(北投/士林/中山)
+  if(currentRegion !== 'all') slots = slots.filter(s => getSlotRegion(s) === currentRegion);
+  if(q) slots = slots.filter(s => (((s.course_name||'') + ' ' + (s.course_location||'')).toLowerCase().includes(q)));
+  if(!slots.length){
+    body.innerHTML = '<div style="padding:18px;text-align:center;color:var(--text-muted)">這天沒有符合篩選的場次</div>';
+    return;
+  }
+  // 當日彙總
+  let sumBk = 0, sumCk = 0, sumCap = 0, cancelledCnt = 0;
+  slots.forEach(s => {
+    if(s.status === 'cancelled'){ cancelledCnt++; return; }
+    sumBk += s.booked_count || 0;
+    sumCk += s.checked_count || 0;
+    sumCap += s.capacity || 0;
+  });
+  const typeColors = { mental:'#7c3aed', nutrition:'#2aac8a', social:'#1a9fbe', exercise:'#e8930a', other:'#9aa5b1' };
+  const typeLabels = { mental:'情緒調適', nutrition:'營養', social:'社會', exercise:'運動' };
+  const regionColors = { '北投區':'#2aac8a', '士林區':'#1a9fbe', '中山區':'#7c3aed', '其他':'#9aa5b1' };
+  // 已取消的場次不顯示在課表上(彙總列仍會註記取消場數)
+  slots = slots.filter(s => s.status !== 'cancelled');
+  // 依開始時間分組
+  const byTime = {};
+  slots.forEach(s => {
+    const t = (s.start_time || '').slice(0,5) || '—';
+    (byTime[t] = byTime[t] || []).push(s);
+  });
+  const times = Object.keys(byTime).sort();
+  let html = `<div class="day-summary">
+    <span><b>${slots.length}</b> 場${cancelledCnt ? `（另 ${cancelledCnt} 場取消未列出）` : ''}</span>
+    <span>報名 <b>${sumBk.toLocaleString()}</b></span>
+    <span>已到 <b>${sumCk.toLocaleString()}</b></span>
+    <span>總容量 <b>${sumCap.toLocaleString()}</b></span>
+    <span>滿座率 <b>${sumCap > 0 ? Math.round(sumBk/sumCap*100) : 0}%</b></span>
+    <span>出席率 <b>${sumBk > 0 ? Math.round(sumCk/sumBk*100) : 0}%</b></span>
+  </div>`;
+  // 同時段卡片固定順序:運動 → 營養 → 情緒調適 → 社會 → 其他
+  const TYPE_ORDER = { exercise:0, nutrition:1, mental:2, social:3 };
+  html += times.map(t => {
+    // 同類型直向堆成一欄,欄與欄依固定順序橫向排列
+    const typeGroups = {};
+    byTime[t].forEach(s => { const k = TYPE_ORDER[s.course_type] ?? 4; (typeGroups[k] = typeGroups[k] || []).push(s); });
+    const renderCard = (s) => {
+        const cap = s.capacity || 0, bk = s.booked_count || 0;
+        const ck = s.checked_count != null ? s.checked_count : '—';
+        const rate = cap > 0 ? Math.round(bk/cap*100) : 0;
+        const tc = typeColors[s.course_type] || '#9aa5b1';
+        const region = getSlotRegion(s);
+        const rc = regionColors[region] || '#9aa5b1';
+        const barColor = rate >= 100 ? '#c0392b' : (rate >= 70 ? '#e8930a' : '#2aac8a');
+        const cancelled = s.status === 'cancelled';
+        const completed = s.status === 'completed';
+        const hasEntries = Array.isArray(s.entries) && s.entries.length > 0;
+        const expanded = _expandedSlot === s.slot_id;
+        let entriesHtml = '';
+        if(expanded && hasEntries){
+          entriesHtml = `<div class="day-card-entries">` + s.entries
+            .slice().sort((a,b)=>(a.ba||'').localeCompare(b.ba||''))
+            .map(e => {
+              const ok = e.cs === 'checked';
+              return `<div class="dce-row"><span class="mono">${e.pn||'—'}</span><span style="color:${ok?'#2aac8a':'#9aa5b1'};font-weight:700">${ok?'✓ 已到':'未到'}</span></div>`;
+            }).join('') + `</div>`;
+        }
+        const endT = (s.end_time||'').slice(0,5);
+        return `<div class="day-card${cancelled?' cancelled':''}" style="border-left-color:${tc}" ${hasEntries ? `onclick="toggleSlotExpand('${s.slot_id}',event)"` : ''} title="${hasEntries ? '點擊展開/收合預約名單' : ''}">
+          <div class="dc-top">
+            <span class="dc-type" style="background:${tc}22;color:${tc}">${typeLabels[s.course_type]||'其他'}</span>
+            <span class="dc-region" style="color:${rc}">${region.replace(/區$/,'')}</span>
+            ${cancelled ? '<span class="dc-status">已取消</span>' : ''}${completed ? '<span class="dc-status done">已完成</span>' : ''}
+          </div>
+          <div class="dc-name">${s.course_name||'(未命名課程)'}</div>
+          <div class="dc-loc">${endT ? '~ '+endT+' · ' : ''}${s.course_location||'—'}</div>
+          <div class="dc-meta">
+            <b>${bk}</b>/${cap} 人 · 已到 ${ck}
+            <div class="fill-bar" style="width:54px"><i style="width:${Math.min(rate,100)}%;background:${barColor}"></i></div>
+            <span style="color:${barColor};font-weight:700">${rate}%</span>
+          </div>
+          ${entriesHtml}
+        </div>`;
+      };
+    // 四個類型欄位固定占位:該時段沒有的類型留空欄,讓同類型跨時段對齊
+    const orderKeys = [0,1,2,3];
+    if(typeGroups[4]) orderKeys.push(4);
+    const cards = orderKeys.map(k => {
+      const arr = typeGroups[k];
+      if(!arr || !arr.length) return `<div class="day-type-col empty"></div>`;
+      return `<div class="day-type-col">` +
+        arr.slice().sort((a,b)=>(a.course_name||'').localeCompare(b.course_name||'','zh-Hant')).map(renderCard).join('') +
+      `</div>`;
+    }).join('');
+    return `<div class="day-time-row"><div class="day-time">${t}</div><div class="day-cards">${cards}</div></div>`;
+  }).join('');
+  body.innerHTML = html;
+}
+
 function filterSlotsTable(f, btn){
   window._slotsFilter = f;
   document.querySelectorAll('#slotsFilterBar .pdf-tab-btn').forEach(b => b.classList.remove('active'));
@@ -3446,7 +3969,7 @@ function updateWeeklyReportButton(){
   if(latestWeeklyReport && latestWeeklyReport.b64){
     btn.style.display = 'inline-block';
     btn.title = `${latestWeeklyReport.filename} · ${(latestWeeklyReport.size/1024).toFixed(1)} KB · 產出於 ${latestWeeklyReport.generated_at ? new Date(latestWeeklyReport.generated_at).toLocaleString('zh-TW') : latestWeeklyReport.date}`;
-    btn.textContent = `📥 下載週報(${latestWeeklyReport.date})`;
+    btn.textContent = `下載週報(${latestWeeklyReport.report_date || latestWeeklyReport.date || ''})`;
   } else {
     btn.style.display = 'none';
   }
@@ -3548,11 +4071,26 @@ function renderSlotsTable(){
   if(sorted.length === 0){
     tbody.innerHTML = '';
     if(empty) empty.style.display = 'block';
+    renderDaySchedule();
     return;
   }
   if(empty) empty.style.display = 'none';
+  const WEEKDAYS = ['日','一','二','三','四','五','六'];
   const rows = [];
+  let lastGroupKey = null;
   sorted.forEach(s => {
+    const isPinned = pinnedDates.has(s.slot_date);
+    // 日期變了就插入群組標題列(置頂群與一般群分開)
+    const groupKey = (isPinned ? 'P' : 'N') + s.slot_date;
+    if(groupKey !== lastGroupKey){
+      lastGroupKey = groupKey;
+      const d = new Date(s.slot_date + 'T00:00:00');
+      const wd = isNaN(d) ? '' : `（${WEEKDAYS[d.getDay()]}）`;
+      const dayCount = sorted.filter(x => x.slot_date === s.slot_date).length;
+      const pinIcon = isPinned ? '📌' : '◯';
+      const pinTitle = isPinned ? '取消置頂此日' : '把此日所有場次置頂(雲端同步)';
+      rows.push(`<tr class="date-sep${isPinned ? ' pinned' : ''}"><td colspan="9"><span class="pin-toggle" title="${pinTitle}" onclick="togglePinDate('${s.slot_date}',event)">${pinIcon}</span>${s.slot_date}${wd}　·　${dayCount} 場${isPinned ? '<span class="pin-tag">已置頂</span>' : ''}</td></tr>`);
+    }
     const cap = s.capacity || 0;
     const bk = s.booked_count || 0;
     const ck = s.checked_count != null ? s.checked_count : '—';
@@ -3562,6 +4100,7 @@ function renderSlotsTable(){
     const slbl = statusLabels[s.status] || s.status || '—';
     const scolor = statusColors[s.status] || '#9aa5b1';
     const rateColor = rate >= 100 ? '#c0392b' : (rate >= 70 ? '#e8930a' : 'var(--text-muted)');
+    const rateBarColor = rate >= 100 ? '#c0392b' : (rate >= 70 ? '#e8930a' : '#2aac8a');
     const region = getSlotRegion(s);
     const regionColors = { '北投區':'#2aac8a', '士林區':'#1a9fbe', '中山區':'#7c3aed', '其他':'#9aa5b1' };
     const rcolor = regionColors[region] || '#9aa5b1';
@@ -3570,23 +4109,17 @@ function renderSlotsTable(){
     const hasEntries = Array.isArray(s.entries) && s.entries.length > 0;
     const expandIcon = hasEntries ? (expanded ? '▼' : '▶') : '·';
     const cursor = hasEntries ? 'pointer' : 'default';
-    const isPinned = pinnedDates.has(s.slot_date);
-    const pinIcon = isPinned ? '📌' : '◯';
-    const pinTitle = isPinned ? '取消置頂此日' : '把此日所有場次置頂(雲端同步)';
-    const rowBg = isPinned ? 'background:#fffbe6' : '';
-    rows.push(`<tr style="cursor:${cursor};${rowBg}" ${hasEntries ? `onclick="toggleSlotExpand('${s.slot_id}',event)"` : ''}>
+    const rowCls = (isPinned ? 'in-pinned' : '') + (s.status === 'cancelled' ? ' row-cancelled' : '');
+    rows.push(`<tr class="${rowCls.trim()}" style="cursor:${cursor}" ${hasEntries ? `onclick="toggleSlotExpand('${s.slot_id}',event)"` : ''}>
       <td style="color:var(--text-muted);font-size:0.75rem">${expandIcon}</td>
-      <td style="text-align:center;cursor:pointer;font-size:1rem;${isPinned?'':'opacity:0.35'}" title="${pinTitle}" onclick="togglePinDate('${s.slot_date}',event)">${pinIcon}</td>
-      <td style="font-weight:${isPinned?'700':'400'}">${s.slot_date}</td>
-      <td>${(s.start_time||'').slice(0,5)} - ${(s.end_time||'').slice(0,5)}</td>
+      <td style="white-space:nowrap;font-variant-numeric:tabular-nums">${(s.start_time||'').slice(0,5)} - ${(s.end_time||'').slice(0,5)}</td>
       <td>${s.course_name||''}</td>
-      <td><span style="display:inline-block;padding:2px 8px;border-radius:10px;background:${tcolor}22;color:${tcolor};font-size:0.78rem;font-weight:700">${tlbl}</span></td>
+      <td><span style="display:inline-block;padding:2px 8px;border-radius:10px;background:${tcolor}22;color:${tcolor};font-size:0.78rem;font-weight:700;white-space:nowrap">${tlbl}</span></td>
       <td style="font-size:0.82rem;color:var(--text-muted)">${regionTag}${s.course_location||'—'}</td>
-      <td class="num">${bk}</td>
+      <td class="num" style="white-space:nowrap"><b style="font-size:0.95rem">${bk}</b><span style="color:var(--text-muted)"> / ${cap}</span></td>
+      <td class="num"><div class="fill-cell"><div class="fill-bar"><i style="width:${Math.min(rate,100)}%;background:${rateBarColor}"></i></div><span style="color:${rateColor}">${rate}%</span></div></td>
       <td class="num" style="color:${ck === bk && bk > 0 ? '#2aac8a' : 'var(--text-muted)'}">${ck}</td>
-      <td class="num">${cap}</td>
-      <td class="num" style="color:${rateColor};font-weight:700">${rate}%</td>
-      <td class="num"><span style="display:inline-block;padding:2px 8px;border-radius:10px;background:${scolor}22;color:${scolor};font-size:0.76rem;font-weight:700">${slbl}</span></td>
+      <td class="num"><span style="display:inline-block;padding:2px 8px;border-radius:10px;background:${scolor}22;color:${scolor};font-size:0.76rem;font-weight:700;white-space:nowrap">${slbl}</span></td>
     </tr>`);
     if(expanded && hasEntries){
       const entriesHtml = s.entries
@@ -3603,13 +4136,14 @@ function renderSlotsTable(){
             <div style="color:${ckColor};font-weight:700;text-align:right">${ckLbl}</div>
           </div>`;
         }).join('');
-      rows.push(`<tr><td colspan="12" style="padding:14px 28px;background:#f7fbf9">
+      rows.push(`<tr><td colspan="9" style="padding:14px 28px;background:#f7fbf9">
         <div style="font-size:0.78rem;color:var(--text-muted);margin-bottom:6px">— ${s.entries.length} 筆預約 —</div>
         ${entriesHtml}
       </td></tr>`);
     }
   });
   tbody.innerHTML = rows.join('');
+  renderDaySchedule();
 }
 
 // ══════════════════════════════════════════════
@@ -3648,7 +4182,7 @@ function downloadChart(btn) {
 const PDF_CHART_GROUPS = [
   {
     groupId: 'weekly',
-    groupLabel: '📂 每週趨勢',
+    groupLabel: '每週趨勢',
     tabId: 'tab-weekly',
     charts: [
       { id: 'weekly-pres', label: '每週處方開立數' },
@@ -3657,7 +4191,7 @@ const PDF_CHART_GROUPS = [
   },
   {
     groupId: 'daily',
-    groupLabel: '📆 單月每日',
+    groupLabel: '單月每日',
     tabId: 'tab-daily',
     charts: [
       { id: 'daily-pres', label: '單月每日處方開立數' },
@@ -3666,7 +4200,7 @@ const PDF_CHART_GROUPS = [
   },
   {
     groupId: 'type',
-    groupLabel: '📊 處方開立分析',
+    groupLabel: '處方開立分析',
     tabId: 'tab-type',
     charts: [
       { id: 'cum-pres',  label: '處方開立數累積趨勢（依週）', modes: ['line'] },
@@ -3679,7 +4213,7 @@ const PDF_CHART_GROUPS = [
   },
   {
     groupId: 'typeweekly',
-    groupLabel: '🔎 各類型週趨勢細項',
+    groupLabel: '各類型週趨勢細項',
     tabId: 'tab-typeweekly',
     charts: [
       { id: 'tw-0',    label: '情緒調適處方週趨勢', modes: ['line','bar','area'] },
@@ -3694,7 +4228,7 @@ const PDF_CHART_GROUPS = [
   },
   {
     groupId: 'clinic',
-    groupLabel: '🏥 診所分析',
+    groupLabel: '診所分析',
     tabId: 'tab-clinic',
     charts: [
       { id: 'clinic-enroll', label: '各診所選課或執行筆數' },
@@ -3704,7 +4238,7 @@ const PDF_CHART_GROUPS = [
   },
   {
     groupId: 'prescday',
-    groupLabel: '📅 處方日執行數',
+    groupLabel: '處方日執行數',
     tabId: 'tab-prescday',
     charts: [
       { id: 'prescday-bar',         label: '各類處方執行數（直條圖）' },
@@ -3772,6 +4306,7 @@ function syncRegionFilterBar(){
     const m = onclick.match(/setRegionFilter\('([^']+)'/);
     if(m) b.classList.toggle('active', m[1] === currentRegion);
   });
+  updateRegionDropdownLabel();
 }
 
 // 記錄目前 tab
@@ -3917,6 +4452,10 @@ async function startPdfExport() {
   localStorage.setItem('pdfLastChecked', JSON.stringify([...pdfChecked]));
 
   closePdfModal();
+
+  // 匯出期間關閉圖表動畫,確保截圖完整
+  const _pdfPrevAnim = (typeof Chart !== 'undefined') ? Chart.defaults.animation : null;
+  if (typeof Chart !== 'undefined') Chart.defaults.animation = false;
 
   const progressOverlay = document.getElementById('pdf-progress-overlay');
   const progressMsg = document.getElementById('pdf-progress-msg');
@@ -4182,11 +4721,61 @@ async function startPdfExport() {
     console.error('PDF 匯出失敗', err);
     alert('PDF 匯出時發生錯誤：' + err.message);
   } finally {
+    if (typeof Chart !== 'undefined') Chart.defaults.animation = _pdfPrevAnim;
     progressOverlay.classList.remove('show');
   }
 }
 
+// ── 整合篩選面板:把各分頁的顯示控制列搬進 #tabControlsHost,跟著分頁切換顯示 ──
+function updateTabControls(name){
+  const host = document.getElementById('tabControlsHost');
+  if(!host) return;
+  let any = false;
+  host.querySelectorAll('[data-tab]').forEach(bar=>{
+    const show = bar.dataset.tab === name;
+    bar.style.display = show ? 'flex' : 'none';
+    if(show) any = true;
+  });
+  host.style.display = any ? '' : 'none';
+}
+(function integrateTabControls(){
+  const host = document.getElementById('tabControlsHost');
+  if(!host) return;
+  [['tab-weekly','weekly'],['tab-daily','daily'],['tab-type','type'],['tab-typeweekly','typeweekly'],['tab-clinic','clinic']].forEach(([tabId,name])=>{
+    const tab = document.getElementById(tabId);
+    if(!tab) return;
+    tab.querySelectorAll('.period-bar, .chart-type-bar, .clinic-sort-bar').forEach(bar=>{
+      bar.dataset.tab = name;
+      host.appendChild(bar);
+    });
+  });
+  updateTabControls('weekly');
+})();
+
+// ── 區塊收合(單日課表/場次明細),狀態記在 localStorage ──
+function toggleSection(btn){
+  const sec = btn.closest('.chart-section');
+  if(!sec) return;
+  sec.classList.toggle('collapsed');
+  const key = sec.dataset.collapseKey;
+  if(key){ try{ localStorage.setItem('secCollapsed_' + key, sec.classList.contains('collapsed') ? '1' : '0'); }catch(e){} }
+}
+document.querySelectorAll('.chart-section[data-collapse-key]').forEach(sec=>{
+  try{ if(localStorage.getItem('secCollapsed_' + sec.dataset.collapseKey) === '1') sec.classList.add('collapsed'); }catch(e){}
+});
+
+// ── 還原課程分頁的查詢區間(重整後單日課表才不會消失) ──
+try{
+  const savedRange = JSON.parse(localStorage.getItem('courseDateRange') || 'null');
+  if(savedRange && (savedRange.from || savedRange.to)){
+    document.getElementById('courseGlobalFrom').value = savedRange.from || '';
+    document.getElementById('courseGlobalTo').value   = savedRange.to || '';
+    document.querySelectorAll('#tab-course .quick-date-btn').forEach(b=>b.classList.remove('active'));
+  }
+}catch(e){}
+
 // ── 初始化 ──
+document.getElementById('tab-weekly').classList.add('tab-anim');
 loadRegionMap();
 loadFromCloud();
 incrementViewCount();
@@ -4194,12 +4783,12 @@ document.getElementById('dateFilterBar').style.display = 'flex';
 if(prescDayDatasets.length){ renderPrescDayList(); buildPrescDayCharts(); buildPrescDayCourseCharts(); }
 
 // ── 自動同步雲端資料(n8n 每 5 分鐘更新 Supabase) ──
-setInterval(loadFromCloud, 5 * 60 * 1000);
+setInterval(() => loadFromCloud(true), 5 * 60 * 1000);
 let lastVisibleReload = Date.now();
 document.addEventListener('visibilitychange', () => {
   if(document.visibilityState === 'visible' && Date.now() - lastVisibleReload > 30 * 1000){
     lastVisibleReload = Date.now();
-    loadFromCloud();
+    loadFromCloud(true);
   }
 });
 </script>
