@@ -2833,6 +2833,8 @@ function buildAllCharts(){
   buildTypeWeeklyCharts(currentChartType.typeweekly);
   buildClinicCharts();
   buildPrescDayCharts();
+  // 若正停在課程分頁,雲端資料更新後也要重畫(否則停在該頁時載入完成畫面會是空的)
+  if(currentActiveTab === 'course') buildCourseCharts();
 }
 
 // ══════════════════════════════════════════════
@@ -3515,9 +3517,13 @@ function filteredCourseSlots(){
     return true;
   });
 }
+function _saveCourseDateRange(){
+  try{ localStorage.setItem('courseDateRange', JSON.stringify(getCourseDateRange())); }catch(e){}
+}
 function onGlobalDateChange(){
   // 手動改 input 後 quick 按鈕都不算 active
   document.querySelectorAll('#tab-course .quick-date-btn').forEach(b=>b.classList.remove('active'));
+  _saveCourseDateRange();
   buildCourseCharts();
 }
 function setGlobalDateQuick(type, btn){
@@ -3544,12 +3550,14 @@ function setGlobalDateQuick(type, btn){
   document.getElementById('courseGlobalTo').value   = to;
   document.querySelectorAll('#tab-course .quick-date-btn').forEach(b=>b.classList.remove('active'));
   if(btn) btn.classList.add('active');
+  _saveCourseDateRange();
   buildCourseCharts();
 }
 function setGlobalDateToDay(d){
   document.getElementById('courseGlobalFrom').value = d;
   document.getElementById('courseGlobalTo').value   = d;
   document.querySelectorAll('#tab-course .quick-date-btn').forEach(b=>b.classList.remove('active'));
+  _saveCourseDateRange();
   buildCourseCharts();
 }
 let _calMonth = null; // "YYYY-MM"
@@ -4753,6 +4761,16 @@ function toggleSection(btn){
 document.querySelectorAll('.chart-section[data-collapse-key]').forEach(sec=>{
   try{ if(localStorage.getItem('secCollapsed_' + sec.dataset.collapseKey) === '1') sec.classList.add('collapsed'); }catch(e){}
 });
+
+// ── 還原課程分頁的查詢區間(重整後單日課表才不會消失) ──
+try{
+  const savedRange = JSON.parse(localStorage.getItem('courseDateRange') || 'null');
+  if(savedRange && (savedRange.from || savedRange.to)){
+    document.getElementById('courseGlobalFrom').value = savedRange.from || '';
+    document.getElementById('courseGlobalTo').value   = savedRange.to || '';
+    document.querySelectorAll('#tab-course .quick-date-btn').forEach(b=>b.classList.remove('active'));
+  }
+}catch(e){}
 
 // ── 初始化 ──
 document.getElementById('tab-weekly').classList.add('tab-anim');
