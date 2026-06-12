@@ -7,7 +7,6 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/echarts-gl@2.0.9/dist/echarts-gl.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/0.149.0/three.min.js"></script>
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700;800&display=swap');
 
@@ -106,9 +105,14 @@ section > .sub { color: var(--text-muted); font-size: 0.83rem; margin-bottom: 16
   box-shadow: var(--shadow-md);
 }
 
+/* ── 像素粒子數字 ── */
+#hero-wrap { height: 250px; overflow: hidden; position: relative; }
+#pixelHero { width: 100%; height: 100%; display: block; cursor: crosshair; }
+
 /* ── KPI 液體卡片 ── */
-.kpi-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; }
-.kpi-card { position: relative; overflow: hidden; padding: 22px 24px 30px; min-height: 150px; }
+.kpi-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; perspective: 900px; }
+.kpi-card { position: relative; overflow: hidden; padding: 22px 24px 30px; min-height: 150px; transition: transform 0.25s ease, box-shadow 0.25s ease; will-change: transform; }
+.kpi-card.tilting { transition: box-shadow 0.25s ease; box-shadow: var(--shadow-lg); }
 .kpi-card canvas { position: absolute; left: 0; right: 0; bottom: 0; width: 100%; height: 100%; }
 .kpi-card .kpi-label { position: relative; z-index: 2; font-size: 0.85rem; color: var(--text-muted); letter-spacing: 0.08em; }
 .kpi-card .kpi-value { position: relative; z-index: 2; font-size: 2.5rem; font-weight: 800; margin-top: 6px; color: var(--text); }
@@ -131,25 +135,33 @@ section > .sub { color: var(--text-muted); font-size: 0.83rem; margin-bottom: 16
 }
 .seg button.on { background: var(--grad-main); color: #fff; font-weight: 700; }
 
-/* ── 流體粒子場景(深色水族箱容器,讓粒子發光可見) ── */
+/* ── 像素粒子轉換流(深色顯示器容器,像素粒子才看得清楚) ── */
 #flow-wrap {
-  position: relative; height: 520px; overflow: hidden; cursor: grab;
-  background: linear-gradient(135deg, #11434a 0%, #0f4a3e 55%, #145a4c 100%);
+  position: relative; height: 500px; overflow: hidden;
+  background: linear-gradient(160deg, #10312e 0%, #0d3a35 100%);
   border: 1px solid var(--border); box-shadow: var(--shadow-lg);
 }
-#flow-wrap:active { cursor: grabbing; }
 #flowCanvas { width: 100%; height: 100%; display: block; }
-#flow-legend {
-  position: absolute; top: 16px; left: 18px; z-index: 3; color: #eafff5;
-  background: rgba(5, 25, 20, 0.6); border: 1px solid rgba(255,255,255,0.15);
-  border-radius: 12px; padding: 12px 16px; backdrop-filter: blur(8px);
-  font-size: 0.8rem; line-height: 1.9; pointer-events: none;
+.bin-counter {
+  position: absolute; bottom: 10px; transform: translateX(-50%); z-index: 3;
+  font-size: 0.82rem; font-weight: 700; color: #b9d6cc; pointer-events: none;
+  text-shadow: 0 1px 3px rgba(0,0,0,0.6); white-space: nowrap;
 }
-#flow-legend .dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 7px; box-shadow: 0 0 8px currentColor; }
-#flow-note {
-  position: absolute; bottom: 12px; right: 16px; z-index: 3;
-  font-size: 0.72rem; color: rgba(255,255,255,0.6); pointer-events: none;
+.bin-counter.lit { color: #eaff9a; }
+#flow-result {
+  position: absolute; top: 18px; right: 22px; z-index: 3; text-align: right;
+  color: #eafff5; pointer-events: none; opacity: 0; transition: opacity 0.8s;
+  text-shadow: 0 2px 8px rgba(0,0,0,0.5);
 }
+#flow-result.show { opacity: 1; }
+#flow-result .big { font-size: 2rem; font-weight: 800; color: #eaff9a; }
+#flowReplay {
+  position: absolute; top: 16px; left: 18px; z-index: 4;
+  background: rgba(255,255,255,0.12); color: #eafff5; border: 1px solid rgba(255,255,255,0.35);
+  border-radius: 999px; padding: 6px 16px; font-size: 0.82rem; font-family: inherit;
+  cursor: pointer; transition: background 0.2s;
+}
+#flowReplay:hover { background: rgba(255,255,255,0.22); }
 
 footer { margin-top: 50px; text-align: center; color: var(--text-muted); font-size: 0.78rem; }
 
@@ -169,13 +181,19 @@ footer { margin-top: 50px; text-align: center; color: var(--text-muted); font-si
     <div class="header-row">
       <div>
         <h1>健康處方 3D 流體實驗室</h1>
-        <p>同一份 Supabase 即時資料的另一種樣貌 — 流體背景・液體量表・3D 圖表・資料驅動粒子流</p>
+        <p>同一份 Supabase 即時資料的另一種樣貌 — 流體背景・像素粒子・液體量表・3D 圖表</p>
         <span id="data-status">資料載入中…</span>
       </div>
       <a class="back-link" href="index.html">← 回主儀表板</a>
     </div>
     <p class="hint">滑鼠(或手指)在頁面上滑動,可以攪動背景的流體 🌊</p>
   </header>
+
+  <section>
+    <h2>像素粒子數字</h2>
+    <p class="sub">累計開立處方數 — 每顆像素依四種處方類型占比上色;滑鼠掃過會把粒子打散,離開後自動歸位</p>
+    <div id="hero-wrap" class="glass"><canvas id="pixelHero"></canvas></div>
+  </section>
 
   <section>
     <h2>液體 KPI</h2>
@@ -215,16 +233,21 @@ footer { margin-top: 50px; text-align: center; color: var(--text-muted); font-si
       <button id="segPresc" class="on" onclick="setBar3dMetric('presc')">開立數</button>
       <button id="segExec" onclick="setBar3dMetric('exec')">執行數</button>
     </div>
+    <div class="seg" style="margin-left:10px">
+      <button id="btnPlay" onclick="playBar3d()">▶ 月份播放</button>
+    </div>
     <div id="bar3d-wrap" class="glass"><div id="bar3d"></div></div>
   </section>
 
   <section>
-    <h2>資料驅動流體粒子場景</h2>
-    <p class="sub">每顆粒子代表處方紀錄(等比例縮放),顏色 = 處方類型,亮粒子 = 已執行;整體流速與執行率成正比。拖曳可旋轉視角。</p>
+    <h2>像素粒子轉換流 — 從開立到執行</h2>
+    <p class="sub" id="flow-sub">每顆像素代表一批處方:從左側四條類型通道流出,通過「執行判定」閘門時依該類型的真實執行率決定去向 — 亮起來的掉進「已執行」池,變灰的落入「未執行」堆。</p>
     <div id="flow-wrap" class="glass">
       <canvas id="flowCanvas"></canvas>
-      <div id="flow-legend"></div>
-      <div id="flow-note">拖曳旋轉視角</div>
+      <div class="bin-counter" id="cntMiss" style="left:44%">未執行 0</div>
+      <div class="bin-counter lit" id="cntExec" style="left:85%">已執行 0</div>
+      <div id="flow-result"><div>整體執行率</div><div class="big">–</div></div>
+      <button id="flowReplay" onclick="replayFlow()">↻ 重播</button>
     </div>
   </section>
 
@@ -240,9 +263,21 @@ const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
 
 const TYPE_COLORS = ['#8fba2e', '#2aac8a', '#1a9fbe', '#1a7ea0'];
 
+// 除錯用功能開關:?nofluid / ?nochart / ?nohero / ?noflow / ?noliquid
+const FLAGS = new URLSearchParams(location.search);
+
 function hexToRgb(hex) {
   const n = parseInt(hex.slice(1), 16);
   return { r: (n >> 16) & 255, g: (n >> 8) & 255, b: n & 255 };
+}
+
+// 效能:回報元素是否在視窗內,離開視窗的動畫迴圈會自動休眠
+function visibilityFlag(el) {
+  const flag = { visible: true };
+  if ('IntersectionObserver' in window) {
+    new IntersectionObserver(es => es.forEach(e => { flag.visible = e.isIntersecting; }), { rootMargin: '80px' }).observe(el);
+  }
+  return flag;
 }
 
 // ══════════════════════════════════════════════
@@ -323,9 +358,10 @@ async function loadData() {
     statusEl.textContent = '⚠️ 無法連線雲端,目前顯示範例資料';
   }
   aggregate(rows);
+  if (!FLAGS.has('nohero')) initPixelHero();
   initKpiAndGauges();
-  initBar3d();
-  initFlowScene();
+  if (!FLAGS.has('nochart')) initBar3d();
+  if (!FLAGS.has('noflow')) initPixelFlow();
 }
 
 // ══════════════════════════════════════════════
@@ -333,6 +369,7 @@ async function loadData() {
 // ══════════════════════════════════════════════
 (function initFluid() {
   const canvas = document.getElementById('fluidCanvas');
+  if (FLAGS.has('nofluid')) { canvas.style.display = 'none'; return; }
   const gl = canvas.getContext('webgl2', { alpha: true, depth: false, stencil: false, antialias: false, premultipliedAlpha: true });
   if (!gl || !gl.getExtension('EXT_color_buffer_float')) { canvas.style.display = 'none'; return; }
   gl.getExtension('OES_texture_float_linear');
@@ -480,8 +517,8 @@ async function loadData() {
   let velocity, dye, divergence, pressure;
   function initFBOs() {
     const aspect = canvas.width / Math.max(1, canvas.height);
-    const simH = 128, simW = Math.max(32, Math.round(simH * aspect));
-    const dyeH = 480, dyeW = Math.max(64, Math.round(dyeH * aspect));
+    const simH = 112, simW = Math.max(32, Math.round(simH * aspect));
+    const dyeH = 360, dyeW = Math.max(64, Math.round(dyeH * aspect));
     velocity = doubleFBO(simW, simH);
     dye = doubleFBO(dyeW, dyeH);
     divergence = createFBO(simW, simH);
@@ -573,7 +610,7 @@ async function loadData() {
     pressureP.bind();
     gl.uniform2f(pressureP.u.texelSize, velocity.texel[0], velocity.texel[1]);
     gl.uniform1i(pressureP.u.uDivergence, divergence.attach(0));
-    for (let i = 0; i < 20; i++) {
+    for (let i = 0; i < 14; i++) {
       gl.uniform1i(pressureP.u.uPressure, pressure.read.attach(1));
       blit(pressure.write); pressure.swap();
     }
@@ -650,17 +687,46 @@ function drawGauge(c, pct, color, phase) {
   ctx.shadowBlur = 0;
 }
 
+// 數字滾動計數
+function countUp(el, target, fmt, dur = 1600) {
+  const t0 = performance.now();
+  (function tick(now) {
+    const p = Math.min(1, ((now || performance.now()) - t0) / dur);
+    const ease = 1 - Math.pow(1 - p, 3);
+    el.textContent = fmt(target * ease);
+    if (p < 1) requestAnimationFrame(tick);
+  })(performance.now());
+}
+
+// KPI 卡片 3D 傾斜視差
+function initTilt() {
+  document.querySelectorAll('.kpi-card').forEach(card => {
+    card.addEventListener('pointermove', e => {
+      const r = card.getBoundingClientRect();
+      const px = (e.clientX - r.left) / r.width - 0.5;
+      const py = (e.clientY - r.top) / r.height - 0.5;
+      card.classList.add('tilting');
+      card.style.transform = `rotateY(${(px * 9).toFixed(2)}deg) rotateX(${(-py * 9).toFixed(2)}deg) translateY(-3px) scale(1.015)`;
+    });
+    card.addEventListener('pointerleave', () => {
+      card.classList.remove('tilting');
+      card.style.transform = '';
+    });
+  });
+}
+
 function initKpiAndGauges() {
   const totalPresc = typeData.reduce((s, t) => s + t.presc, 0);
   const totalExec = typeData.reduce((s, t) => s + t.exec, 0);
   const rate = totalPresc > 0 ? totalExec / totalPresc : 0;
 
-  document.getElementById('kpiVal0').textContent = totalPresc.toLocaleString();
+  countUp(document.getElementById('kpiVal0'), totalPresc, v => Math.round(v).toLocaleString());
   document.getElementById('kpiSub0').textContent = typeData.length + ' 種處方類型';
-  document.getElementById('kpiVal1').textContent = totalExec.toLocaleString();
+  countUp(document.getElementById('kpiVal1'), totalExec, v => Math.round(v).toLocaleString());
   document.getElementById('kpiSub1').textContent = '水位 = 佔開立數 ' + (rate * 100).toFixed(1) + '%';
-  document.getElementById('kpiVal2').textContent = (rate * 100).toFixed(1) + '%';
+  countUp(document.getElementById('kpiVal2'), rate * 100, v => v.toFixed(1) + '%');
   document.getElementById('kpiSub2').textContent = '已執行 ' + totalExec.toLocaleString() + ' / ' + totalPresc.toLocaleString();
+  initTilt();
 
   const kpiDefs = [
     { id: 'kpiWave0', pct: 0.6, color: '#8fba2e' },
@@ -669,7 +735,7 @@ function initKpiAndGauges() {
   ];
   kpiDefs.forEach(d => {
     const c = document.getElementById(d.id);
-    waveCards.push({ canvas: c, pct: d.pct, color: d.color });
+    waveCards.push({ canvas: c, pct: 0, target: d.pct, color: d.color });
   });
 
   const row = document.getElementById('gaugeRow');
@@ -681,18 +747,26 @@ function initKpiAndGauges() {
       '<div class="g-name" style="color:' + t.color + '">' + t.name + '</div>' +
       '<div class="g-nums">開立 ' + t.presc.toLocaleString() + ' · 執行 ' + t.exec.toLocaleString() + '</div>';
     row.appendChild(card);
-    gauges.push({ canvas: card.querySelector('canvas'), pct: t.rate, color: t.color });
+    gauges.push({ canvas: card.querySelector('canvas'), pct: 0, target: t.rate, color: t.color });
   });
 
+  const kpiVis = visibilityFlag(document.querySelector('.kpi-row'));
+  const gaugeVis = visibilityFlag(row);
+  if (FLAGS.has('noliquid')) return;
   (function animateLiquid() {
+    if (!kpiVis.visible && !gaugeVis.visible) { requestAnimationFrame(animateLiquid); return; }
     const phase = performance.now() / 600;
     waveCards.forEach(w => {
       const box = w.canvas.parentElement.getBoundingClientRect();
       const tw = Math.max(280, Math.round(box.width)), th = Math.max(140, Math.round(box.height));
       if (w.canvas.width !== tw || w.canvas.height !== th) { w.canvas.width = tw; w.canvas.height = th; }
+      w.pct += (w.target - w.pct) * 0.04; // 水位緩升到目標
       drawWaveCard(w.canvas, w.pct, w.color, phase);
     });
-    gauges.forEach(g => drawGauge(g.canvas, g.pct, g.color, phase));
+    gauges.forEach(g => {
+      g.pct += (g.target - g.pct) * 0.04;
+      drawGauge(g.canvas, g.pct, g.color, phase);
+    });
     requestAnimationFrame(animateLiquid);
   })();
 }
@@ -750,6 +824,12 @@ function initBar3d() {
   bar3dChart.setOption(bar3dOption());
   addEventListener('resize', () => bar3dChart && bar3dChart.resize());
   new ResizeObserver(() => bar3dChart && bar3dChart.resize()).observe(el);
+  // 離開視窗就停止自轉,省 GPU
+  if ('IntersectionObserver' in window) {
+    new IntersectionObserver(es => es.forEach(e => {
+      if (bar3dChart) bar3dChart.setOption({ grid3D: { viewControl: { autoRotate: e.isIntersecting } } });
+    }), { rootMargin: '80px' }).observe(el);
+  }
 }
 
 function setBar3dMetric(m) {
@@ -759,147 +839,276 @@ function setBar3dMetric(m) {
   if (bar3dChart) bar3dChart.setOption(bar3dOption());
 }
 
+// 月份播放:長條逐月長出來(縮時攝影)
+let bar3dPlaying = false;
+function playBar3d() {
+  if (bar3dPlaying || !bar3dChart || !monthAgg.months.length) return;
+  bar3dPlaying = true;
+  const btn = document.getElementById('btnPlay');
+  btn.disabled = true;
+  const nMonths = monthAgg.months.length;
+  let i = 0;
+  const timer = setInterval(() => {
+    i++;
+    btn.textContent = '▶ ' + monthAgg.months[Math.min(i, nMonths) - 1];
+    const opt = bar3dOption(); // visualMap/軸固定用全量資料,只把未播到的月份歸零
+    opt.series[0].data = opt.series[0].data.map(d => d[0] < i ? d : [d[0], d[1], 0]);
+    bar3dChart.setOption(opt);
+    if (i >= nMonths) {
+      clearInterval(timer);
+      bar3dPlaying = false;
+      btn.disabled = false;
+      btn.textContent = '▶ 月份播放';
+    }
+  }, 650);
+}
+
 // ══════════════════════════════════════════════
-//  ④ three.js 資料驅動流體粒子場景
+//  ④ 像素粒子數字(粒子聚成總開立數,滑鼠可打散)
 // ══════════════════════════════════════════════
-function initFlowScene() {
+function initPixelHero() {
+  const wrap = document.getElementById('hero-wrap');
+  const canvas = document.getElementById('pixelHero');
+  const ctx = canvas.getContext('2d');
+  const totalPresc = typeData.reduce((s, t) => s + t.presc, 0);
+  const GRID = 4;   // 字形取樣間距
+  const SZ = 3;     // 像素方塊大小
+  let parts = [];
+  let mouseX = -9999, mouseY = -9999;
+
+  function build() {
+    const w = wrap.clientWidth || 800, h = wrap.clientHeight || 250;
+    if (canvas.width === w && canvas.height === h && parts.length) return;
+    canvas.width = w; canvas.height = h;
+    // 離屏畫出數字 → 取樣不透明點當粒子目標
+    const off = document.createElement('canvas');
+    off.width = w; off.height = h;
+    const octx = off.getContext('2d');
+    const text = totalPresc.toLocaleString();
+    let fontSize = Math.min(170, h * 0.62);
+    octx.font = '800 ' + fontSize + 'px "Noto Sans TC", sans-serif';
+    while (octx.measureText(text).width > w * 0.82 && fontSize > 40) {
+      fontSize -= 6;
+      octx.font = '800 ' + fontSize + 'px "Noto Sans TC", sans-serif';
+    }
+    octx.textAlign = 'center'; octx.textBaseline = 'middle';
+    octx.fillStyle = '#000';
+    octx.fillText(text, w / 2, h / 2);
+    const img = octx.getImageData(0, 0, w, h).data;
+    const targets = [];
+    for (let y = 0; y < h; y += GRID)
+      for (let x = 0; x < w; x += GRID)
+        if (img[(y * w + x) * 4 + 3] > 128) targets.push([x, y]);
+    // 顏色池:依各類型開立數占比分配,洗牌讓顏色交錯
+    const colorPool = [];
+    typeData.forEach(t => {
+      const n = Math.round(targets.length * t.presc / totalPresc);
+      for (let i = 0; i < n; i++) colorPool.push(t.color);
+    });
+    while (colorPool.length < targets.length) colorPool.push(typeData[0] ? typeData[0].color : '#2aac8a');
+    for (let i = colorPool.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [colorPool[i], colorPool[j]] = [colorPool[j], colorPool[i]];
+    }
+    parts = targets.map(([tx, ty], i) => ({
+      x: Math.random() * w, y: Math.random() * h, vx: 0, vy: 0,
+      tx, ty, color: colorPool[i]
+    }));
+  }
+  build();
+  new ResizeObserver(build).observe(wrap);
+
+  canvas.addEventListener('pointermove', e => {
+    const r = canvas.getBoundingClientRect();
+    mouseX = e.clientX - r.left; mouseY = e.clientY - r.top;
+  });
+  canvas.addEventListener('pointerleave', () => { mouseX = mouseY = -9999; });
+
+  const vis = visibilityFlag(wrap);
+  (function frame() {
+    if (!vis.visible) { requestAnimationFrame(frame); return; } // 離開視窗就休眠
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.imageSmoothingEnabled = false;
+    for (const p of parts) {
+      p.vx += (p.tx - p.x) * 0.045;            // 彈簧拉回目標
+      p.vy += (p.ty - p.y) * 0.045;
+      const dx = p.x - mouseX, dy = p.y - mouseY;
+      const d2 = dx * dx + dy * dy;
+      if (d2 < 5600) {                          // 滑鼠斥力
+        const f = (1 - d2 / 5600) * 5.5;
+        const d = Math.sqrt(d2) || 1;
+        p.vx += dx / d * f; p.vy += dy / d * f;
+      }
+      p.vx *= 0.86; p.vy *= 0.86;
+      p.x += p.vx; p.y += p.vy;
+      ctx.fillStyle = p.color;
+      ctx.fillRect(Math.round(p.x / 2) * 2, Math.round(p.y / 2) * 2, SZ, SZ);
+    }
+    requestAnimationFrame(frame);
+  })();
+}
+
+// ══════════════════════════════════════════════
+//  ⑤ 像素粒子轉換流:開立 → 執行判定 → 已執行/未執行
+// ══════════════════════════════════════════════
+function initPixelFlow() {
   const wrap = document.getElementById('flow-wrap');
   const canvas = document.getElementById('flowCanvas');
-  let renderer;
-  try {
-    renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
-  } catch (e) {
-    wrap.innerHTML = '<p style="padding:40px;color:#8fb5a8">此裝置不支援 WebGL,無法顯示粒子場景</p>';
-    return;
-  }
-  renderer.setPixelRatio(Math.min(2, devicePixelRatio));
-
-  const scene = new THREE.Scene();
-  scene.fog = new THREE.FogExp2(0x114a42, 0.012);
-  const camera = new THREE.PerspectiveCamera(58, 16 / 9, 0.1, 300);
-
+  const ctx = canvas.getContext('2d');
   const totalPresc = typeData.reduce((s, t) => s + t.presc, 0) || 1;
   const totalExec = typeData.reduce((s, t) => s + t.exec, 0);
-  const overallRate = totalExec / totalPresc;
-  const scaleN = Math.min(1, 9000 / totalPresc);
-  const swirlSpeed = 0.35 + overallRate * 0.85; // 流速 ∝ 執行率
+  const rate = totalExec / totalPresc;
+  const N_TOTAL = 620;                  // 一輪模擬的粒子總數
+  const PER = totalPresc / N_TOTAL;     // 每顆像素代表幾筆
+  document.getElementById('flow-sub').textContent =
+    '每顆像素 ≈ ' + Math.round(PER) + ' 筆處方:從左側四條類型通道流出,通過「執行判定」閘門時依該類型的真實執行率決定去向 — 亮起來的掉進「已執行」池,變灰的落入「未執行」堆。';
 
-  const R_RING = 14, R_TUBE = 4.6;
-  const groups = []; // {pts, positions, parts:[{x,y,z,seed}], speedMul}
+  const state = { parts: [], schedule: [], spawned: 0, t: 0, missLanded: 0, execLanded: 0, done: false, total: 0, finalMiss: 1, finalExec: 0 };
 
-  function spawnPart() {
-    const theta = Math.random() * Math.PI * 2;
-    const phi = Math.random() * Math.PI * 2;
-    const r = Math.sqrt(Math.random()) * R_TUBE;
-    return {
-      x: (R_RING + r * Math.cos(phi)) * Math.cos(theta),
-      y: r * Math.sin(phi) * 0.85,
-      z: (R_RING + r * Math.cos(phi)) * Math.sin(theta),
-      seed: Math.random() * 100
-    };
-  }
-
-  typeData.forEach(t => {
-    const n = Math.max(40, Math.round(t.presc * scaleN));
-    const nExec = Math.round(n * t.rate);
-    const rgb = hexToRgb(t.color);
-    const baseColor = new THREE.Color(rgb.r / 255, rgb.g / 255, rgb.b / 255);
-    const litColor = baseColor.clone().lerp(new THREE.Color(1, 1, 1), 0.5);
-    [[n - nExec, baseColor, 0.32, 0.45, 0.92], [nExec, litColor, 0.5, 0.9, 1.18]].forEach(([cnt, col, size, opacity, speedMul]) => {
-      if (cnt <= 0) return;
-      const parts = Array.from({ length: cnt }, spawnPart);
-      const positions = new Float32Array(cnt * 3);
-      const geo = new THREE.BufferGeometry();
-      geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-      const mat = new THREE.PointsMaterial({
-        color: col, size, transparent: true, opacity,
-        blending: THREE.AdditiveBlending, depthWrite: false, sizeAttenuation: true
-      });
-      const pts = new THREE.Points(geo, mat);
-      scene.add(pts);
-      groups.push({ pts, positions, parts, speedMul });
+  function resetSim() {
+    state.parts = []; state.spawned = 0; state.t = 0;
+    state.missLanded = 0; state.execLanded = 0; state.done = false;
+    document.getElementById('flow-result').classList.remove('show');
+    // 排程:每類型依開立數占比分配粒子,出發時間打散在 0~26 秒
+    state.schedule = [];
+    typeData.forEach((t, li) => {
+      const n = Math.max(20, Math.round(N_TOTAL * t.presc / totalPresc));
+      for (let i = 0; i < n; i++) state.schedule.push({ at: Math.random() * 26, lane: li, exec: Math.random() < t.rate });
     });
-  });
-
-  // 中央光暈
-  const glowGeo = new THREE.SphereGeometry(1.6, 24, 24);
-  const glowMat = new THREE.MeshBasicMaterial({ color: 0x2aac8a, transparent: true, opacity: 0.35 });
-  scene.add(new THREE.Mesh(glowGeo, glowMat));
-
-  // 圖例
-  const legend = document.getElementById('flow-legend');
-  legend.innerHTML = typeData.map(t =>
-    '<div><span class="dot" style="color:' + t.color + ';background:' + t.color + '"></span>' +
-    t.name + ' — 開立 ' + t.presc.toLocaleString() + ' / 執行 ' + t.exec.toLocaleString() +
-    '(' + (t.rate * 100).toFixed(0) + '%)</div>'
-  ).join('') + '<div style="margin-top:4px;color:#8fb5a8">整體執行率 ' + (overallRate * 100).toFixed(1) + '% → 流速 ×' + swirlSpeed.toFixed(2) + '</div>';
-
-  // 視角:自動旋轉 + 拖曳
-  let azimuth = 0.6, elevation = 0.42, dragVX = 0, dragging = false, lastPX = 0, lastPY = 0;
-  wrap.addEventListener('pointerdown', e => { dragging = true; lastPX = e.clientX; lastPY = e.clientY; wrap.setPointerCapture(e.pointerId); });
-  wrap.addEventListener('pointermove', e => {
-    if (!dragging) return;
-    azimuth += (e.clientX - lastPX) * 0.006;
-    elevation = Math.max(0.08, Math.min(1.2, elevation + (e.clientY - lastPY) * 0.004));
-    lastPX = e.clientX; lastPY = e.clientY;
-  });
-  addEventListener('pointerup', () => { dragging = false; });
+    state.schedule.sort((a, b) => a.at - b.at);
+    state.total = state.schedule.length;
+    state.finalMiss = Math.max(1, state.schedule.filter(s => !s.exec).length);
+    state.finalExec = state.total - state.finalMiss;
+  }
+  window.replayFlow = resetSim;
 
   function resize() {
-    const w = wrap.clientWidth || 800, h = wrap.clientHeight || 480;
-    renderer.setSize(w, h, false);
-    camera.aspect = w / h;
-    camera.updateProjectionMatrix();
+    canvas.width = wrap.clientWidth || 900;
+    canvas.height = wrap.clientHeight || 500;
   }
   resize();
-  requestAnimationFrame(resize);
-  addEventListener('resize', resize);
   new ResizeObserver(resize).observe(wrap);
+  resetSim();
+
+  const GRID = 3, SZ = 5;
+  const snap = v => Math.round(v / GRID) * GRID;
+  const vis = visibilityFlag(wrap);
 
   let lastT = performance.now();
-  function frame(now) {
+  (function frame(now) {
+    if (!vis.visible) { lastT = now; requestAnimationFrame(frame); return; } // 離開視窗暫停,回來繼續演
     const dt = Math.min(0.05, (now - lastT) / 1000); lastT = now;
-    const t = now / 1000;
-    if (!dragging) azimuth += dt * 0.12;
+    state.t += dt;
+    const w = canvas.width, h = canvas.height;
+    const L = {
+      laneX0: w * 0.13, gateX: w * 0.60,
+      laneYs: typeData.map((_, i) => h * 0.14 + i * h * 0.115),
+      missX: w * 0.44, execX: w * 0.85,
+      floorY: h - 36, binW: w * 0.20, execBinW: w * 0.14,
+      maxPile: h * 0.30
+    };
 
-    const camR = 36;
-    camera.position.set(
-      Math.cos(azimuth) * camR * Math.cos(elevation),
-      Math.sin(elevation) * camR,
-      Math.sin(azimuth) * camR * Math.cos(elevation)
-    );
-    camera.lookAt(0, 0, 0);
+    // 生成粒子
+    while (state.spawned < state.schedule.length && state.schedule[state.spawned].at <= state.t) {
+      const s = state.schedule[state.spawned++];
+      state.parts.push({
+        lane: s.lane, exec: s.exec, phase: 'flow',
+        x: L.laneX0 - 30 - Math.random() * 20, y: L.laneYs[s.lane],
+        v: 90 + Math.random() * 50, wob: Math.random() * 6.28,
+        dropT: 0, fromX: 0, fromY: 0
+      });
+    }
 
-    groups.forEach(g => {
-      const sp = swirlSpeed * g.speedMul;
-      const pos = g.positions, parts = g.parts;
-      for (let i = 0; i < parts.length; i++) {
-        const p = parts[i];
-        // 環向漩渦
-        const rr = Math.sqrt(p.x * p.x + p.z * p.z) || 0.001;
-        const tx = -p.z / rr, tz = p.x / rr;
-        // 擬流場擾動(curl-ish noise)
-        const nx = Math.sin(p.y * 0.55 + t * 0.9 + p.seed) + Math.cos(p.z * 0.4 - t * 0.6);
-        const ny = Math.sin(p.z * 0.5 + t * 0.7 + p.seed * 1.3) + Math.cos(p.x * 0.45 + t * 0.5);
-        const nz = Math.sin(p.x * 0.5 - t * 0.55) + Math.cos(p.y * 0.6 + t * 0.8 + p.seed);
-        // 拉回環面
-        const radialErr = rr - R_RING;
-        const pullX = -(p.x / rr) * radialErr * 0.55 ;
-        const pullZ = -(p.z / rr) * radialErr * 0.55;
-        const pullY = -p.y * 0.35;
-        p.x += (tx * 6.5 * sp + nx * 1.6 + pullX) * dt;
-        p.y += (ny * 1.5 + pullY) * dt;
-        p.z += (tz * 6.5 * sp + nz * 1.6 + pullZ) * dt;
-        pos[i * 3] = p.x; pos[i * 3 + 1] = p.y; pos[i * 3 + 2] = p.z;
-      }
-      g.pts.geometry.attributes.position.needsUpdate = true;
+    // 背景 + 掃描線(像素 CRT 感)
+    ctx.imageSmoothingEnabled = false;
+    ctx.fillStyle = '#0d322e';
+    ctx.fillRect(0, 0, w, h);
+    ctx.fillStyle = 'rgba(255,255,255,0.025)';
+    for (let y = 0; y < h; y += 4) ctx.fillRect(0, y, w, 1);
+
+    // 四條類型通道
+    typeData.forEach((t, i) => {
+      const y = L.laneYs[i];
+      ctx.fillStyle = 'rgba(255,255,255,0.05)';
+      ctx.fillRect(L.laneX0 - 8, y - 7, L.gateX - L.laneX0 + 8, 14);
+      ctx.fillStyle = t.color;
+      ctx.font = '700 12px "Noto Sans TC", sans-serif';
+      ctx.textAlign = 'right'; ctx.textBaseline = 'middle';
+      ctx.fillText(t.name + ' ' + t.presc.toLocaleString(), L.laneX0 - 16, y - 6);
+      ctx.fillStyle = 'rgba(255,255,255,0.5)';
+      ctx.font = '11px "Noto Sans TC", sans-serif';
+      ctx.fillText('執行率 ' + (t.rate * 100).toFixed(0) + '%', L.laneX0 - 16, y + 9);
     });
 
-    glowMat.opacity = 0.25 + Math.sin(t * 1.4) * 0.1;
-    renderer.render(scene, camera);
+    // 執行判定閘門(黃色虛線)
+    ctx.fillStyle = 'rgba(234,255,154,0.5)';
+    for (let y = h * 0.08; y < h * 0.62; y += 10) ctx.fillRect(L.gateX, y, 2, 5);
+    ctx.fillStyle = '#eaff9a';
+    ctx.font = '700 12px "Noto Sans TC", sans-serif';
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText('執行判定', L.gateX, h * 0.055);
+
+    // 粒子更新與繪製
+    for (const p of state.parts) {
+      if (p.phase === 'flow') {
+        p.x += p.v * dt;
+        p.y = L.laneYs[p.lane] + Math.sin(state.t * 3 + p.wob) * 3;
+        if (p.x >= L.gateX) { p.phase = 'drop'; p.dropT = 0; p.fromX = p.x; p.fromY = p.y; }
+      } else if (p.phase === 'drop') {
+        p.dropT += dt / 1.1;
+        const tx = (p.exec ? L.execX : L.missX) + Math.sin(p.wob * 13.7) * (p.exec ? L.execBinW : L.binW) * 0.42;
+        const pileH = ((p.exec ? state.execLanded : state.missLanded) / state.finalMiss) * L.maxPile;
+        const ty = L.floorY - pileH - 4;
+        const e = Math.min(1, p.dropT);
+        p.x = p.fromX + (tx - p.fromX) * e;
+        p.y = p.fromY + (ty - p.fromY) * e * e; // 加速下墜
+        if (p.dropT >= 1) {
+          p.phase = 'landed';
+          if (p.exec) state.execLanded++; else state.missLanded++;
+        }
+      }
+      if (p.phase !== 'landed') {
+        if (p.phase === 'drop') ctx.fillStyle = p.exec ? '#eaff9a' : 'rgba(160,180,175,0.75)';
+        else ctx.fillStyle = typeData[p.lane].color;
+        ctx.fillRect(snap(p.x), snap(p.y), SZ, SZ);
+      }
+    }
+
+    // 兩座像素堆(高度同一比例尺:已執行堆只有未執行的 ~18%,這就是重點)
+    function pile(cx, bw, landed, color) {
+      const ph = (landed / state.finalMiss) * L.maxPile;
+      const x0 = cx - bw / 2;
+      ctx.fillStyle = color;
+      const cols = Math.floor(bw / GRID);
+      for (let c = 0; c < cols; c++) {
+        const jag = ((c * 7919) % 5) - 2; // 固定鋸齒頂
+        const hh = Math.max(0, ph + jag);
+        ctx.fillRect(x0 + c * GRID, L.floorY - hh, GRID - 1, hh);
+      }
+      ctx.fillStyle = 'rgba(255,255,255,0.18)';
+      ctx.fillRect(x0 - 4, L.floorY, bw + 8, 3);
+    }
+    pile(L.missX, L.binW, state.missLanded, 'rgba(150,170,165,0.5)');
+    pile(L.execX, L.execBinW, state.execLanded, '#bfe24a');
+
+    // 計數器(每顆像素換算回真實筆數;結束時鎖定精確值;只在數值變化時碰 DOM)
+    const missTxt = '未執行 ' + (state.done ? (totalPresc - totalExec).toLocaleString() : Math.round(state.missLanded * PER).toLocaleString());
+    const execTxt = '已執行 ' + (state.done ? totalExec.toLocaleString() : Math.round(state.execLanded * PER).toLocaleString());
+    const cm = document.getElementById('cntMiss'), ce = document.getElementById('cntExec');
+    if (cm.textContent !== missTxt) cm.textContent = missTxt;
+    if (ce.textContent !== execTxt) ce.textContent = execTxt;
+
+    // 一輪結束 → 顯示執行率結果
+    if (!state.done && state.spawned >= state.schedule.length &&
+        state.missLanded + state.execLanded >= state.total) {
+      state.done = true;
+      const res = document.getElementById('flow-result');
+      res.querySelector('.big').textContent = (rate * 100).toFixed(1) + '%';
+      res.classList.add('show');
+    }
+
     requestAnimationFrame(frame);
-  }
-  requestAnimationFrame(frame);
+  })(performance.now());
 }
 
 // ══════════════════════════════════════════════
