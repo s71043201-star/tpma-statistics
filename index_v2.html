@@ -480,8 +480,56 @@ body.is-loading .chart-wrap::after {
 .period-btn.active { background: #e6f5fa; border-color: var(--cyan); color: var(--cyan); }
 .period-btn:hover:not(.active) { border-color: #7dc7dd; background: #f0fbfd; }
 
+/* ── 整合篩選面板 ── */
+#filter-panel {
+  margin: 14px 36px 0; padding: 12px 18px;
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius); box-shadow: var(--shadow-sm);
+  display: flex; flex-direction: column; gap: 10px;
+}
+.fp-row { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+#dateFilterBar { align-items: center; gap: 8px; flex-wrap: wrap; }
+#tabControlsHost {
+  display: flex; flex-direction: column; gap: 8px;
+  border-top: 1px dashed var(--border); padding-top: 10px;
+}
+#tabControlsHost .period-bar,
+#tabControlsHost .chart-type-bar,
+#tabControlsHost .clinic-sort-bar { padding: 0; margin: 0; }
+
+/* ── 進場動畫 ── */
+@keyframes riseIn { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: translateY(0); } }
+.summary-grid .card { animation: riseIn 0.5s cubic-bezier(.22,.8,.36,1) backwards; }
+.summary-grid .card:nth-child(1) { animation-delay: 0.03s; }
+.summary-grid .card:nth-child(2) { animation-delay: 0.09s; }
+.summary-grid .card:nth-child(3) { animation-delay: 0.15s; }
+.summary-grid .card:nth-child(4) { animation-delay: 0.21s; }
+.summary-grid .card:nth-child(5) { animation-delay: 0.27s; }
+.tab-anim .chart-section { animation: riseIn 0.45s cubic-bezier(.22,.8,.36,1) backwards; }
+.tab-anim .chart-section:nth-of-type(2) { animation-delay: 0.08s; }
+.tab-anim .chart-section:nth-of-type(3) { animation-delay: 0.16s; }
+.tab-anim .type-grid .chart-section:nth-child(2) { animation-delay: 0.08s; }
+.tab-anim .type-grid .chart-section:nth-child(3) { animation-delay: 0.16s; }
+.tab-anim .type-grid .chart-section:nth-child(4) { animation-delay: 0.24s; }
+
+/* ── 數值更新脈衝 ── */
+@keyframes cardPulse {
+  0%   { box-shadow: var(--shadow-md), 0 0 0 0 rgba(42,172,138,0.45); }
+  100% { box-shadow: var(--shadow-md), 0 0 0 16px rgba(42,172,138,0); }
+}
+.card.pulse { animation: cardPulse 0.9s ease-out 2; }
+
+/* ── 動畫無障礙 ── */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
 /* ── 區域篩選下拉清單 ── */
-#region-filter-bar { position: relative; display: inline-block; margin: 12px 36px 0; }
+#region-filter-bar { position: relative; display: inline-block; margin: 0; }
 #region-filter-bar > summary {
   list-style: none; cursor: pointer; user-select: none;
   display: inline-flex; align-items: center; gap: 9px;
@@ -783,32 +831,33 @@ footer {
   <div class="card violet"><span class="icon"><svg class="ic" viewBox="0 0 24 24"><path d="M22 10v6M2 10l10-5 10 5-10 5z"/><path d="M6 12v5c3 3 9 3 12 0v-5"/></svg></span><div class="val" id="sumEnroll">—</div><div class="lbl">總選課人次</div><div class="delta" id="sumEnrollToday"></div></div>
 </div>
 
-<!-- 區域篩選（可收合下拉清單） -->
-<details id="region-filter-bar">
-  <summary>
-    <svg class="ic" viewBox="0 0 24 24" style="width:16px;height:16px"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg>
-    區域篩選：<b id="regionDropdownLabel">全部</b>
-    <svg class="ic chev" viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg>
-  </summary>
-  <div class="region-menu">
-    <button class="region-btn active" onclick="setRegionFilter('all',this)">全部</button>
-    <button class="region-btn" onclick="setRegionFilter('北投區',this)">北投區</button>
-    <button class="region-btn" onclick="setRegionFilter('士林區',this)">士林區</button>
-    <button class="region-btn" onclick="setRegionFilter('中山區',this)">中山區</button>
+<!-- ═══ 整合篩選面板（區域 / 日期 / 各分頁顯示控制） ═══ -->
+<div id="filter-panel">
+  <div class="fp-row">
+    <details id="region-filter-bar">
+      <summary>
+        <svg class="ic" viewBox="0 0 24 24" style="width:16px;height:16px"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg>
+        區域篩選：<b id="regionDropdownLabel">全部</b>
+        <svg class="ic chev" viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg>
+      </summary>
+      <div class="region-menu">
+        <button class="region-btn active" onclick="setRegionFilter('all',this)">全部</button>
+        <button class="region-btn" onclick="setRegionFilter('北投區',this)">北投區</button>
+        <button class="region-btn" onclick="setRegionFilter('士林區',this)">士林區</button>
+        <button class="region-btn" onclick="setRegionFilter('中山區',this)">中山區</button>
+      </div>
+    </details>
+    <div id="dateFilterBar" style="display:none">
+      <span style="font-size:0.95rem;font-weight:700;color:var(--teal);white-space:nowrap">開立日期：</span>
+      <input type="date" id="filterFrom" style="padding:7px 12px;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:0.94rem;font-family:inherit">
+      <span style="color:var(--text-muted);font-size:0.94rem">至</span>
+      <input type="date" id="filterTo" style="padding:7px 12px;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:0.94rem;font-family:inherit">
+      <button onclick="applyDateFilter()" style="padding:7px 20px;border-radius:8px;border:none;background:var(--teal);color:#fff;font-size:0.94rem;font-weight:700;cursor:pointer;font-family:inherit">套用</button>
+      <button onclick="clearDateFilter()" style="padding:7px 16px;border-radius:8px;border:1px solid var(--border);background:transparent;color:var(--text-muted);font-size:0.94rem;cursor:pointer;font-family:inherit">清除</button>
+      <span id="filterStatus" style="font-size:0.88rem;color:var(--text-muted)"></span>
+    </div>
   </div>
-</details>
-
-<!-- 日期篩選列 -->
-<div id="dateFilterBar" style="display:none;margin:12px 36px;padding:10px 16px;background:var(--surface);border-radius:10px;border:1px solid var(--border);align-items:center;gap:12px;flex-wrap:wrap">
-  <span style="font-size:0.98rem;font-weight:700;color:var(--teal);white-space:nowrap">篩選開立日期：</span>
-  <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
-    <input type="date" id="filterFrom" style="padding:7px 12px;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:0.94rem;font-family:inherit">
-    <span style="color:var(--text-muted);font-size:0.94rem">至</span>
-    <input type="date" id="filterTo" style="padding:7px 12px;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:0.94rem;font-family:inherit">
-  </div>
-  <button onclick="applyDateFilter()" style="padding:7px 20px;border-radius:8px;border:none;background:var(--teal);color:#fff;font-size:0.94rem;font-weight:700;cursor:pointer;font-family:inherit">套用</button>
-  <button onclick="clearDateFilter()" style="padding:7px 16px;border-radius:8px;border:1px solid var(--border);background:transparent;color:var(--text-muted);font-size:0.94rem;cursor:pointer;font-family:inherit">清除</button>
-  <span id="filterStatus" style="font-size:0.88rem;color:var(--text-muted)"></span>
+  <div id="tabControlsHost"></div>
 </div>
 
 <!-- ═══ TAB 1 ═══ -->
@@ -1249,9 +1298,9 @@ if (isConfigured) {
   document.getElementById("setup-banner").style.display = "none";
 }
 
-// 全域關閉 Chart.js 動畫（確保截圖時圖表完整渲染）+ 統一視覺主題
+// Chart.js 統一視覺主題 + 生長動畫（PDF 匯出/自動同步時暫時關閉）
 if (typeof Chart !== 'undefined') {
-  Chart.defaults.animation = false;
+  Chart.defaults.animation = { duration: 700, easing: 'easeOutQuart' };
   Chart.defaults.font.family = "'Noto Sans TC','Noto Sans TC','Microsoft JhengHei',sans-serif";
   Chart.defaults.color = '#56716a';
   Chart.defaults.plugins.tooltip.backgroundColor = 'rgba(15,38,31,0.92)';
@@ -1329,7 +1378,7 @@ function setCloudStatus(state, msg) {
 // ══════════════════════════════════════════════
 //  從 Supabase 讀取資料
 // ══════════════════════════════════════════════
-async function loadFromCloud() {
+async function loadFromCloud(auto) {
   if (!sbClient) {
     setCloudStatus('error', '⚠️ 尚未設定 Supabase，請參考設定教學填入 URL 和 Key');
     return;
@@ -1389,8 +1438,12 @@ async function loadFromCloud() {
     document.getElementById('headerDesc').textContent =
       `資料區間：${dr}　｜　共 ${weeklyData.reduce((s,d)=>s+d.開立數,0).toLocaleString()} 筆處方紀錄`;
     setCloudStatus('', `✦ 已載入最新資料　來源：${fn}　上傳時間：${at}`);
+    // 自動背景同步時不重播圖表生長動畫,避免每 5 分鐘晃一次
+    const _prevAnim = (typeof Chart !== 'undefined') ? Chart.defaults.animation : null;
+    if (auto && typeof Chart !== 'undefined') Chart.defaults.animation = false;
     updateSummary();
     buildAllCharts();
+    if (auto && typeof Chart !== 'undefined') Chart.defaults.animation = _prevAnim;
     trackDailyUpdate();
   } catch(e) {
     setCloudStatus('error', '❌ 連線失敗，請確認網路及 Supabase 設定');
@@ -1624,19 +1677,27 @@ function setAnimatedText(id, finalText){
   if(!el) return;
   finalText = String(finalText);
   if(el.dataset.prevText === finalText) return;
+  const isUpdate = el.dataset.prevText !== undefined; // 非首次,代表資料有變
   el.dataset.prevText = finalText;
   if(_animTimers[id]) cancelAnimationFrame(_animTimers[id]);
+  // 資料更新時讓所屬卡片發出脈衝光圈
+  if(isUpdate){
+    const card = el.closest('.card');
+    if(card){ card.classList.remove('pulse'); void card.offsetWidth; card.classList.add('pulse'); }
+  }
   const m = finalText.match(/^([^0-9]*)([0-9][0-9,]*(?:\.[0-9]+)?)(.*)$/);
-  if(!m){ el.textContent = finalText; return; }
+  if(!m){ el.textContent = finalText; delete el.dataset.prevNum; return; }
   const target = parseFloat(m[2].replace(/,/g,''));
   if(!isFinite(target)){ el.textContent = finalText; return; }
+  const fromVal = parseFloat(el.dataset.prevNum || '0') || 0; // 從上次的值滾動,首次從 0
+  el.dataset.prevNum = target;
   const decimals = (m[2].split('.')[1]||'').length;
   const useGrouping = m[2].includes(',');
   const start = performance.now(), dur = 650;
   const frame = (now)=>{
     const t = Math.min(1, (now-start)/dur);
     const eased = 1 - Math.pow(1-t, 3);
-    const v = target * eased;
+    const v = fromVal + (target - fromVal) * eased;
     el.textContent = m[1] + v.toLocaleString('en-US',{minimumFractionDigits:decimals,maximumFractionDigits:decimals,useGrouping}) + m[3];
     if(t < 1) _animTimers[id] = requestAnimationFrame(frame);
     else { el.textContent = finalText; delete _animTimers[id]; }
@@ -3179,6 +3240,10 @@ function showTab(name, btn){
   currentActiveTab = name;
   const bar = document.getElementById('dateFilterBar');
   if(bar) bar.style.display = (name!=='prescday' && name!=='course') ? 'flex' : 'none';
+  updateTabControls(name);
+  // 重新觸發該分頁圖卡的進場動畫
+  const tabEl = document.getElementById('tab-'+name);
+  if(tabEl){ tabEl.classList.remove('tab-anim'); void tabEl.offsetWidth; tabEl.classList.add('tab-anim'); }
   if(name==='daily') setTimeout(()=>buildDailyCharts(currentChartType.daily), 50);
   if(name==='clinic') setTimeout(()=>buildClinicCharts(), 50);
   if(name==='prescday') setTimeout(()=>buildPrescDayCharts(), 50);
@@ -4153,6 +4218,10 @@ async function startPdfExport() {
 
   closePdfModal();
 
+  // 匯出期間關閉圖表動畫,確保截圖完整
+  const _pdfPrevAnim = (typeof Chart !== 'undefined') ? Chart.defaults.animation : null;
+  if (typeof Chart !== 'undefined') Chart.defaults.animation = false;
+
   const progressOverlay = document.getElementById('pdf-progress-overlay');
   const progressMsg = document.getElementById('pdf-progress-msg');
   const progressSub = document.getElementById('pdf-progress-sub');
@@ -4417,11 +4486,39 @@ async function startPdfExport() {
     console.error('PDF 匯出失敗', err);
     alert('PDF 匯出時發生錯誤：' + err.message);
   } finally {
+    if (typeof Chart !== 'undefined') Chart.defaults.animation = _pdfPrevAnim;
     progressOverlay.classList.remove('show');
   }
 }
 
+// ── 整合篩選面板:把各分頁的顯示控制列搬進 #tabControlsHost,跟著分頁切換顯示 ──
+function updateTabControls(name){
+  const host = document.getElementById('tabControlsHost');
+  if(!host) return;
+  let any = false;
+  host.querySelectorAll('[data-tab]').forEach(bar=>{
+    const show = bar.dataset.tab === name;
+    bar.style.display = show ? 'flex' : 'none';
+    if(show) any = true;
+  });
+  host.style.display = any ? '' : 'none';
+}
+(function integrateTabControls(){
+  const host = document.getElementById('tabControlsHost');
+  if(!host) return;
+  [['tab-weekly','weekly'],['tab-daily','daily'],['tab-type','type'],['tab-typeweekly','typeweekly'],['tab-clinic','clinic']].forEach(([tabId,name])=>{
+    const tab = document.getElementById(tabId);
+    if(!tab) return;
+    tab.querySelectorAll('.period-bar, .chart-type-bar, .clinic-sort-bar').forEach(bar=>{
+      bar.dataset.tab = name;
+      host.appendChild(bar);
+    });
+  });
+  updateTabControls('weekly');
+})();
+
 // ── 初始化 ──
+document.getElementById('tab-weekly').classList.add('tab-anim');
 loadRegionMap();
 loadFromCloud();
 incrementViewCount();
@@ -4429,12 +4526,12 @@ document.getElementById('dateFilterBar').style.display = 'flex';
 if(prescDayDatasets.length){ renderPrescDayList(); buildPrescDayCharts(); buildPrescDayCourseCharts(); }
 
 // ── 自動同步雲端資料(n8n 每 5 分鐘更新 Supabase) ──
-setInterval(loadFromCloud, 5 * 60 * 1000);
+setInterval(() => loadFromCloud(true), 5 * 60 * 1000);
 let lastVisibleReload = Date.now();
 document.addEventListener('visibilitychange', () => {
   if(document.visibilityState === 'visible' && Date.now() - lastVisibleReload > 30 * 1000){
     lastVisibleReload = Date.now();
-    loadFromCloud();
+    loadFromCloud(true);
   }
 });
 </script>
