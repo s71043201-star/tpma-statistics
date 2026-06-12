@@ -3348,10 +3348,16 @@ function showTab(name, btn){
   // 重新觸發該分頁圖卡的進場動畫
   const tabEl = document.getElementById('tab-'+name);
   if(tabEl){ tabEl.classList.remove('tab-anim'); void tabEl.offsetWidth; tabEl.classList.add('tab-anim'); }
-  if(name==='daily') setTimeout(()=>buildDailyCharts(currentChartType.daily), 50);
-  if(name==='clinic') setTimeout(()=>buildClinicCharts(), 50);
-  if(name==='prescday') setTimeout(()=>buildPrescDayCharts(), 50);
-  if(name==='course') setTimeout(()=>buildCourseCharts(), 50);
+  // 等瀏覽器完成版面布局後再重建/校正圖表,避免在 0 尺寸(隱藏)容器上建立而呈空白
+  requestAnimationFrame(()=>requestAnimationFrame(()=>{
+    if(name==='daily')         buildDailyCharts(currentChartType.daily);
+    else if(name==='clinic')   buildClinicCharts();
+    else if(name==='prescday') buildPrescDayCharts();
+    else if(name==='course')   buildCourseCharts();
+    // weekly/type/typeweekly 的圖表在資料載入時即建立(可能曾在隱藏分頁下產生 0 尺寸死圖),
+    // 顯示後強制校正一次尺寸即可重繪,免去依賴 ResizeObserver 的時機
+    Object.values(chartInstances).forEach(c=>{ try{ c.resize(); }catch(e){} });
+  }));
   updateSummary();
 }
 
@@ -3664,12 +3670,13 @@ function renderDaySchedule(){
     return;
   }
   // 當日彙總
-  let sumBk = 0, sumCk = 0, sumCap = 0, cancelledCnt = 0;
+  let sumBk = 0, sumCk = 0, sumCap = 0, cancelledCnt = 0, fullCnt = 0;
   slots.forEach(s => {
     if(s.status === 'cancelled'){ cancelledCnt++; return; }
     sumBk += s.booked_count || 0;
     sumCk += s.checked_count || 0;
     sumCap += s.capacity || 0;
+    if((s.capacity || 0) > 0 && (s.booked_count || 0) >= s.capacity) fullCnt++;
   });
   const typeColors = { mental:'#7c3aed', nutrition:'#2aac8a', social:'#1a9fbe', exercise:'#e8930a', other:'#9aa5b1' };
   const typeLabels = { mental:'情緒調適', nutrition:'營養', social:'社會', exercise:'運動' };
@@ -3688,7 +3695,8 @@ function renderDaySchedule(){
     <span>報名 <b>${sumBk.toLocaleString()}</b></span>
     <span>已到 <b>${sumCk.toLocaleString()}</b></span>
     <span>總容量 <b>${sumCap.toLocaleString()}</b></span>
-    <span>滿座率 <b>${sumCap > 0 ? Math.round(sumBk/sumCap*100) : 0}%</b></span>
+    <span>報名率 <b>${sumCap > 0 ? Math.round(sumBk/sumCap*100) : 0}%</b></span>
+    <span>滿座率 <b>${slots.length > 0 ? Math.round(fullCnt/slots.length*100) : 0}%</b></span>
     <span>出席率 <b>${sumBk > 0 ? Math.round(sumCk/sumBk*100) : 0}%</b></span>
   </div>`;
   // 同時段卡片固定順序:運動 → 營養 → 情緒調適 → 社會 → 其他
