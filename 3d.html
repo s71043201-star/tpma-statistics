@@ -1,0 +1,884 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>健康處方 3D 流體實驗室</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/echarts-gl@2.0.9/dist/echarts-gl.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/0.149.0/three.min.js"></script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700;800&display=swap');
+
+:root {
+  --green-yellow: #8fba2e;
+  --teal:         #2aac8a;
+  --cyan:         #1a9fbe;
+  --blue-teal:    #1a7ea0;
+  --bg:           #07130f;
+  --text:         #e9f6f0;
+  --text-muted:   #8fb5a8;
+  --glass:        rgba(14, 36, 29, 0.55);
+  --glass-border: rgba(143, 186, 46, 0.18);
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+html { scroll-behavior: smooth; }
+
+body {
+  font-family: 'Noto Sans TC', 'Microsoft JhengHei', sans-serif;
+  background: var(--bg); color: var(--text); min-height: 100vh;
+  overflow-x: hidden;
+}
+
+/* 互動流體背景 */
+#fluidCanvas {
+  position: fixed; inset: 0; width: 100vw; height: 100vh;
+  z-index: 0; pointer-events: none;
+}
+
+.page { position: relative; z-index: 1; max-width: 1180px; margin: 0 auto; padding: 0 24px 80px; }
+
+/* ── Header ── */
+header { padding: 42px 0 10px; }
+header h1 {
+  font-size: 2rem; font-weight: 800; letter-spacing: 0.04em;
+  background: linear-gradient(110deg, #b9e35a, #3fd4ac, #3fc2e8);
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+}
+header p { color: var(--text-muted); margin-top: 8px; font-size: 0.92rem; }
+.header-row { display: flex; align-items: flex-end; justify-content: space-between; flex-wrap: wrap; gap: 12px; }
+.back-link {
+  color: var(--teal); text-decoration: none; font-size: 0.88rem;
+  border: 1px solid rgba(42,172,138,0.4); border-radius: 999px; padding: 7px 16px;
+  transition: background 0.2s;
+}
+.back-link:hover { background: rgba(42,172,138,0.15); }
+#data-status {
+  display: inline-block; margin-top: 10px; font-size: 0.78rem; color: var(--text-muted);
+  border: 1px solid var(--glass-border); border-radius: 999px; padding: 4px 12px;
+  background: var(--glass);
+}
+#data-status.live { color: #b9e35a; border-color: rgba(143,186,46,0.45); }
+
+.hint { color: var(--text-muted); font-size: 0.8rem; margin-top: 6px; }
+
+/* ── 區塊 ── */
+section { margin-top: 38px; }
+section > h2 {
+  font-size: 1.15rem; font-weight: 700; letter-spacing: 0.06em; margin-bottom: 6px;
+  display: flex; align-items: center; gap: 10px;
+}
+section > h2::before {
+  content: ''; width: 10px; height: 10px; border-radius: 3px;
+  background: linear-gradient(135deg, var(--green-yellow), var(--cyan));
+  box-shadow: 0 0 12px rgba(63,212,172,0.8);
+}
+section > .sub { color: var(--text-muted); font-size: 0.83rem; margin-bottom: 16px; }
+
+.glass {
+  background: var(--glass); border: 1px solid var(--glass-border);
+  border-radius: 18px; backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
+  box-shadow: 0 8px 40px rgba(0,0,0,0.35);
+}
+
+/* ── KPI 液體卡片 ── */
+.kpi-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; }
+.kpi-card { position: relative; overflow: hidden; padding: 22px 24px 30px; min-height: 150px; }
+.kpi-card canvas { position: absolute; left: 0; right: 0; bottom: 0; width: 100%; height: 100%; }
+.kpi-card .kpi-label { position: relative; z-index: 2; font-size: 0.85rem; color: var(--text-muted); letter-spacing: 0.08em; }
+.kpi-card .kpi-value { position: relative; z-index: 2; font-size: 2.5rem; font-weight: 800; margin-top: 6px; text-shadow: 0 2px 12px rgba(0,0,0,0.5); }
+.kpi-card .kpi-sub { position: relative; z-index: 2; font-size: 0.78rem; color: var(--text-muted); margin-top: 4px; }
+
+/* ── 類型液體量表 ── */
+.gauge-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 18px; }
+.gauge-card { padding: 20px 12px 16px; text-align: center; }
+.gauge-card canvas { width: 150px; height: 150px; max-width: 100%; }
+.gauge-card .g-name { font-weight: 700; font-size: 0.95rem; margin-top: 8px; }
+.gauge-card .g-nums { font-size: 0.78rem; color: var(--text-muted); margin-top: 3px; }
+
+/* ── 3D 圖表 ── */
+#bar3d-wrap { height: 520px; padding: 8px; }
+#bar3d { width: 100%; height: 100%; }
+.seg { display: inline-flex; border: 1px solid var(--glass-border); border-radius: 999px; overflow: hidden; margin-bottom: 14px; }
+.seg button {
+  background: transparent; color: var(--text-muted); border: none; cursor: pointer;
+  padding: 7px 20px; font-size: 0.85rem; font-family: inherit; transition: all 0.2s;
+}
+.seg button.on { background: linear-gradient(135deg, rgba(143,186,46,0.35), rgba(26,159,190,0.35)); color: #fff; font-weight: 700; }
+
+/* ── 流體粒子場景 ── */
+#flow-wrap { position: relative; height: 520px; overflow: hidden; cursor: grab; }
+#flow-wrap:active { cursor: grabbing; }
+#flowCanvas { width: 100%; height: 100%; display: block; }
+#flow-legend {
+  position: absolute; top: 16px; left: 18px; z-index: 3;
+  background: rgba(5, 18, 14, 0.65); border: 1px solid var(--glass-border);
+  border-radius: 12px; padding: 12px 16px; backdrop-filter: blur(8px);
+  font-size: 0.8rem; line-height: 1.9; pointer-events: none;
+}
+#flow-legend .dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 7px; box-shadow: 0 0 8px currentColor; }
+#flow-note {
+  position: absolute; bottom: 12px; right: 16px; z-index: 3;
+  font-size: 0.72rem; color: var(--text-muted); pointer-events: none;
+}
+
+footer { margin-top: 50px; text-align: center; color: var(--text-muted); font-size: 0.78rem; }
+
+@media (max-width: 880px) {
+  .kpi-row { grid-template-columns: 1fr; }
+  .gauge-row { grid-template-columns: repeat(2, 1fr); }
+  #bar3d-wrap, #flow-wrap { height: 420px; }
+}
+</style>
+</head>
+<body>
+
+<canvas id="fluidCanvas"></canvas>
+
+<div class="page">
+  <header>
+    <div class="header-row">
+      <div>
+        <h1>健康處方 3D 流體實驗室</h1>
+        <p>同一份 Supabase 即時資料的另一種樣貌 — 流體背景・液體量表・3D 圖表・資料驅動粒子流</p>
+        <span id="data-status">資料載入中…</span>
+      </div>
+      <a class="back-link" href="index.html">← 回主儀表板</a>
+    </div>
+    <p class="hint">滑鼠(或手指)在頁面上滑動,可以攪動背景的流體 🌊</p>
+  </header>
+
+  <section>
+    <h2>液體 KPI</h2>
+    <p class="sub">水位高度由真實數據驅動:執行數卡片的水位 = 執行數佔開立數比例</p>
+    <div class="kpi-row">
+      <div class="kpi-card glass">
+        <canvas id="kpiWave0"></canvas>
+        <div class="kpi-label">總開立數</div>
+        <div class="kpi-value" id="kpiVal0">–</div>
+        <div class="kpi-sub" id="kpiSub0"></div>
+      </div>
+      <div class="kpi-card glass">
+        <canvas id="kpiWave1"></canvas>
+        <div class="kpi-label">總執行數</div>
+        <div class="kpi-value" id="kpiVal1">–</div>
+        <div class="kpi-sub" id="kpiSub1"></div>
+      </div>
+      <div class="kpi-card glass">
+        <canvas id="kpiWave2"></canvas>
+        <div class="kpi-label">整體執行率</div>
+        <div class="kpi-value" id="kpiVal2">–</div>
+        <div class="kpi-sub" id="kpiSub2"></div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>各類型執行率液體量表</h2>
+    <p class="sub">圓形容器的水位 = 該處方類型的執行率</p>
+    <div class="gauge-row" id="gaugeRow"></div>
+  </section>
+
+  <section>
+    <h2>月份 × 處方類型 3D 長條圖</h2>
+    <p class="sub">可拖曳旋轉、滾輪縮放;自動緩慢旋轉中</p>
+    <div class="seg">
+      <button id="segPresc" class="on" onclick="setBar3dMetric('presc')">開立數</button>
+      <button id="segExec" onclick="setBar3dMetric('exec')">執行數</button>
+    </div>
+    <div id="bar3d-wrap" class="glass"><div id="bar3d"></div></div>
+  </section>
+
+  <section>
+    <h2>資料驅動流體粒子場景</h2>
+    <p class="sub">每顆粒子代表處方紀錄(等比例縮放),顏色 = 處方類型,亮粒子 = 已執行;整體流速與執行率成正比。拖曳可旋轉視角。</p>
+    <div id="flow-wrap" class="glass">
+      <canvas id="flowCanvas"></canvas>
+      <div id="flow-legend"></div>
+      <div id="flow-note">拖曳旋轉視角</div>
+    </div>
+  </section>
+
+  <footer>實驗頁 — 不影響正式儀表板 · 資料來源與 index.html 相同(Supabase prescription_data)</footer>
+</div>
+
+<script>
+// ══════════════════════════════════════════════
+//  共用:Supabase 設定(與 index.html 相同)
+// ══════════════════════════════════════════════
+const SUPABASE_URL      = 'https://ilcnqpywxaseeyasiwws.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlsY25xcHl3eGFzZWV5YXNpd3dzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM4MzIzODgsImV4cCI6MjA4OTQwODM4OH0.TrjIr4IMdvpstkN8tNBQtAEvvNDTLg3XcXXIpptJIs0';
+
+const TYPE_COLORS = ['#8fba2e', '#2aac8a', '#1a9fbe', '#1a7ea0'];
+
+function hexToRgb(hex) {
+  const n = parseInt(hex.slice(1), 16);
+  return { r: (n >> 16) & 255, g: (n >> 8) & 255, b: n & 255 };
+}
+
+// ══════════════════════════════════════════════
+//  資料載入與聚合
+// ══════════════════════════════════════════════
+// typeData: [{name, presc, exec, rate, color}]
+// monthAgg: {months:[...], perType: {typeName: {month: {presc, exec}}}}
+let typeData = [], monthAgg = { months: [], perType: {} };
+
+function monthOf(dateStr) {
+  const d = new Date(dateStr);
+  if (isNaN(d)) return null;
+  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
+}
+
+function aggregate(rows) {
+  const typeMap = {}, monthSet = new Set(), perType = {};
+  rows.forEach(r => {
+    if (!r.type) return;
+    if (!typeMap[r.type]) typeMap[r.type] = { presc: 0, exec: 0 };
+    typeMap[r.type].presc++;
+    if (r.ex) typeMap[r.type].exec++;
+    const pm = monthOf(r.prescDate);
+    if (pm) {
+      monthSet.add(pm);
+      if (!perType[r.type]) perType[r.type] = {};
+      if (!perType[r.type][pm]) perType[r.type][pm] = { presc: 0, exec: 0 };
+      perType[r.type][pm].presc++;
+      if (r.ex) {
+        const em = monthOf(r.execDate) || pm;
+        monthSet.add(em);
+        if (!perType[r.type][em]) perType[r.type][em] = { presc: 0, exec: 0 };
+        perType[r.type][em].exec++;
+      }
+    }
+  });
+  const names = Object.keys(typeMap).sort((a, b) => typeMap[b].presc - typeMap[a].presc);
+  typeData = names.map((n, i) => ({
+    name: n, presc: typeMap[n].presc, exec: typeMap[n].exec,
+    rate: typeMap[n].presc > 0 ? typeMap[n].exec / typeMap[n].presc : 0,
+    color: TYPE_COLORS[i % TYPE_COLORS.length]
+  }));
+  monthAgg = { months: [...monthSet].sort(), perType };
+}
+
+function demoData() {
+  const names = ['運動處方', '營養處方', '心理處方', '社會處方'];
+  const rows = [];
+  const base = [520, 380, 300, 210];
+  for (let t = 0; t < 4; t++) {
+    for (let i = 0; i < base[t]; i++) {
+      const m = 1 + Math.floor(Math.pow((i / base[t]), 0.8) * 5); // 2026-01 ~ 2026-05
+      rows.push({
+        type: names[t],
+        prescDate: '2026-0' + m + '-15',
+        execDate: '2026-0' + Math.min(5, m + (i % 2)) + '-20',
+        ex: (i % 10) < (7 - t)
+      });
+    }
+  }
+  return rows;
+}
+
+async function loadData() {
+  const statusEl = document.getElementById('data-status');
+  let rows = null;
+  try {
+    const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    const { data, error } = await sb.from('prescription_data').select('raw_rows').eq('id', 'main').single();
+    if (!error && data && Array.isArray(data.raw_rows) && data.raw_rows.length) {
+      rows = data.raw_rows;
+      statusEl.textContent = '☁️ 雲端即時資料 · ' + rows.length.toLocaleString() + ' 筆處方紀錄';
+      statusEl.classList.add('live');
+    }
+  } catch (e) { /* fall through to demo */ }
+  if (!rows) {
+    rows = demoData();
+    statusEl.textContent = '⚠️ 無法連線雲端,目前顯示範例資料';
+  }
+  aggregate(rows);
+  initKpiAndGauges();
+  initBar3d();
+  initFlowScene();
+}
+
+// ══════════════════════════════════════════════
+//  ① 互動流體背景(WebGL2 Navier-Stokes)
+// ══════════════════════════════════════════════
+(function initFluid() {
+  const canvas = document.getElementById('fluidCanvas');
+  const gl = canvas.getContext('webgl2', { alpha: true, depth: false, stencil: false, antialias: false, premultipliedAlpha: true });
+  if (!gl || !gl.getExtension('EXT_color_buffer_float')) { canvas.style.display = 'none'; return; }
+  gl.getExtension('OES_texture_float_linear');
+
+  const VERT = `#version 300 es
+  precision highp float;
+  layout(location=0) in vec2 aPos;
+  out vec2 vUv;
+  void main(){ vUv = aPos*0.5+0.5; gl_Position = vec4(aPos,0.0,1.0); }`;
+
+  function makeProgram(fragSrc) {
+    function sh(type, src) {
+      const s = gl.createShader(type);
+      gl.shaderSource(s, src); gl.compileShader(s);
+      if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(s));
+      return s;
+    }
+    const p = gl.createProgram();
+    gl.attachShader(p, sh(gl.VERTEX_SHADER, VERT));
+    gl.attachShader(p, sh(gl.FRAGMENT_SHADER, fragSrc));
+    gl.linkProgram(p);
+    if (!gl.getProgramParameter(p, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(p));
+    const uniforms = {};
+    const n = gl.getProgramParameter(p, gl.ACTIVE_UNIFORMS);
+    for (let i = 0; i < n; i++) {
+      const name = gl.getActiveUniform(p, i).name;
+      uniforms[name] = gl.getUniformLocation(p, name);
+    }
+    return { prog: p, u: uniforms, bind() { gl.useProgram(p); } };
+  }
+
+  const HEAD = `#version 300 es
+  precision highp float; precision highp sampler2D;
+  in vec2 vUv; out vec4 frag;`;
+
+  const advectP = makeProgram(HEAD + `
+  uniform sampler2D uVelocity, uSource;
+  uniform vec2 texelSize; uniform float dt, dissipation;
+  void main(){
+    vec2 coord = vUv - dt * texture(uVelocity, vUv).xy * texelSize;
+    frag = dissipation * texture(uSource, coord);
+  }`);
+
+  const splatP = makeProgram(HEAD + `
+  uniform sampler2D uTarget;
+  uniform float aspectRatio, radius;
+  uniform vec2 point; uniform vec3 color;
+  void main(){
+    vec2 p = vUv - point; p.x *= aspectRatio;
+    vec3 splat = exp(-dot(p,p)/radius) * color;
+    frag = vec4(texture(uTarget, vUv).xyz + splat, 1.0);
+  }`);
+
+  const divergenceP = makeProgram(HEAD + `
+  uniform sampler2D uVelocity; uniform vec2 texelSize;
+  void main(){
+    float L = texture(uVelocity, vUv - vec2(texelSize.x,0.0)).x;
+    float R = texture(uVelocity, vUv + vec2(texelSize.x,0.0)).x;
+    float B = texture(uVelocity, vUv - vec2(0.0,texelSize.y)).y;
+    float T = texture(uVelocity, vUv + vec2(0.0,texelSize.y)).y;
+    frag = vec4(0.5*(R-L+T-B), 0.0, 0.0, 1.0);
+  }`);
+
+  const pressureP = makeProgram(HEAD + `
+  uniform sampler2D uPressure, uDivergence; uniform vec2 texelSize;
+  void main(){
+    float L = texture(uPressure, vUv - vec2(texelSize.x,0.0)).x;
+    float R = texture(uPressure, vUv + vec2(texelSize.x,0.0)).x;
+    float B = texture(uPressure, vUv - vec2(0.0,texelSize.y)).x;
+    float T = texture(uPressure, vUv + vec2(0.0,texelSize.y)).x;
+    float div = texture(uDivergence, vUv).x;
+    frag = vec4((L+R+B+T-div)*0.25, 0.0, 0.0, 1.0);
+  }`);
+
+  const gradientP = makeProgram(HEAD + `
+  uniform sampler2D uPressure, uVelocity; uniform vec2 texelSize;
+  void main(){
+    float L = texture(uPressure, vUv - vec2(texelSize.x,0.0)).x;
+    float R = texture(uPressure, vUv + vec2(texelSize.x,0.0)).x;
+    float B = texture(uPressure, vUv - vec2(0.0,texelSize.y)).x;
+    float T = texture(uPressure, vUv + vec2(0.0,texelSize.y)).x;
+    vec2 v = texture(uVelocity, vUv).xy - 0.5*vec2(R-L, T-B);
+    frag = vec4(v, 0.0, 1.0);
+  }`);
+
+  const clearP = makeProgram(HEAD + `
+  uniform sampler2D uTexture; uniform float value;
+  void main(){ frag = value * texture(uTexture, vUv); }`);
+
+  const displayP = makeProgram(HEAD + `
+  uniform sampler2D uTexture;
+  void main(){
+    vec3 c = texture(uTexture, vUv).rgb;
+    float a = clamp(max(c.r, max(c.g, c.b)) * 1.4, 0.0, 1.0);
+    frag = vec4(c, a);
+  }`);
+
+  // 全螢幕三角形
+  const vao = gl.createVertexArray();
+  gl.bindVertexArray(vao);
+  const vbo = gl.createBuffer();
+  gl.bindBuffer(gl.ARRAY_BUFFER, vbo);
+  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 3, -1, -1, 3]), gl.STATIC_DRAW);
+  gl.enableVertexAttribArray(0);
+  gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
+
+  function blit(target) {
+    if (target) {
+      gl.bindFramebuffer(gl.FRAMEBUFFER, target.fbo);
+      gl.viewport(0, 0, target.w, target.h);
+    } else {
+      gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+      gl.viewport(0, 0, gl.drawingBufferWidth, gl.drawingBufferHeight);
+    }
+    gl.drawArrays(gl.TRIANGLES, 0, 3);
+  }
+
+  function createFBO(w, h) {
+    const tex = gl.createTexture();
+    gl.activeTexture(gl.TEXTURE0);
+    gl.bindTexture(gl.TEXTURE_2D, tex);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA16F, w, h, 0, gl.RGBA, gl.HALF_FLOAT, null);
+    const fbo = gl.createFramebuffer();
+    gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
+    gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, tex, 0);
+    gl.clearColor(0, 0, 0, 0); gl.clear(gl.COLOR_BUFFER_BIT);
+    return {
+      tex, fbo, w, h, texel: [1 / w, 1 / h],
+      attach(id) { gl.activeTexture(gl.TEXTURE0 + id); gl.bindTexture(gl.TEXTURE_2D, tex); return id; }
+    };
+  }
+  function doubleFBO(w, h) {
+    let a = createFBO(w, h), b = createFBO(w, h);
+    return {
+      get read() { return a; }, get write() { return b; },
+      swap() { const t = a; a = b; b = t; }, texel: [1 / w, 1 / h], w, h
+    };
+  }
+
+  let velocity, dye, divergence, pressure;
+  function initFBOs() {
+    const aspect = canvas.width / Math.max(1, canvas.height);
+    const simH = 128, simW = Math.max(32, Math.round(simH * aspect));
+    const dyeH = 480, dyeW = Math.max(64, Math.round(dyeH * aspect));
+    velocity = doubleFBO(simW, simH);
+    dye = doubleFBO(dyeW, dyeH);
+    divergence = createFBO(simW, simH);
+    pressure = doubleFBO(simW, simH);
+  }
+
+  function resize() {
+    const w = Math.floor(innerWidth), h = Math.floor(innerHeight);
+    if (canvas.width !== w || canvas.height !== h) {
+      canvas.width = w; canvas.height = h;
+      initFBOs();
+    }
+  }
+  resize();
+  addEventListener('resize', resize);
+
+  function splat(x, y, dx, dy, color) {
+    splatP.bind();
+    gl.uniform1i(splatP.u.uTarget, velocity.read.attach(0));
+    gl.uniform1f(splatP.u.aspectRatio, canvas.width / canvas.height);
+    gl.uniform2f(splatP.u.point, x, y);
+    gl.uniform3f(splatP.u.color, dx, dy, 0);
+    gl.uniform1f(splatP.u.radius, 0.0016);
+    blit(velocity.write); velocity.swap();
+    gl.uniform1i(splatP.u.uTarget, dye.read.attach(0));
+    gl.uniform3f(splatP.u.color, color[0], color[1], color[2]);
+    blit(dye.write); dye.swap();
+  }
+
+  // 滑鼠/觸控攪動
+  let lastX = null, lastY = null, colorIdx = 0;
+  const palette = TYPE_COLORS.map(h => { const c = hexToRgb(h); return [c.r / 255 * 0.32, c.g / 255 * 0.32, c.b / 255 * 0.32]; });
+  addEventListener('pointermove', e => {
+    const x = e.clientX / innerWidth, y = 1 - e.clientY / innerHeight;
+    if (lastX !== null) {
+      const dx = (x - lastX) * 1400, dy = (y - lastY) * 1400;
+      if (Math.abs(dx) + Math.abs(dy) > 0.4) {
+        colorIdx = (colorIdx + 1) % palette.length;
+        splat(x, y, dx, dy, palette[Math.floor(colorIdx)]);
+      }
+    }
+    lastX = x; lastY = y;
+  }, { passive: true });
+  addEventListener('pointerleave', () => { lastX = lastY = null; });
+
+  // 自動水花:位置與方向隨機,顏色依各類型開立數占比加權(資料驅動)
+  window.fluidAutoSplat = function () {
+    const total = typeData.reduce((s, t) => s + t.presc, 0);
+    let pick = 0;
+    if (total > 0) {
+      let r = Math.random() * total;
+      for (let i = 0; i < typeData.length; i++) { r -= typeData[i].presc; if (r <= 0) { pick = i; break; } }
+    } else pick = Math.floor(Math.random() * palette.length);
+    const angle = Math.random() * Math.PI * 2;
+    const c = palette[pick % palette.length];
+    splat(0.15 + Math.random() * 0.7, 0.15 + Math.random() * 0.7,
+      Math.cos(angle) * 600, Math.sin(angle) * 600, [c[0] * 1.6, c[1] * 1.6, c[2] * 1.6]);
+  };
+  setInterval(() => window.fluidAutoSplat(), 2400);
+  setTimeout(() => { for (let i = 0; i < 4; i++) window.fluidAutoSplat(); }, 600);
+
+  gl.disable(gl.BLEND);
+  let lastT = performance.now();
+  function frame(now) {
+    const dt = Math.min(0.033, (now - lastT) / 1000); lastT = now;
+    // 平流速度場
+    advectP.bind();
+    gl.uniform2f(advectP.u.texelSize, velocity.texel[0], velocity.texel[1]);
+    gl.uniform1i(advectP.u.uVelocity, velocity.read.attach(0));
+    gl.uniform1i(advectP.u.uSource, velocity.read.attach(0));
+    gl.uniform1f(advectP.u.dt, dt);
+    gl.uniform1f(advectP.u.dissipation, 0.995);
+    blit(velocity.write); velocity.swap();
+    // 平流染料
+    gl.uniform1i(advectP.u.uVelocity, velocity.read.attach(0));
+    gl.uniform1i(advectP.u.uSource, dye.read.attach(1));
+    gl.uniform1f(advectP.u.dissipation, 0.984);
+    blit(dye.write); dye.swap();
+    // 散度
+    divergenceP.bind();
+    gl.uniform2f(divergenceP.u.texelSize, velocity.texel[0], velocity.texel[1]);
+    gl.uniform1i(divergenceP.u.uVelocity, velocity.read.attach(0));
+    blit(divergence);
+    // 壓力衰減 + Jacobi 迭代
+    clearP.bind();
+    gl.uniform1i(clearP.u.uTexture, pressure.read.attach(0));
+    gl.uniform1f(clearP.u.value, 0.8);
+    blit(pressure.write); pressure.swap();
+    pressureP.bind();
+    gl.uniform2f(pressureP.u.texelSize, velocity.texel[0], velocity.texel[1]);
+    gl.uniform1i(pressureP.u.uDivergence, divergence.attach(0));
+    for (let i = 0; i < 20; i++) {
+      gl.uniform1i(pressureP.u.uPressure, pressure.read.attach(1));
+      blit(pressure.write); pressure.swap();
+    }
+    // 減去壓力梯度
+    gradientP.bind();
+    gl.uniform2f(gradientP.u.texelSize, velocity.texel[0], velocity.texel[1]);
+    gl.uniform1i(gradientP.u.uPressure, pressure.read.attach(0));
+    gl.uniform1i(gradientP.u.uVelocity, velocity.read.attach(1));
+    blit(velocity.write); velocity.swap();
+    // 顯示
+    displayP.bind();
+    gl.uniform1i(displayP.u.uTexture, dye.read.attach(0));
+    blit(null);
+    requestAnimationFrame(frame);
+  }
+  requestAnimationFrame(frame);
+})();
+
+// ══════════════════════════════════════════════
+//  ② 液體 KPI 卡片 + 類型液體量表
+// ══════════════════════════════════════════════
+const waveCards = [];   // {canvas, pct, color}
+const gauges = [];      // {canvas, pct, color}
+
+function drawWaveCard(c, pct, color, phase) {
+  const ctx = c.getContext('2d');
+  const w = c.width, h = c.height;
+  ctx.clearRect(0, 0, w, h);
+  const rgb = hexToRgb(color);
+  const level = h * (1 - Math.min(0.92, Math.max(0.08, pct)));
+  for (let layer = 0; layer < 2; layer++) {
+    ctx.beginPath();
+    ctx.moveTo(0, h);
+    for (let x = 0; x <= w; x += 4) {
+      const y = level + Math.sin(x * 0.018 + phase * (layer ? 1.3 : 1) + layer * 2.1) * 6
+        + Math.sin(x * 0.041 - phase * 0.7) * 3;
+      ctx.lineTo(x, y);
+    }
+    ctx.lineTo(w, h); ctx.closePath();
+    ctx.fillStyle = `rgba(${rgb.r},${rgb.g},${rgb.b},${layer ? 0.34 : 0.18})`;
+    ctx.fill();
+  }
+}
+
+function drawGauge(c, pct, color, phase) {
+  const ctx = c.getContext('2d');
+  const s = c.width, cx = s / 2, cy = s / 2, R = s / 2 - 8;
+  ctx.clearRect(0, 0, s, s);
+  const rgb = hexToRgb(color);
+  // 外框
+  ctx.beginPath(); ctx.arc(cx, cy, R, 0, Math.PI * 2);
+  ctx.strokeStyle = `rgba(${rgb.r},${rgb.g},${rgb.b},0.55)`; ctx.lineWidth = 3; ctx.stroke();
+  // 水面(裁切在內圓)
+  ctx.save();
+  ctx.beginPath(); ctx.arc(cx, cy, R - 5, 0, Math.PI * 2); ctx.clip();
+  const level = cy + (R - 5) - 2 * (R - 5) * Math.min(0.97, Math.max(0.04, pct));
+  for (let layer = 0; layer < 2; layer++) {
+    ctx.beginPath();
+    ctx.moveTo(cx - R, s);
+    for (let x = cx - R; x <= cx + R; x += 3) {
+      const y = level + Math.sin(x * 0.07 + phase * (layer ? 1.4 : 1) + layer * 2) * 4;
+      ctx.lineTo(x, y);
+    }
+    ctx.lineTo(cx + R, s); ctx.closePath();
+    ctx.fillStyle = `rgba(${rgb.r},${rgb.g},${rgb.b},${layer ? 0.55 : 0.3})`;
+    ctx.fill();
+  }
+  ctx.restore();
+  // 百分比文字
+  ctx.fillStyle = '#eafff5'; ctx.font = '700 26px "Noto Sans TC",sans-serif';
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.shadowColor = 'rgba(0,0,0,0.6)'; ctx.shadowBlur = 6;
+  ctx.fillText(Math.round(pct * 100) + '%', cx, cy);
+  ctx.shadowBlur = 0;
+}
+
+function initKpiAndGauges() {
+  const totalPresc = typeData.reduce((s, t) => s + t.presc, 0);
+  const totalExec = typeData.reduce((s, t) => s + t.exec, 0);
+  const rate = totalPresc > 0 ? totalExec / totalPresc : 0;
+
+  document.getElementById('kpiVal0').textContent = totalPresc.toLocaleString();
+  document.getElementById('kpiSub0').textContent = typeData.length + ' 種處方類型';
+  document.getElementById('kpiVal1').textContent = totalExec.toLocaleString();
+  document.getElementById('kpiSub1').textContent = '水位 = 佔開立數 ' + (rate * 100).toFixed(1) + '%';
+  document.getElementById('kpiVal2').textContent = (rate * 100).toFixed(1) + '%';
+  document.getElementById('kpiSub2').textContent = '已執行 ' + totalExec.toLocaleString() + ' / ' + totalPresc.toLocaleString();
+
+  const kpiDefs = [
+    { id: 'kpiWave0', pct: 0.6, color: '#8fba2e' },
+    { id: 'kpiWave1', pct: rate, color: '#2aac8a' },
+    { id: 'kpiWave2', pct: rate, color: '#1a9fbe' },
+  ];
+  kpiDefs.forEach(d => {
+    const c = document.getElementById(d.id);
+    waveCards.push({ canvas: c, pct: d.pct, color: d.color });
+  });
+
+  const row = document.getElementById('gaugeRow');
+  row.innerHTML = '';
+  typeData.forEach(t => {
+    const card = document.createElement('div');
+    card.className = 'gauge-card glass';
+    card.innerHTML = '<canvas width="150" height="150"></canvas>' +
+      '<div class="g-name" style="color:' + t.color + '">' + t.name + '</div>' +
+      '<div class="g-nums">開立 ' + t.presc.toLocaleString() + ' · 執行 ' + t.exec.toLocaleString() + '</div>';
+    row.appendChild(card);
+    gauges.push({ canvas: card.querySelector('canvas'), pct: t.rate, color: t.color });
+  });
+
+  (function animateLiquid() {
+    const phase = performance.now() / 600;
+    waveCards.forEach(w => {
+      const box = w.canvas.parentElement.getBoundingClientRect();
+      const tw = Math.max(280, Math.round(box.width)), th = Math.max(140, Math.round(box.height));
+      if (w.canvas.width !== tw || w.canvas.height !== th) { w.canvas.width = tw; w.canvas.height = th; }
+      drawWaveCard(w.canvas, w.pct, w.color, phase);
+    });
+    gauges.forEach(g => drawGauge(g.canvas, g.pct, g.color, phase));
+    requestAnimationFrame(animateLiquid);
+  })();
+}
+
+// ══════════════════════════════════════════════
+//  ③ ECharts GL:月份 × 類型 3D 長條圖
+// ══════════════════════════════════════════════
+let bar3dChart = null, bar3dMetric = 'presc';
+
+function bar3dOption() {
+  const months = monthAgg.months;
+  const types = typeData.map(t => t.name);
+  const data = [];
+  let maxV = 1;
+  types.forEach((tn, ti) => {
+    months.forEach((m, mi) => {
+      const cell = (monthAgg.perType[tn] || {})[m];
+      const v = cell ? cell[bar3dMetric] : 0;
+      maxV = Math.max(maxV, v);
+      data.push([mi, ti, v]);
+    });
+  });
+  return {
+    backgroundColor: 'transparent',
+    tooltip: {
+      formatter: p => months[p.value[0]] + '<br>' + types[p.value[1]] + ':<b>' + p.value[2] + '</b> ' + (bar3dMetric === 'presc' ? '開立' : '執行')
+    },
+    visualMap: {
+      max: maxV, calculable: true,
+      inRange: { color: ['#0f3a4d', '#1a7ea0', '#2aac8a', '#8fba2e', '#e9f57a'] },
+      textStyle: { color: '#8fb5a8' }, left: 8, bottom: 20
+    },
+    xAxis3D: { type: 'category', data: months, name: '月份', nameTextStyle: { color: '#8fb5a8' }, axisLabel: { color: '#9fc4b8', fontSize: 10 }, axisLine: { lineStyle: { color: '#2f5448' } } },
+    yAxis3D: { type: 'category', data: types, name: '', axisLabel: { color: '#9fc4b8', fontSize: 11 }, axisLine: { lineStyle: { color: '#2f5448' } } },
+    zAxis3D: { type: 'value', name: bar3dMetric === 'presc' ? '開立數' : '執行數', nameTextStyle: { color: '#8fb5a8' }, axisLabel: { color: '#9fc4b8' }, axisLine: { lineStyle: { color: '#2f5448' } }, splitLine: { lineStyle: { color: 'rgba(143,186,46,0.12)' } } },
+    grid3D: {
+      boxWidth: 170, boxDepth: 60, boxHeight: 70,
+      axisPointer: { show: false },
+      viewControl: { autoRotate: true, autoRotateSpeed: 5, distance: 230, alpha: 22, beta: 35 },
+      light: { main: { intensity: 1.3, alpha: 35, beta: 25 }, ambient: { intensity: 0.45 } },
+      environment: 'transparent'
+    },
+    series: [{
+      type: 'bar3D', shading: 'lambert', data,
+      barSize: 4.5,
+      itemStyle: { opacity: 0.95 },
+      emphasis: { itemStyle: { color: '#ffffff' }, label: { show: true, textStyle: { color: '#fff', fontSize: 13, backgroundColor: 'rgba(0,0,0,0.5)', padding: 4, borderRadius: 4 } } }
+    }]
+  };
+}
+
+function initBar3d() {
+  const el = document.getElementById('bar3d');
+  bar3dChart = echarts.init(el);
+  bar3dChart.setOption(bar3dOption());
+  addEventListener('resize', () => bar3dChart && bar3dChart.resize());
+  new ResizeObserver(() => bar3dChart && bar3dChart.resize()).observe(el);
+}
+
+function setBar3dMetric(m) {
+  bar3dMetric = m;
+  document.getElementById('segPresc').classList.toggle('on', m === 'presc');
+  document.getElementById('segExec').classList.toggle('on', m === 'exec');
+  if (bar3dChart) bar3dChart.setOption(bar3dOption());
+}
+
+// ══════════════════════════════════════════════
+//  ④ three.js 資料驅動流體粒子場景
+// ══════════════════════════════════════════════
+function initFlowScene() {
+  const wrap = document.getElementById('flow-wrap');
+  const canvas = document.getElementById('flowCanvas');
+  let renderer;
+  try {
+    renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
+  } catch (e) {
+    wrap.innerHTML = '<p style="padding:40px;color:#8fb5a8">此裝置不支援 WebGL,無法顯示粒子場景</p>';
+    return;
+  }
+  renderer.setPixelRatio(Math.min(2, devicePixelRatio));
+
+  const scene = new THREE.Scene();
+  scene.fog = new THREE.FogExp2(0x07130f, 0.012);
+  const camera = new THREE.PerspectiveCamera(58, 16 / 9, 0.1, 300);
+
+  const totalPresc = typeData.reduce((s, t) => s + t.presc, 0) || 1;
+  const totalExec = typeData.reduce((s, t) => s + t.exec, 0);
+  const overallRate = totalExec / totalPresc;
+  const scaleN = Math.min(1, 9000 / totalPresc);
+  const swirlSpeed = 0.35 + overallRate * 0.85; // 流速 ∝ 執行率
+
+  const R_RING = 14, R_TUBE = 4.6;
+  const groups = []; // {pts, positions, parts:[{x,y,z,seed}], speedMul}
+
+  function spawnPart() {
+    const theta = Math.random() * Math.PI * 2;
+    const phi = Math.random() * Math.PI * 2;
+    const r = Math.sqrt(Math.random()) * R_TUBE;
+    return {
+      x: (R_RING + r * Math.cos(phi)) * Math.cos(theta),
+      y: r * Math.sin(phi) * 0.85,
+      z: (R_RING + r * Math.cos(phi)) * Math.sin(theta),
+      seed: Math.random() * 100
+    };
+  }
+
+  typeData.forEach(t => {
+    const n = Math.max(40, Math.round(t.presc * scaleN));
+    const nExec = Math.round(n * t.rate);
+    const rgb = hexToRgb(t.color);
+    const baseColor = new THREE.Color(rgb.r / 255, rgb.g / 255, rgb.b / 255);
+    const litColor = baseColor.clone().lerp(new THREE.Color(1, 1, 1), 0.5);
+    [[n - nExec, baseColor, 0.32, 0.45, 0.92], [nExec, litColor, 0.5, 0.9, 1.18]].forEach(([cnt, col, size, opacity, speedMul]) => {
+      if (cnt <= 0) return;
+      const parts = Array.from({ length: cnt }, spawnPart);
+      const positions = new Float32Array(cnt * 3);
+      const geo = new THREE.BufferGeometry();
+      geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+      const mat = new THREE.PointsMaterial({
+        color: col, size, transparent: true, opacity,
+        blending: THREE.AdditiveBlending, depthWrite: false, sizeAttenuation: true
+      });
+      const pts = new THREE.Points(geo, mat);
+      scene.add(pts);
+      groups.push({ pts, positions, parts, speedMul });
+    });
+  });
+
+  // 中央光暈
+  const glowGeo = new THREE.SphereGeometry(1.6, 24, 24);
+  const glowMat = new THREE.MeshBasicMaterial({ color: 0x2aac8a, transparent: true, opacity: 0.35 });
+  scene.add(new THREE.Mesh(glowGeo, glowMat));
+
+  // 圖例
+  const legend = document.getElementById('flow-legend');
+  legend.innerHTML = typeData.map(t =>
+    '<div><span class="dot" style="color:' + t.color + ';background:' + t.color + '"></span>' +
+    t.name + ' — 開立 ' + t.presc.toLocaleString() + ' / 執行 ' + t.exec.toLocaleString() +
+    '(' + (t.rate * 100).toFixed(0) + '%)</div>'
+  ).join('') + '<div style="margin-top:4px;color:#8fb5a8">整體執行率 ' + (overallRate * 100).toFixed(1) + '% → 流速 ×' + swirlSpeed.toFixed(2) + '</div>';
+
+  // 視角:自動旋轉 + 拖曳
+  let azimuth = 0.6, elevation = 0.42, dragVX = 0, dragging = false, lastPX = 0, lastPY = 0;
+  wrap.addEventListener('pointerdown', e => { dragging = true; lastPX = e.clientX; lastPY = e.clientY; wrap.setPointerCapture(e.pointerId); });
+  wrap.addEventListener('pointermove', e => {
+    if (!dragging) return;
+    azimuth += (e.clientX - lastPX) * 0.006;
+    elevation = Math.max(0.08, Math.min(1.2, elevation + (e.clientY - lastPY) * 0.004));
+    lastPX = e.clientX; lastPY = e.clientY;
+  });
+  addEventListener('pointerup', () => { dragging = false; });
+
+  function resize() {
+    const w = wrap.clientWidth || 800, h = wrap.clientHeight || 480;
+    renderer.setSize(w, h, false);
+    camera.aspect = w / h;
+    camera.updateProjectionMatrix();
+  }
+  resize();
+  requestAnimationFrame(resize);
+  addEventListener('resize', resize);
+  new ResizeObserver(resize).observe(wrap);
+
+  let lastT = performance.now();
+  function frame(now) {
+    const dt = Math.min(0.05, (now - lastT) / 1000); lastT = now;
+    const t = now / 1000;
+    if (!dragging) azimuth += dt * 0.12;
+
+    const camR = 36;
+    camera.position.set(
+      Math.cos(azimuth) * camR * Math.cos(elevation),
+      Math.sin(elevation) * camR,
+      Math.sin(azimuth) * camR * Math.cos(elevation)
+    );
+    camera.lookAt(0, 0, 0);
+
+    groups.forEach(g => {
+      const sp = swirlSpeed * g.speedMul;
+      const pos = g.positions, parts = g.parts;
+      for (let i = 0; i < parts.length; i++) {
+        const p = parts[i];
+        // 環向漩渦
+        const rr = Math.sqrt(p.x * p.x + p.z * p.z) || 0.001;
+        const tx = -p.z / rr, tz = p.x / rr;
+        // 擬流場擾動(curl-ish noise)
+        const nx = Math.sin(p.y * 0.55 + t * 0.9 + p.seed) + Math.cos(p.z * 0.4 - t * 0.6);
+        const ny = Math.sin(p.z * 0.5 + t * 0.7 + p.seed * 1.3) + Math.cos(p.x * 0.45 + t * 0.5);
+        const nz = Math.sin(p.x * 0.5 - t * 0.55) + Math.cos(p.y * 0.6 + t * 0.8 + p.seed);
+        // 拉回環面
+        const radialErr = rr - R_RING;
+        const pullX = -(p.x / rr) * radialErr * 0.55 ;
+        const pullZ = -(p.z / rr) * radialErr * 0.55;
+        const pullY = -p.y * 0.35;
+        p.x += (tx * 6.5 * sp + nx * 1.6 + pullX) * dt;
+        p.y += (ny * 1.5 + pullY) * dt;
+        p.z += (tz * 6.5 * sp + nz * 1.6 + pullZ) * dt;
+        pos[i * 3] = p.x; pos[i * 3 + 1] = p.y; pos[i * 3 + 2] = p.z;
+      }
+      g.pts.geometry.attributes.position.needsUpdate = true;
+    });
+
+    glowMat.opacity = 0.25 + Math.sin(t * 1.4) * 0.1;
+    renderer.render(scene, camera);
+    requestAnimationFrame(frame);
+  }
+  requestAnimationFrame(frame);
+}
+
+// ══════════════════════════════════════════════
+//  啟動
+// ══════════════════════════════════════════════
+loadData();
+</script>
+</body>
+</html>
