@@ -666,6 +666,47 @@ body.is-loading .chart-wrap::after {
 .fill-bar { width: 44px; height: 6px; border-radius: 3px; background: #e4f0ea; overflow: hidden; flex-shrink: 0; }
 .fill-bar i { display: block; height: 100%; border-radius: 3px; }
 
+/* ── 單日課表（活動日檢視） ── */
+.day-summary {
+  display: flex; gap: 20px; flex-wrap: wrap; align-items: baseline;
+  padding: 10px 16px; margin-bottom: 6px;
+  background: #f0fbf7; border: 1px solid #b3e8d4; border-radius: 10px;
+  font-size: 0.88rem; color: var(--text-muted);
+}
+.day-summary b { color: var(--teal); font-size: 1.12rem; font-variant-numeric: tabular-nums; }
+.day-time-row { display: flex; gap: 14px; padding: 13px 0; border-bottom: 1px dashed var(--border); }
+.day-time-row:last-child { border-bottom: none; }
+.day-time {
+  width: 58px; flex-shrink: 0; padding-top: 7px;
+  font-weight: 800; font-size: 0.95rem; color: var(--cyan);
+  font-variant-numeric: tabular-nums;
+}
+.day-cards { display: flex; gap: 10px; flex-wrap: wrap; flex: 1; }
+.day-card {
+  width: 248px; padding: 10px 12px;
+  border: 1px solid var(--border); border-left: 4px solid #9aa5b1; border-radius: 10px;
+  background: #fcfffe; cursor: pointer;
+  transition: box-shadow 0.15s, transform 0.15s;
+}
+.day-card:hover { box-shadow: var(--shadow-md); transform: translateY(-2px); }
+.day-card.cancelled { opacity: 0.5; }
+.dc-top { display: flex; align-items: center; gap: 6px; margin-bottom: 5px; flex-wrap: wrap; }
+.dc-type { padding: 1px 8px; border-radius: 10px; font-size: 0.72rem; font-weight: 700; white-space: nowrap; }
+.dc-region { font-size: 0.72rem; font-weight: 700; }
+.dc-status { margin-left: auto; font-size: 0.7rem; font-weight: 700; color: #9aa5b1; border: 1px solid #cfd8d3; padding: 0 7px; border-radius: 9px; white-space: nowrap; }
+.dc-status.done { color: var(--teal); border-color: #9adfc8; }
+.dc-name { font-weight: 700; font-size: 0.88rem; line-height: 1.35; margin-bottom: 3px; color: var(--text); }
+.dc-loc { font-size: 0.74rem; color: var(--text-muted); margin-bottom: 7px; }
+.dc-meta { display: flex; align-items: center; gap: 7px; font-size: 0.78rem; color: var(--text-muted); flex-wrap: wrap; }
+.dc-meta b { color: var(--text); font-size: 0.94rem; font-variant-numeric: tabular-nums; }
+.day-card-entries {
+  margin-top: 8px; padding-top: 7px; border-top: 1px dashed var(--border);
+  font-size: 0.76rem; color: var(--text-muted);
+  max-height: 170px; overflow-y: auto;
+}
+.dce-row { display: flex; justify-content: space-between; gap: 8px; padding: 2px 0; }
+.dce-row .mono { font-family: monospace; }
+
 /* ── 場次明細:日期群組列 ── */
 .date-sep td {
   background: #e9f6f0 !important; color: #15735a;
@@ -1133,6 +1174,15 @@ footer {
     <div class="card orange"><span class="icon"><svg class="ic" viewBox="0 0 24 24"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/><polyline points="17 11 19 13 23 9"/></svg></span><div class="val" id="csTotalAttend">—</div><div class="lbl">總出席人次</div></div>
     <div class="card purple"><span class="icon"><svg class="ic" viewBox="0 0 24 24"><line x1="19" y1="5" x2="5" y2="19"/><circle cx="6.5" cy="6.5" r="2.5"/><circle cx="17.5" cy="17.5" r="2.5"/></svg></span><div class="val" id="csAttendRate">—</div><div class="lbl">出席率</div></div>
     <div class="card violet"><span class="icon"><svg class="ic" viewBox="0 0 24 24"><path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z"/></svg></span><div class="val" id="csFullSlots">—</div><div class="lbl">滿座場次</div></div>
+  </div>
+
+  <!-- ── 單日課表(查詢區間選到單一日期時顯示,供活動日追蹤) ── -->
+  <div id="daySchedule" class="chart-section" style="margin:14px 36px;display:none">
+    <div class="chart-header" style="flex-wrap:wrap;gap:10px">
+      <h2 id="dayScheduleTitle">單日課表</h2>
+      <span style="font-size:0.78rem;color:var(--text-muted)">跟隨下方「處方類型／地區／搜尋」篩選；含所有狀態</span>
+    </div>
+    <div id="dayScheduleBody"></div>
   </div>
 
   <!-- ── 場次明細(主要交互區,放最上) ── -->
@@ -3546,6 +3596,104 @@ function renderPinnedDateChips(){
 }
 
 let _expandedSlot = null;
+
+// ══════════════════════════════════════════════
+//  單日課表(活動日檢視):查詢區間為單一日期時,依開始時間排成課表
+//  套用處方類型/地區/搜尋篩選,但「不套用」狀態篩選(活動日要看全貌)
+// ══════════════════════════════════════════════
+function renderDaySchedule(){
+  const box = document.getElementById('daySchedule');
+  if(!box) return;
+  const {from, to} = getCourseDateRange();
+  if(!from || from !== to){ box.style.display = 'none'; return; }
+  box.style.display = '';
+  const WEEKDAYS = ['日','一','二','三','四','五','六'];
+  const d = new Date(from + 'T00:00:00');
+  const wd = isNaN(d) ? '' : `（${WEEKDAYS[d.getDay()]}）`;
+  const titleEl = document.getElementById('dayScheduleTitle');
+  if(titleEl) titleEl.textContent = `單日課表 · ${from}${wd}`;
+  const body = document.getElementById('dayScheduleBody');
+
+  const q = (document.getElementById('slotsFilterSearch')?.value || '').toLowerCase().trim();
+  let slots = courseSlots.filter(s => s.slot_date === from);
+  slots = applySlotsTypeFilter(applySlotsRegionFilter(slots));
+  if(q) slots = slots.filter(s => (((s.course_name||'') + ' ' + (s.course_location||'')).toLowerCase().includes(q)));
+  if(!slots.length){
+    body.innerHTML = '<div style="padding:18px;text-align:center;color:var(--text-muted)">這天沒有符合篩選的場次</div>';
+    return;
+  }
+  // 當日彙總
+  let sumBk = 0, sumCk = 0, sumCap = 0, cancelledCnt = 0;
+  slots.forEach(s => {
+    if(s.status === 'cancelled'){ cancelledCnt++; return; }
+    sumBk += s.booked_count || 0;
+    sumCk += s.checked_count || 0;
+    sumCap += s.capacity || 0;
+  });
+  const typeColors = { mental:'#7c3aed', nutrition:'#2aac8a', social:'#1a9fbe', exercise:'#e8930a', other:'#9aa5b1' };
+  const typeLabels = { mental:'情緒調適', nutrition:'營養', social:'社會', exercise:'運動' };
+  const regionColors = { '北投區':'#2aac8a', '士林區':'#1a9fbe', '中山區':'#7c3aed', '其他':'#9aa5b1' };
+  // 依開始時間分組
+  const byTime = {};
+  slots.forEach(s => {
+    const t = (s.start_time || '').slice(0,5) || '—';
+    (byTime[t] = byTime[t] || []).push(s);
+  });
+  const times = Object.keys(byTime).sort();
+  let html = `<div class="day-summary">
+    <span><b>${slots.length - cancelledCnt}</b> 場${cancelledCnt ? `（另 ${cancelledCnt} 場取消）` : ''}</span>
+    <span>報名 <b>${sumBk.toLocaleString()}</b></span>
+    <span>已到 <b>${sumCk.toLocaleString()}</b></span>
+    <span>總容量 <b>${sumCap.toLocaleString()}</b></span>
+    <span>滿座率 <b>${sumCap > 0 ? Math.round(sumBk/sumCap*100) : 0}%</b></span>
+    <span>出席率 <b>${sumBk > 0 ? Math.round(sumCk/sumBk*100) : 0}%</b></span>
+  </div>`;
+  html += times.map(t => {
+    const cards = byTime[t]
+      .slice().sort((a,b)=>(a.course_name||'').localeCompare(b.course_name||'','zh-Hant'))
+      .map(s => {
+        const cap = s.capacity || 0, bk = s.booked_count || 0;
+        const ck = s.checked_count != null ? s.checked_count : '—';
+        const rate = cap > 0 ? Math.round(bk/cap*100) : 0;
+        const tc = typeColors[s.course_type] || '#9aa5b1';
+        const region = getSlotRegion(s);
+        const rc = regionColors[region] || '#9aa5b1';
+        const barColor = rate >= 100 ? '#c0392b' : (rate >= 70 ? '#e8930a' : '#2aac8a');
+        const cancelled = s.status === 'cancelled';
+        const completed = s.status === 'completed';
+        const hasEntries = Array.isArray(s.entries) && s.entries.length > 0;
+        const expanded = _expandedSlot === s.slot_id;
+        let entriesHtml = '';
+        if(expanded && hasEntries){
+          entriesHtml = `<div class="day-card-entries">` + s.entries
+            .slice().sort((a,b)=>(a.ba||'').localeCompare(b.ba||''))
+            .map(e => {
+              const ok = e.cs === 'checked';
+              return `<div class="dce-row"><span class="mono">${e.pn||'—'}</span><span style="color:${ok?'#2aac8a':'#9aa5b1'};font-weight:700">${ok?'✓ 已到':'未到'}</span></div>`;
+            }).join('') + `</div>`;
+        }
+        const endT = (s.end_time||'').slice(0,5);
+        return `<div class="day-card${cancelled?' cancelled':''}" style="border-left-color:${tc}" ${hasEntries ? `onclick="toggleSlotExpand('${s.slot_id}',event)"` : ''} title="${hasEntries ? '點擊展開/收合預約名單' : ''}">
+          <div class="dc-top">
+            <span class="dc-type" style="background:${tc}22;color:${tc}">${typeLabels[s.course_type]||'其他'}</span>
+            <span class="dc-region" style="color:${rc}">${region.replace(/區$/,'')}</span>
+            ${cancelled ? '<span class="dc-status">已取消</span>' : ''}${completed ? '<span class="dc-status done">已完成</span>' : ''}
+          </div>
+          <div class="dc-name">${s.course_name||'(未命名課程)'}</div>
+          <div class="dc-loc">${endT ? '~ '+endT+' · ' : ''}${s.course_location||'—'}</div>
+          <div class="dc-meta">
+            <b>${bk}</b>/${cap} 人 · 已到 ${ck}
+            <div class="fill-bar" style="width:54px"><i style="width:${Math.min(rate,100)}%;background:${barColor}"></i></div>
+            <span style="color:${barColor};font-weight:700">${rate}%</span>
+          </div>
+          ${entriesHtml}
+        </div>`;
+      }).join('');
+    return `<div class="day-time-row"><div class="day-time">${t}</div><div class="day-cards">${cards}</div></div>`;
+  }).join('');
+  body.innerHTML = html;
+}
+
 function filterSlotsTable(f, btn){
   window._slotsFilter = f;
   document.querySelectorAll('#slotsFilterBar .pdf-tab-btn').forEach(b => b.classList.remove('active'));
@@ -3867,6 +4015,7 @@ function renderSlotsTable(){
   if(sorted.length === 0){
     tbody.innerHTML = '';
     if(empty) empty.style.display = 'block';
+    renderDaySchedule();
     return;
   }
   if(empty) empty.style.display = 'none';
@@ -3938,6 +4087,7 @@ function renderSlotsTable(){
     }
   });
   tbody.innerHTML = rows.join('');
+  renderDaySchedule();
 }
 
 // ══════════════════════════════════════════════
