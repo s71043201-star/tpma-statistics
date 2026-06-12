@@ -696,7 +696,8 @@ body.is-loading .chart-wrap::after {
   font-weight: 800; font-size: 0.95rem; color: var(--cyan);
   font-variant-numeric: tabular-nums;
 }
-.day-cards { display: flex; gap: 10px; flex-wrap: wrap; flex: 1; }
+.day-cards { display: flex; gap: 10px; flex-wrap: wrap; flex: 1; align-items: flex-start; }
+.day-type-col { display: flex; flex-direction: column; gap: 10px; }
 .day-card {
   width: 248px; padding: 10px 12px;
   border: 1px solid var(--border); border-left: 4px solid #9aa5b1; border-radius: 10px;
@@ -3674,11 +3675,10 @@ function renderDaySchedule(){
   // 同時段卡片固定順序:運動 → 營養 → 情緒調適 → 社會 → 其他
   const TYPE_ORDER = { exercise:0, nutrition:1, mental:2, social:3 };
   html += times.map(t => {
-    const cards = byTime[t]
-      .slice().sort((a,b)=>
-        ((TYPE_ORDER[a.course_type] ?? 4) - (TYPE_ORDER[b.course_type] ?? 4)) ||
-        (a.course_name||'').localeCompare(b.course_name||'','zh-Hant'))
-      .map(s => {
+    // 同類型直向堆成一欄,欄與欄依固定順序橫向排列
+    const typeGroups = {};
+    byTime[t].forEach(s => { const k = TYPE_ORDER[s.course_type] ?? 4; (typeGroups[k] = typeGroups[k] || []).push(s); });
+    const renderCard = (s) => {
         const cap = s.capacity || 0, bk = s.booked_count || 0;
         const ck = s.checked_count != null ? s.checked_count : '—';
         const rate = cap > 0 ? Math.round(bk/cap*100) : 0;
@@ -3715,7 +3715,12 @@ function renderDaySchedule(){
           </div>
           ${entriesHtml}
         </div>`;
-      }).join('');
+      };
+    const cards = Object.keys(typeGroups).sort((a,b)=>a-b).map(k =>
+      `<div class="day-type-col">` +
+        typeGroups[k].slice().sort((a,b)=>(a.course_name||'').localeCompare(b.course_name||'','zh-Hant')).map(renderCard).join('') +
+      `</div>`
+    ).join('');
     return `<div class="day-time-row"><div class="day-time">${t}</div><div class="day-cards">${cards}</div></div>`;
   }).join('');
   body.innerHTML = html;
