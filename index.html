@@ -774,6 +774,9 @@ footer {
 }
 
 /* ── RWD ── */
+/* 左右滑提示：桌機隱藏，手機 media query 內再開啟 */
+.swipe-hint { display: none; }
+
 @media (max-width: 980px) {
   #sidebar {
     position: sticky; top: 0; bottom: auto; width: 100% !important;
@@ -794,6 +797,26 @@ footer {
 @media (max-width: 700px) {
   /* ── 手機精簡：每分頁只留主圖，隱藏次要 / 重複圖表 ── */
   .m-hide { display: none !important; }
+
+  /* 手機不會匯入資料 → 隱藏上傳 Excel / 診所分區設定面板 */
+  #data-tools { display: none !important; }
+
+  /* ── 多圖分頁改左右滑（carousel）：各類型週趨勢 4 張 ── */
+  .type-grid {
+    display: flex; grid-template-columns: none;
+    overflow-x: auto; scroll-snap-type: x mandatory;
+    -webkit-overflow-scrolling: touch;
+    gap: 10px; margin: 0 0 12px; padding: 0 12px;
+    scrollbar-width: none;
+  }
+  .type-grid::-webkit-scrollbar { display: none; }
+  .type-grid > .chart-section {
+    flex: 0 0 90%; scroll-snap-align: center; margin: 0 !important;
+  }
+  .swipe-hint {
+    display: flex; align-items: center; justify-content: center; gap: 6px;
+    margin: 4px 14px 0; font-size: 0.76rem; font-weight: 600; color: var(--text-muted);
+  }
 
   /* ── 內距 / 邊距全面收斂（含蓋掉行內 36px margin） ── */
   .type-grid, .side-by-side { grid-template-columns: 1fr; margin: 0 12px 12px; }
@@ -1104,6 +1127,7 @@ footer {
     <button class="ct-btn" onclick="setChartType('typeweekly','area',this)">面積圖</button>
     <button class="ct-btn" onclick="setChartType('typeweekly','hbar',this)">橫條對比</button>
   </div>
+  <div class="swipe-hint">← 左右滑切換各類型 →</div>
   <div id="tw-multi-view">
     <div class="type-grid">
       <div class="chart-section" data-pdf-id="tw-0" data-pdf-label="情緒調適處方週趨勢"><div class="chart-header"><h2 id="tw-title-0">情緒調適處方</h2><button class="dl-btn" onclick="downloadChart(this)">↓ 下載 JPG</button></div><div class="chart-wrap" style="height:260px"><canvas id="twDetail0"></canvas></div><div id="tw-drill-0" class="drill-box hidden"><div class="drill-header"><h3 id="tw-drill-title-0">該月週統計</h3><button class="drill-close" onclick="closeDrill('typeweekly',0)">✕ 關閉</button></div><div class="drill-wrap"><canvas id="twDrill0"></canvas></div></div></div>
