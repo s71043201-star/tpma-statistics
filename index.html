@@ -1412,8 +1412,10 @@ if (typeof Chart !== 'undefined') {
   Chart.defaults.plugins.tooltip.padding = 10;
   Chart.defaults.plugins.tooltip.boxPadding = 5;
   Chart.defaults.plugins.tooltip.titleFont = { weight: '700' };
+  // 圖例色塊用方形(沿用原本顯示方式),而非美化版的圓點/膠囊
   Chart.defaults.plugins.legend.labels.usePointStyle = true;
-  Chart.defaults.plugins.legend.labels.pointStyleWidth = 10;
+  Chart.defaults.plugins.legend.labels.pointStyle = 'rect';
+  Chart.defaults.plugins.legend.labels.pointStyleWidth = 12;
 }
 // 首次載入顯示骨架動畫,等雲端資料回來後移除
 if (isConfigured) document.body.classList.add('is-loading');
@@ -3336,6 +3338,21 @@ dz.addEventListener('drop', e=>{e.preventDefault();dz.classList.remove('drag-ove
 // ══════════════════════════════════════════════
 //  Tab 切換
 // ══════════════════════════════════════════════
+// 統一的「分頁圖表重建」派發。
+// 關鍵原則:任何分頁的圖表只能在「該分頁可見且容器已取得實際尺寸」時才建立。
+// Chart.js 若在 display:none(0 尺寸)容器中 new Chart,會鎖死成 0×0 且 resize()
+// 救不回(實測),這正是切過去後出現空白圖卡的根因。
+function rebuildTabCharts(name){
+  switch(name){
+    case 'weekly':     buildWeeklyCharts(currentChartType.weekly); break;
+    case 'daily':      buildDailyCharts(currentChartType.daily); break;
+    case 'type':       buildTypeCharts(currentChartType.type); break;
+    case 'typeweekly': buildTypeWeeklyCharts(currentChartType.typeweekly); break;
+    case 'clinic':     buildClinicCharts(); break;
+    case 'prescday':   buildPrescDayCharts(); break;
+    case 'course':     buildCourseCharts(); break;
+  }
+}
 function showTab(name, btn){
   ['weekly','daily','type','typeweekly','clinic','prescday','course'].forEach(t=>document.getElementById('tab-'+t).classList.add('hidden'));
   document.getElementById('tab-'+name).classList.remove('hidden');
@@ -3345,19 +3362,18 @@ function showTab(name, btn){
   const bar = document.getElementById('dateFilterBar');
   if(bar) bar.style.display = (name!=='prescday' && name!=='course') ? 'flex' : 'none';
   updateTabControls(name);
-  // 重新觸發該分頁圖卡的進場動畫
   const tabEl = document.getElementById('tab-'+name);
-  if(tabEl){ tabEl.classList.remove('tab-anim'); void tabEl.offsetWidth; tabEl.classList.add('tab-anim'); }
-  // 等瀏覽器完成版面布局後再重建/校正圖表,避免在 0 尺寸(隱藏)容器上建立而呈空白
-  requestAnimationFrame(()=>requestAnimationFrame(()=>{
-    if(name==='daily')         buildDailyCharts(currentChartType.daily);
-    else if(name==='clinic')   buildClinicCharts();
-    else if(name==='prescday') buildPrescDayCharts();
-    else if(name==='course')   buildCourseCharts();
-    // weekly/type/typeweekly 的圖表在資料載入時即建立(可能曾在隱藏分頁下產生 0 尺寸死圖),
-    // 顯示後強制校正一次尺寸即可重繪,免去依賴 ResizeObserver 的時機
-    Object.values(chartInstances).forEach(c=>{ try{ c.resize(); }catch(e){} });
-  }));
+  // 同步(重)建該分頁圖表。刻意「不」用 requestAnimationFrame 延後:
+  // 分頁切到背景時瀏覽器會暫停 rAF,延後執行會讓圖卡在尺寸就緒前就被建立而空白。
+  //  1) 先移除進場動畫並強制 reflow(讀 offsetWidth),讓剛顯示的容器「立即」取得
+  //     正確尺寸 — 動畫(transform)進行中建圖會被 Chart.js 量到 0 尺寸而鎖死。
+  //  2) 在無動畫、容器已定尺寸的狀態下同步重建,保證每張圖都拿到正確寬高。
+  //  3) 建好後再套上進場動畫,圖卡連同已正確繪製的圖一起淡入(不再影響尺寸)。
+  if(tabEl){ tabEl.classList.remove('tab-anim'); void tabEl.offsetWidth; }
+  rebuildTabCharts(name);
+  // 校正其餘已存在的圖(例如鑽取小圖)
+  Object.values(chartInstances).forEach(c=>{ try{ c.resize(); }catch(e){} });
+  if(tabEl){ void tabEl.offsetWidth; tabEl.classList.add('tab-anim'); }
   updateSummary();
 }
 
