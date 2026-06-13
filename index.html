@@ -792,14 +792,63 @@ footer {
   #cloud-bar { max-width: 100%; }
 }
 @media (max-width: 700px) {
-  .type-grid, .side-by-side { grid-template-columns: 1fr; }
-  .summary-grid { padding: 16px; }
-  .chart-section { margin: 12px; }
-  .type-grid, .side-by-side { margin: 0 12px 12px; }
-  .chart-type-bar { padding: 12px 16px; }
-  .clinic-sort-bar { padding: 12px 16px 0; }
+  /* ── 手機精簡：每分頁只留主圖，隱藏次要 / 重複圖表 ── */
+  .m-hide { display: none !important; }
+
+  /* ── 內距 / 邊距全面收斂（含蓋掉行內 36px margin） ── */
+  .type-grid, .side-by-side { grid-template-columns: 1fr; margin: 0 12px 12px; }
+  .chart-section { margin: 12px !important; padding: 16px 14px; }
+  .summary-grid { padding: 12px; gap: 10px; grid-template-columns: repeat(2, 1fr); }
+  .chart-type-bar, .period-bar { padding: 10px 14px 0; gap: 7px; }
+  .clinic-sort-bar { padding: 12px 14px 0; }
+  #filter-panel { margin: 12px; padding: 12px 14px; }
   #data-tools, #week-note-bar { margin: 10px 12px 0; }
+  .course-query-box { margin: 12px !important; }
+  #prescDayTypeSelector, #prescDayCourseSelector { margin: 0 12px 10px !important; }
   .pdf-check-grid { grid-template-columns: 1fr; }
+
+  /* ── 頂部工具列：取消 sticky，避免吃掉半個螢幕；按鈕收斂 ── */
+  #topbar { position: relative; padding: 12px 14px; gap: 10px; }
+  .topbar-title h1 { font-size: 1rem; }
+  .topbar-title p { font-size: 0.72rem; }
+  #cloud-bar { max-width: 100%; width: 100%; }
+  .topbar-actions { gap: 6px; }
+  .act-btn, #pdf-export-btn { padding: 6px 11px; font-size: 0.78rem; }
+  #view-counter { margin-left: 0; }
+
+  /* ── 摘要卡片精簡 ── */
+  .card { padding: 14px 10px; }
+  .card .icon { width: 36px; height: 36px; margin-bottom: 8px; }
+  .card .val { font-size: 1.55rem; }
+  .card .lbl { font-size: 0.74rem; margin-top: 5px; }
+  .card .delta { font-size: 0.68rem; }
+
+  /* ── 圖表高度收斂 ── */
+  .chart-wrap { height: 260px; }
+  .drill-wrap { height: 200px; }
+  .chart-header { flex-wrap: wrap; gap: 8px; }
+  .chart-header h2 { font-size: 0.95rem; }
+
+  /* ── 表格觸控捲動 + 字級收斂 ── */
+  .clinic-table-wrap { -webkit-overflow-scrolling: touch; }
+  .clinic-table { font-size: 0.8rem; }
+  .clinic-table th, .clinic-table td { padding: 8px 10px; }
+  .data-table th, .data-table td { padding: 7px 8px; }
+
+  /* ── 單日課表卡片改滿版 ── */
+  .day-type-col, .day-card { width: 100% !important; }
+  .day-cards { flex-direction: column; }
+
+  /* ── 導覽列收斂 ── */
+  .nav { gap: 2px; }
+  .tab-btn { padding: 8px 10px; }
+}
+
+/* ── 極窄螢幕（< 460px）：隱藏側欄品牌爭取頁籤空間、標題再縮 ── */
+@media (max-width: 460px) {
+  .brand { display: none; }
+  .topbar-title h1 { font-size: 0.94rem; }
+  .card .val { font-size: 1.4rem; }
 }
 
 .hidden { display: none; }
@@ -967,7 +1016,7 @@ footer {
     <div class="chart-wrap"><canvas id="weeklyBarChart"></canvas></div>
     <div id="weekly-drill-pres" class="drill-box hidden"><div class="drill-header"><h3 id="weekly-drill-pres-title">該月週統計</h3><button class="drill-close" onclick="closeDrill('weekly','pres')">✕ 關閉</button></div><div class="drill-wrap"><canvas id="weeklyDrillPresChart"></canvas></div></div>
   </div>
-  <div class="chart-section" data-pdf-id="weekly-exec" data-pdf-label="每週處方執行數">
+  <div class="chart-section m-hide" data-pdf-id="weekly-exec" data-pdf-label="每週處方執行數">
     <div class="chart-header"><h2 id="w2-title">每週處方執行數</h2><button class="dl-btn" onclick="downloadChart(this)">↓ 下載 JPG</button></div>
     <div class="chart-wrap"><canvas id="weeklyExecChart"></canvas></div>
     <div id="weekly-drill-exec" class="drill-box hidden"><div class="drill-header"><h3 id="weekly-drill-exec-title">該月週統計</h3><button class="drill-close" onclick="closeDrill('weekly','exec')">✕ 關閉</button></div><div class="drill-wrap"><canvas id="weeklyDrillExecChart"></canvas></div></div>
@@ -993,7 +1042,7 @@ footer {
     <div style="font-size:0.85rem;">請先上傳含「開立日期」的 Excel，或等待雲端資料同步。</div>
   </div>
   <div id="daily-content">
-    <div class="chart-section" style="margin:18px 36px">
+    <div class="chart-section m-hide" style="margin:18px 36px">
       <div class="chart-header"><h2>今日更新時間軸<span id="dailyFeedTodayLabel" style="font-size:0.78rem;font-weight:400;color:var(--text-muted);margin-left:10px"></span></h2><button onclick="clearDailyUpdateLog()" style="border:1.5px solid var(--border);background:transparent;color:var(--text-muted);border-radius:14px;padding:4px 14px;font-size:0.78rem;cursor:pointer;font-family:inherit">清空紀錄</button></div>
       <div id="dailyUpdateFeed" style="display:flex;flex-wrap:wrap;gap:8px;max-height:200px;overflow-y:auto;padding:6px 2px"></div>
       <div style="margin-top:8px;font-size:0.72rem;color:var(--text-muted)">資料每 5 分鐘自動同步,此處紀錄頁面開啟期間偵測到的當日新增。重新整理瀏覽器不影響本機紀錄。</div>
@@ -1002,7 +1051,7 @@ footer {
       <div class="chart-header"><h2 id="d1-title">單月每日處方開立數</h2><button class="dl-btn" onclick="downloadChart(this)">↓ 下載 JPG</button></div>
       <div class="chart-wrap"><canvas id="dailyPresChart"></canvas></div>
     </div>
-    <div class="chart-section" data-pdf-id="daily-exec" data-pdf-label="單月每日處方執行數">
+    <div class="chart-section m-hide" data-pdf-id="daily-exec" data-pdf-label="單月每日處方執行數">
       <div class="chart-header"><h2 id="d2-title">單月每日處方執行數</h2><button class="dl-btn" onclick="downloadChart(this)">↓ 下載 JPG</button></div>
       <div class="chart-wrap"><canvas id="dailyExecChart"></canvas></div>
     </div>
@@ -1026,17 +1075,17 @@ footer {
   </div>
   <div id="type-line-view">
     <div class="chart-section" data-pdf-id="cum-pres" data-pdf-label="處方開立數累積趨勢"><div class="chart-header"><h2 id="cum-pres-title">處方開立數累積趨勢（依週）</h2><button class="dl-btn" onclick="downloadChart(this)">↓ 下載 JPG</button></div><div class="chart-wrap"><canvas id="cumPrescribeChart"></canvas></div></div>
-    <div class="chart-section" data-pdf-id="cum-exec" data-pdf-label="執行數累積趨勢"><div class="chart-header"><h2 id="cum-exec-title">執行數累積趨勢（依週）</h2><button class="dl-btn" onclick="downloadChart(this)">↓ 下載 JPG</button></div><div class="chart-wrap"><canvas id="cumExecChart"></canvas></div></div>
+    <div class="chart-section m-hide" data-pdf-id="cum-exec" data-pdf-label="執行數累積趨勢"><div class="chart-header"><h2 id="cum-exec-title">執行數累積趨勢（依週）</h2><button class="dl-btn" onclick="downloadChart(this)">↓ 下載 JPG</button></div><div class="chart-wrap"><canvas id="cumExecChart"></canvas></div></div>
   </div>
   <div id="type-pie-view" class="hidden">
     <div class="side-by-side">
       <div class="chart-section" data-pdf-id="pie-pres" data-pdf-label="各類型開立數佔比"><div class="chart-header"><h2>各類型開立數佔比</h2><button class="dl-btn" onclick="downloadChart(this)">↓ 下載 JPG</button></div><div class="chart-wrap"><canvas id="piePresChart"></canvas></div></div>
-      <div class="chart-section" data-pdf-id="pie-exec" data-pdf-label="各類型執行數佔比"><div class="chart-header"><h2>各類型執行數佔比</h2><button class="dl-btn" onclick="downloadChart(this)">↓ 下載 JPG</button></div><div class="chart-wrap"><canvas id="pieExecChart"></canvas></div></div>
+      <div class="chart-section m-hide" data-pdf-id="pie-exec" data-pdf-label="各類型執行數佔比"><div class="chart-header"><h2>各類型執行數佔比</h2><button class="dl-btn" onclick="downloadChart(this)">↓ 下載 JPG</button></div><div class="chart-wrap"><canvas id="pieExecChart"></canvas></div></div>
     </div>
   </div>
   <div id="type-hbar-view" class="hidden">
     <div class="chart-section" data-pdf-id="hbar-type" data-pdf-label="各類型開立數 vs 執行數"><div class="chart-header"><h2>各類型開立數 vs 執行數（橫條對比）</h2><button class="dl-btn" onclick="downloadChart(this)">↓ 下載 JPG</button></div><div class="chart-wrap" style="height:260px"><canvas id="hbarTypeChart"></canvas></div></div>
-    <div class="chart-section" data-pdf-id="hbar-rate" data-pdf-label="各類型執行率（%）"><div class="chart-header"><h2>各類型執行率（%）</h2><button class="dl-btn" onclick="downloadChart(this)">↓ 下載 JPG</button></div><div class="chart-wrap" style="height:200px"><canvas id="hbarRateChart"></canvas></div></div>
+    <div class="chart-section m-hide" data-pdf-id="hbar-rate" data-pdf-label="各類型執行率（%）"><div class="chart-header"><h2>各類型執行率（%）</h2><button class="dl-btn" onclick="downloadChart(this)">↓ 下載 JPG</button></div><div class="chart-wrap" style="height:200px"><canvas id="hbarRateChart"></canvas></div></div>
   </div>
 </div>
 
@@ -1092,11 +1141,11 @@ footer {
       <div class="chart-header"><h2>各診所選課或執行筆數（依處方類型堆疊）</h2><button class="dl-btn" onclick="downloadChart(this)">↓ 下載 JPG</button></div>
       <div class="chart-wrap" id="clinicEnrollWrap" style="height:360px"><canvas id="clinicEnrollChart"></canvas></div>
     </div>
-    <div class="chart-section" data-pdf-id="clinic-bar" data-pdf-label="各診所開立數 vs 執行筆數">
+    <div class="chart-section m-hide" data-pdf-id="clinic-bar" data-pdf-label="各診所開立數 vs 執行筆數">
       <div class="chart-header"><h2>各診所開立數 vs 選課或執行筆數</h2><button class="dl-btn" onclick="downloadChart(this)">↓ 下載 JPG</button></div>
       <div class="chart-wrap" id="clinicBarWrap" style="height:360px"><canvas id="clinicBarChart"></canvas></div>
     </div>
-    <div class="chart-section" data-pdf-id="clinic-rate" data-pdf-label="各診所選課或執行比率（%）">
+    <div class="chart-section m-hide" data-pdf-id="clinic-rate" data-pdf-label="各診所選課或執行比率（%）">
       <div class="chart-header"><h2>各診所選課或執行比率（%）</h2><button class="dl-btn" onclick="downloadChart(this)">↓ 下載 JPG</button></div>
       <div class="chart-wrap" id="clinicRateWrap" style="height:360px"><canvas id="clinicRateChart"></canvas></div>
     </div>
@@ -1121,7 +1170,7 @@ footer {
 <!-- ═══ TAB 5：處方日執行數 ═══ -->
 <div id="tab-prescday" class="hidden">
   <!-- 新增處方日 -->
-  <div class="chart-section" style="margin:18px 36px">
+  <div class="chart-section m-hide" style="margin:18px 36px">
     <div class="chart-header"><h2>新增處方日資料</h2></div>
     <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:12px">
       <input id="prescDayLabel" type="text" placeholder="標籤（例：2026-03-01）" style="flex:1;min-width:160px;padding:7px 12px;border-radius:8px;border:1.5px solid var(--border);font-family:inherit;font-size:0.88rem;color:var(--text);background:var(--surface);outline:none">
@@ -1142,7 +1191,7 @@ footer {
       <div class="chart-header"><h2 id="prescday-bar-title">各類處方執行數（直條圖）</h2><button class="dl-btn" onclick="downloadChart(this)">↓ 下載 JPG</button></div>
       <div class="chart-wrap"><canvas id="prescDayBarChart"></canvas></div>
     </div>
-    <div class="chart-section" data-pdf-id="prescday-line" data-pdf-label="各類處方執行數比較（折線圖）">
+    <div class="chart-section m-hide" data-pdf-id="prescday-line" data-pdf-label="各類處方執行數比較（折線圖）">
       <div class="chart-header"><h2 id="prescday-line-title">各類處方執行數（折線圖）</h2><button class="dl-btn" onclick="downloadChart(this)">↓ 下載 JPG</button></div>
       <div class="chart-wrap"><canvas id="prescDayLineChart"></canvas></div>
     </div>
@@ -1157,7 +1206,7 @@ footer {
       <div class="chart-header"><h2 id="prescday-course-bar-title">各課程參與人數（直條圖）</h2><button class="dl-btn" onclick="downloadChart(this)">↓ 下載 JPG</button></div>
       <div class="chart-wrap"><canvas id="prescDayCourseBarChart"></canvas></div>
     </div>
-    <div class="chart-section" data-pdf-id="prescday-course-line" data-pdf-label="各課程參與人數（折線圖）">
+    <div class="chart-section m-hide" data-pdf-id="prescday-course-line" data-pdf-label="各課程參與人數（折線圖）">
       <div class="chart-header"><h2 id="prescday-course-line-title">各課程參與人數（折線圖）</h2><button class="dl-btn" onclick="downloadChart(this)">↓ 下載 JPG</button></div>
       <div class="chart-wrap"><canvas id="prescDayCourseLineChart"></canvas></div>
     </div>
@@ -1167,7 +1216,7 @@ footer {
 <!-- ═══ TAB 6:課程選課 ═══ -->
 <div id="tab-course" class="hidden">
   <!-- ── 頂層查詢區間(影響:處方類型未完成圖 / 場次狀態圖 / 場次明細表)── -->
-  <div style="margin:20px 36px 0;padding:14px 18px;background:linear-gradient(135deg,#f7fbf9,#fff);border-radius:14px;border:1px solid var(--border);box-shadow:var(--shadow-sm)">
+  <div class="course-query-box" style="margin:20px 36px 0;padding:14px 18px;background:linear-gradient(135deg,#f7fbf9,#fff);border-radius:14px;border:1px solid var(--border);box-shadow:var(--shadow-sm)">
     <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;font-size:0.85rem">
       <span style="font-weight:700;color:var(--teal);white-space:nowrap">查詢區間:</span>
       <input type="date" id="courseGlobalFrom" oninput="onGlobalDateChange()" style="padding:6px 10px;border-radius:6px;border:1.5px solid var(--border);font-family:inherit;font-size:0.84rem;background:var(--surface);color:var(--text)">
@@ -1266,17 +1315,17 @@ footer {
 
   <!-- ── 分析圖表(放下方作為補充) ── -->
   <div class="side-by-side">
-    <div class="chart-section" data-pdf-id="course-type-seats" data-pdf-label="各處方類型剩餘可預訂人次">
+    <div class="chart-section m-hide" data-pdf-id="course-type-seats" data-pdf-label="各處方類型剩餘可預訂人次">
       <div class="chart-header"><h2>各處方類型剩餘可預訂(人次)</h2><button class="dl-btn" onclick="downloadChart(this)">↓ 下載 JPG</button></div>
       <div class="chart-wrap"><canvas id="courseTypeFillChart"></canvas></div>
     </div>
-    <div class="chart-section" data-pdf-id="course-status-pie" data-pdf-label="場次狀態分布">
+    <div class="chart-section m-hide" data-pdf-id="course-status-pie" data-pdf-label="場次狀態分布">
       <div class="chart-header"><h2>場次狀態分布</h2><button class="dl-btn" onclick="downloadChart(this)">↓ 下載 JPG</button></div>
       <div class="chart-wrap"><canvas id="courseStatusPieChart"></canvas></div>
     </div>
   </div>
 
-  <div class="chart-section" data-pdf-id="course-per-course-seats" data-pdf-label="各課程場次剩餘可預訂人次">
+  <div class="chart-section m-hide" data-pdf-id="course-per-course-seats" data-pdf-label="各課程場次剩餘可預訂人次">
     <div class="chart-header"><h2>各課程場次剩餘可預訂(人次)</h2><button class="dl-btn" onclick="downloadChart(this)">↓ 下載 JPG</button></div>
     <div class="chart-wrap" id="coursePerCourseWrap" style="height:auto"><canvas id="coursePerCourseChart"></canvas></div>
     <div id="coursePerCourseEmpty" style="display:none;padding:24px;text-align:center;color:var(--text-muted)">此區間沒有即將舉辦的場次</div>
