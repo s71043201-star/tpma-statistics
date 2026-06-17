@@ -648,7 +648,15 @@ body.is-loading .chart-wrap::after {
 .rate-bar-cell { min-width: 120px; }
 .rate-bar-bg { background: #e8f8f2; border-radius: 4px; height: 8px; overflow: hidden; }
 .rate-bar-fill { height: 100%; border-radius: 4px; background: linear-gradient(90deg, #2aac8a, #1a9fbe); }
+.rate-bar-bg.exec { background: #fdf0dc; }
+.rate-bar-fill.exec { background: linear-gradient(90deg, #e8930a, #f0b44a); }
 .clinic-table tbody tr:nth-child(even) { background: #f7fcf9; }
+.clinic-total-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin-top: 6px; }
+.clinic-total-grid .ct-stat { background: linear-gradient(135deg, #f7fcf9, #eefbf5); border: 1.5px solid var(--border); border-radius: 12px; padding: 16px 18px; text-align: center; }
+.clinic-total-grid .ct-val { font-size: 1.7rem; font-weight: 800; color: var(--text); font-variant-numeric: tabular-nums; line-height: 1.1; }
+.clinic-total-grid .ct-val.ct-exec { color: #e8930a; }
+.clinic-total-grid .ct-lbl { font-size: 0.8rem; font-weight: 600; color: var(--text-muted); margin-top: 6px; }
+@media (max-width: 640px) { .clinic-total-grid { gap: 8px; } .clinic-total-grid .ct-stat { padding: 12px 8px; } .clinic-total-grid .ct-val { font-size: 1.25rem; } }
 
 /* ── 場次明細表 ── */
 .data-table { border-collapse: collapse; }
@@ -1130,11 +1138,20 @@ footer {
     <div style="font-size:0.85rem;">請確認 Excel 中有「診所名稱」相關欄位（例如：診所、院所、診所名稱），並重新上傳。</div>
   </div>
   <div id="clinic-content" class="hidden">
+    <div class="chart-section" data-pdf-id="clinic-exec-total" data-pdf-label="整體執行率（所有診所加總）">
+      <div class="chart-header"><h2>整體執行率（所有診所加總）</h2></div>
+      <div id="clinicExecTotal" class="clinic-total-grid">
+        <div class="ct-stat"><div class="ct-val" id="ctTotalPresc">—</div><div class="ct-lbl">總開立筆數</div></div>
+        <div class="ct-stat"><div class="ct-val ct-exec" id="ctTotalExec">—</div><div class="ct-lbl">總執行筆數</div></div>
+        <div class="ct-stat"><div class="ct-val ct-exec" id="ctTotalRate">—</div><div class="ct-lbl">總執行率</div></div>
+      </div>
+    </div>
     <div class="clinic-sort-bar">
       <span class="ct-label">排序依據：</span>
       <button class="ct-btn active" onclick="setClinicSort('prescribe',this)">開立數↓</button>
       <button class="ct-btn" onclick="setClinicSort('enroll',this)">選課或執行↓</button>
       <button class="ct-btn" onclick="setClinicSort('rate',this)">比率↓</button>
+      <button class="ct-btn" onclick="setClinicSort('execRate',this)">執行率↓</button>
       <button class="ct-btn" onclick="setClinicSort('name',this)">名稱↑</button>
     </div>
     <div class="chart-section" data-pdf-id="clinic-enroll" data-pdf-label="各診所選課或執行筆數">
@@ -1149,6 +1166,10 @@ footer {
       <div class="chart-header"><h2>各診所選課或執行比率（%）</h2><button class="dl-btn" onclick="downloadChart(this)">↓ 下載 JPG</button></div>
       <div class="chart-wrap" id="clinicRateWrap" style="height:360px"><canvas id="clinicRateChart"></canvas></div>
     </div>
+    <div class="chart-section" data-pdf-id="clinic-exec-rate" data-pdf-label="各診所執行率（%）">
+      <div class="chart-header"><h2>各診所執行率（%）</h2><button class="dl-btn" onclick="downloadChart(this)">↓ 下載 JPG</button></div>
+      <div class="chart-wrap" id="clinicExecRateWrap" style="height:360px"><canvas id="clinicExecRateChart"></canvas></div>
+    </div>
     <div class="chart-section">
       <div class="chart-header"><h2>各診所詳細統計表</h2><button class="dl-btn" onclick="exportClinicTable()">↓ 匯出 Excel</button></div>
       <div class="clinic-table-wrap">
@@ -1157,7 +1178,8 @@ footer {
             <tr>
               <th style="width:40px;">排名</th><th>診所名稱</th>
               <th class="num">開立筆數</th><th class="num">選課或執行</th>
-              <th class="num">比率</th><th style="min-width:130px;">比率視覺</th>
+              <th class="num">比率</th><th class="num">純執行數</th>
+              <th class="num">執行率</th><th style="min-width:130px;">執行率視覺</th>
             </tr>
           </thead>
           <tbody id="clinicTableBody"></tbody>
@@ -2374,13 +2396,14 @@ function getSortedClinicStats() {
     case 'prescribe': return data.sort((a,b)=>b.開立數-a.開立數);
     case 'enroll':    return data.sort((a,b)=>b.選課或執行-a.選課或執行);
     case 'rate':      return data.sort((a,b)=>b.比率-a.比率);
+    case 'execRate':  return data.sort((a,b)=>(b.執行率||0)-(a.執行率||0));
     case 'name':      return data.sort((a,b)=>a.診所名稱.localeCompare(b.診所名稱,'zh-TW'));
     default:          return data;
   }
 }
 
 function buildClinicCharts() {
-  ['clinicEnroll','clinicBar','clinicRate'].forEach(k=>destroyChart(k));
+  ['clinicEnroll','clinicBar','clinicRate','clinicExecRate'].forEach(k=>destroyChart(k));
   if (!clinicStats.length) {
     document.getElementById('clinic-no-data').classList.remove('hidden');
     document.getElementById('clinic-content').classList.add('hidden');
@@ -2388,15 +2411,26 @@ function buildClinicCharts() {
   }
   document.getElementById('clinic-no-data').classList.add('hidden');
   document.getElementById('clinic-content').classList.remove('hidden');
-  const sorted     = getSortedClinicStats();
-  const names      = sorted.map(d=>d.診所名稱);
-  const presData   = sorted.map(d=>d.開立數);
-  const enrollData = sorted.map(d=>d.選課或執行);
-  const rateData   = sorted.map(d=>d.比率);
+  const sorted       = getSortedClinicStats();
+  const names        = sorted.map(d=>d.診所名稱);
+  const presData     = sorted.map(d=>d.開立數);
+  const enrollData   = sorted.map(d=>d.選課或執行);
+  const rateData     = sorted.map(d=>d.比率);
+  const execData     = sorted.map(d=>d.執行數||0);
+  const execRateData = sorted.map(d=>d.執行率||0);
+  // 整體執行率（所有診所加總）
+  const totPresc = presData.reduce((s,v)=>s+v,0);
+  const totExec  = execData.reduce((s,v)=>s+v,0);
+  const totRate  = totPresc>0 ? (totExec/totPresc*100).toFixed(1) : '0.0';
+  const setCt=(id,txt)=>{const el=document.getElementById(id);if(el)el.textContent=txt;};
+  setCt('ctTotalPresc', totPresc.toLocaleString());
+  setCt('ctTotalExec',  totExec.toLocaleString());
+  setCt('ctTotalRate',  totRate+'%');
   const dynH = Math.max(360, 400);
-  document.getElementById('clinicEnrollWrap').style.height = dynH + 'px';
-  document.getElementById('clinicBarWrap').style.height    = dynH + 'px';
-  document.getElementById('clinicRateWrap').style.height   = dynH + 'px';
+  document.getElementById('clinicEnrollWrap').style.height   = dynH + 'px';
+  document.getElementById('clinicBarWrap').style.height      = dynH + 'px';
+  document.getElementById('clinicRateWrap').style.height     = dynH + 'px';
+  document.getElementById('clinicExecRateWrap').style.height = dynH + 'px';
   const enrollByType = computeClinicEnrollByType(sorted);
   if (enrollByType && enrollByType.typeSet.length) {
     const enrollDatasets = enrollByType.typeSet.map((t, i) => ({
@@ -2435,6 +2469,12 @@ function buildClinicCharts() {
     data: { labels: names, datasets: [{ label: '執行率%', data: rateData, backgroundColor: bgColors, borderColor: '#2aac8a', borderWidth: 1, borderRadius: 4 }] },
     options: { responsive: true, maintainAspectRatio: false, layout: { padding: { top: 30 } }, plugins: { legend: { display: false }, tooltip: { callbacks: { label: c => ` 選課或執行比率：${c.parsed.y}%` } } }, scales: { y: { ticks:{font:defaultFont, callback:v=>v+'%'}, max:100, beginAtZero:true, grid:{color:'#e3eee8'} }, x: { ticks:{font:Object.assign({}, defaultFont, {size:12}), autoSkip:false, maxRotation:45, minRotation:45}, grid:{display:false} } } }
   });
+  const execBgColors = execRateData.map(r => { const alpha = 0.35 + (r / 100) * 0.55; return `rgba(232,147,10,${alpha.toFixed(2)})`; });
+  chartInstances['clinicExecRate'] = new Chart(document.getElementById('clinicExecRateChart').getContext('2d'), {
+    type: 'bar', plugins: [barLabelPlugin],
+    data: { labels: names, datasets: [{ label: '執行率%', data: execRateData, backgroundColor: execBgColors, borderColor: '#e8930a', borderWidth: 1, borderRadius: 4 }] },
+    options: { responsive: true, maintainAspectRatio: false, layout: { padding: { top: 30 } }, plugins: { legend: { display: false }, tooltip: { callbacks: { label: c => ` 執行率：${c.parsed.y}%` } } }, scales: { y: { ticks:{font:defaultFont, callback:v=>v+'%'}, max:100, beginAtZero:true, grid:{color:'#e3eee8'} }, x: { ticks:{font:Object.assign({}, defaultFont, {size:12}), autoSkip:false, maxRotation:45, minRotation:45}, grid:{display:false} } } }
+  });
   buildClinicTable(sorted);
 }
 
@@ -2451,7 +2491,9 @@ function buildClinicTable(sorted) {
       <td class="num">${row.開立數.toLocaleString()}</td>
       <td class="num" style="color:#6d28d9;font-weight:700;">${row.選課或執行.toLocaleString()}</td>
       <td class="num" style="color:#6d28d9;">${row.比率}%</td>
-      <td class="rate-bar-cell"><div class="rate-bar-bg"><div class="rate-bar-fill" style="width:${row.比率}%"></div></div></td>
+      <td class="num" style="color:#e8930a;font-weight:700;">${(row.執行數||0).toLocaleString()}</td>
+      <td class="num" style="color:#e8930a;">${row.執行率||0}%</td>
+      <td class="rate-bar-cell"><div class="rate-bar-bg exec"><div class="rate-bar-fill exec" style="width:${row.執行率||0}%"></div></div></td>
     `;
     tbody.appendChild(tr);
   });
@@ -2467,11 +2509,11 @@ function setClinicSort(sort, btn) {
 function exportClinicTable() {
   if (!clinicStats.length) { alert('尚無診所資料'); return; }
   const sorted = getSortedClinicStats();
-  const wsData = [['排名','診所名稱','開立筆數','選課或執行筆數','比率(%)']];
-  sorted.forEach((row, i) => { wsData.push([i+1, row.診所名稱, row.開立數, row.選課或執行, row.比率]); });
+  const wsData = [['排名','診所名稱','開立筆數','選課或執行筆數','比率(%)','純執行筆數','執行率(%)']];
+  sorted.forEach((row, i) => { wsData.push([i+1, row.診所名稱, row.開立數, row.選課或執行, row.比率, row.執行數||0, row.執行率||0]); });
   const wb = XLSX.utils.book_new();
   const ws = XLSX.utils.aoa_to_sheet(wsData);
-  ws['!cols'] = [{wch:6},{wch:24},{wch:10},{wch:14},{wch:10}];
+  ws['!cols'] = [{wch:6},{wch:24},{wch:10},{wch:14},{wch:10},{wch:12},{wch:10}];
   XLSX.utils.book_append_sheet(wb, ws, '診所統計');
   XLSX.writeFile(wb, '診所統計.xlsx');
 }
@@ -3241,9 +3283,10 @@ function aggregateRawRows(rows){
     if(!typeMapTotal[r.type])typeMapTotal[r.type]={開立數:0,執行數:0};
     typeMapTotal[r.type].開立數++;if(r.ex)typeMapTotal[r.type].執行數++;
     if(r.clinic){
-      if(!clinicMap[r.clinic])clinicMap[r.clinic]={開立數:0,選課或執行:0};
+      if(!clinicMap[r.clinic])clinicMap[r.clinic]={開立數:0,選課或執行:0,執行數:0};
       clinicMap[r.clinic].開立數++;
       if(r.enrolled||r.ex)clinicMap[r.clinic].選課或執行++;
+      if(r.ex)clinicMap[r.clinic].執行數++;
     }
     if(!minDate||pd<minDate)minDate=pd;if(!maxDate||pd>maxDate)maxDate=pd;
   });
@@ -3279,7 +3322,7 @@ function aggregateRawRows(rows){
   allTypes.forEach(t=>sw.forEach(wl=>{const d=typeWeekMap[t]&&typeWeekMap[t][wl];if(d)newTWRaw.push({week_label:wl,處方類型:t,開立數:d.開立數,執行數:d.執行數});}));
   const newTMRaw=[];
   allTypes.forEach(t=>sm.forEach(ml=>{const d=typeMonthMap[t]&&typeMonthMap[t][ml];if(d)newTMRaw.push({month_label:ml,處方類型:t,開立數:d.開立數,執行數:d.執行數});}));
-  const newClinicStats=Object.entries(clinicMap).map(([name,v])=>({診所名稱:name,開立數:v.開立數,選課或執行:v.選課或執行,比率:v.開立數>0?parseFloat((v.選課或執行/v.開立數*100).toFixed(1)):0}));
+  const newClinicStats=Object.entries(clinicMap).map(([name,v])=>({診所名稱:name,開立數:v.開立數,選課或執行:v.選課或執行,比率:v.開立數>0?parseFloat((v.選課或執行/v.開立數*100).toFixed(1)):0,執行數:v.執行數||0,執行率:v.開立數>0?parseFloat(((v.執行數||0)/v.開立數*100).toFixed(1)):0}));
   const fmt=d=>`${d.getFullYear()}/${String(d.getMonth()+1).padStart(2,'0')}/${String(d.getDate()).padStart(2,'0')}`;
   const dr=minDate&&maxDate?`${fmt(minDate)} – ${fmt(maxDate)}`:'—';
   return{newWeeklyData,newMonthlyData,newTypeStats,newTWRaw,newTMRaw,newClinicStats,dateRange:dr};
@@ -4304,9 +4347,10 @@ const PDF_CHART_GROUPS = [
     groupLabel: '診所分析',
     tabId: 'tab-clinic',
     charts: [
-      { id: 'clinic-enroll', label: '各診所選課或執行筆數' },
-      { id: 'clinic-bar',    label: '各診所開立數 vs 執行筆數' },
-      { id: 'clinic-rate',   label: '各診所選課或執行比率（%）' },
+      { id: 'clinic-enroll',     label: '各診所選課或執行筆數' },
+      { id: 'clinic-bar',        label: '各診所開立數 vs 執行筆數' },
+      { id: 'clinic-rate',       label: '各診所選課或執行比率（%）' },
+      { id: 'clinic-exec-rate',  label: '各診所執行率（%）' },
     ]
   },
   {
