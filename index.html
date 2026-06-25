@@ -1611,7 +1611,7 @@ async function loadFromCloud(auto) {
     const fn = data.file_name  || '—';
     const at = data.uploaded_at ? new Date(data.uploaded_at).toLocaleString('zh-TW') : '—';
     document.getElementById('headerDesc').textContent =
-      `資料區間：${dr}　｜　共 ${weeklyData.reduce((s,d)=>s+d.開立數,0).toLocaleString()} 筆處方紀錄`;
+      `資料區間：${dr}　｜　共 ${weeklyData.reduce((s,d)=>s+(Number(d.開立數)||0),0).toLocaleString()} 筆處方紀錄`;
     setCloudStatus('', `✦ 已載入最新資料　來源：${fn}　上傳時間：${at}`);
     // 自動背景同步時不重播圖表生長動畫,避免每 5 分鐘晃一次
     const _prevAnim = (typeof Chart !== 'undefined') ? Chart.defaults.animation : null;
@@ -1864,7 +1864,8 @@ function setAnimatedText(id, finalText){
   if(!m){ el.textContent = finalText; delete el.dataset.prevNum; return; }
   const target = parseFloat(m[2].replace(/,/g,''));
   if(!isFinite(target)){ el.textContent = finalText; return; }
-  const fromVal = parseFloat(el.dataset.prevNum || '0') || 0; // 從上次的值滾動,首次從 0
+  let fromVal = parseFloat(el.dataset.prevNum); // 從上次的值滾動,首次從 0
+  if(!isFinite(fromVal)) fromVal = 0; // 防呆:上次值若異常(非有限)就從 0 起算,避免亂跳
   el.dataset.prevNum = target;
   const decimals = (m[2].split('.')[1]||'').length;
   const useGrouping = m[2].includes(',');
@@ -1873,6 +1874,7 @@ function setAnimatedText(id, finalText){
     const t = Math.min(1, (now-start)/dur);
     const eased = 1 - Math.pow(1-t, 3);
     const v = fromVal + (target - fromVal) * eased;
+    if(!isFinite(v)){ el.textContent = finalText; delete _animTimers[id]; return; } // 防呆:動畫值異常直接顯示最終值
     el.textContent = m[1] + v.toLocaleString('en-US',{minimumFractionDigits:decimals,maximumFractionDigits:decimals,useGrouping}) + m[3];
     if(t < 1) _animTimers[id] = requestAnimationFrame(frame);
     else { el.textContent = finalText; delete _animTimers[id]; }
@@ -1884,10 +1886,10 @@ function setAnimatedText(id, finalText){
 //  摘要
 // ══════════════════════════════════════════════
 function updateSummary(){
-  const total   = weeklyData.reduce((s,d)=>s+d.開立數,0);
-  const exec    = weeklyData.reduce((s,d)=>s+d.執行數,0);
+  const total   = weeklyData.reduce((s,d)=>s+(Number(d.開立數)||0),0);
+  const exec    = weeklyData.reduce((s,d)=>s+(Number(d.執行數)||0),0);
   const rate    = total>0?(exec/total*100).toFixed(1):0;
-  const enroll  = clinicStats.reduce((s,d)=>s+(d.選課或執行||0),0);
+  const enroll  = clinicStats.reduce((s,d)=>s+(Number(d.選課或執行)||0),0);
   setAnimatedText('sumTotal', total.toLocaleString());
   setAnimatedText('sumExec',  exec.toLocaleString());
   setAnimatedText('sumRate',  rate+'%');
@@ -3405,7 +3407,7 @@ async function handleFile(file){
     typeStats=newTypeStats; typeWeeklyRaw=newTWRaw; typeMonthlyRaw=newTMRaw; clinicStats=newClinicStats;
     updateSummary(); buildAllCharts();
     document.getElementById('headerDesc').textContent =
-      `資料區間：${dateRange}　｜　共 ${weeklyData.reduce((s,d)=>s+d.開立數,0).toLocaleString()} 筆處方紀錄`;
+      `資料區間：${dateRange}　｜　共 ${weeklyData.reduce((s,d)=>s+(Number(d.開立數)||0),0).toLocaleString()} 筆處方紀錄`;
     setStatus('⏳ 正在儲存到雲端…');
     const ok = await saveToCloud({
       weeklyData:newWeeklyData, typeStats:newTypeStats, typeWeeklyRaw:newTWRaw,
