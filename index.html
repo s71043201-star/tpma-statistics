@@ -651,6 +651,21 @@ body.is-loading .chart-wrap::after {
 .rate-bar-bg.exec { background: #fdf0dc; }
 .rate-bar-fill.exec { background: linear-gradient(90deg, #e8930a, #f0b44a); }
 .clinic-table tbody tr:nth-child(even) { background: #f7fcf9; }
+.clinic-dl-btn { padding: 5px 12px; border:1.5px solid var(--border); border-radius:8px; background:var(--surface); color:var(--text); font-family:inherit; font-size:0.78rem; font-weight:700; cursor:pointer; white-space:nowrap; transition:all .15s; }
+.clinic-dl-btn:hover:not(:disabled) { background:linear-gradient(135deg,#2aac8a,#1a9fbe); color:#fff; border-color:transparent; }
+.clinic-dl-btn:disabled { opacity:.6; cursor:default; }
+/* ── 下載密碼 / 進度 modal ── */
+.pwd-modal-mask { position:fixed; inset:0; background:rgba(15,30,25,.45); display:flex; align-items:center; justify-content:center; z-index:9999; }
+.pwd-modal { background:var(--surface); border-radius:16px; padding:26px 28px; width:min(92vw,380px); box-shadow:0 24px 60px rgba(0,0,0,.25); }
+.pwd-modal h3 { margin:0 0 6px; font-size:1.1rem; color:var(--text); }
+.pwd-modal p { margin:0 0 16px; font-size:0.82rem; color:var(--text-muted); line-height:1.5; }
+.pwd-modal input { width:100%; box-sizing:border-box; padding:10px 13px; border:1.5px solid var(--border); border-radius:9px; font-family:inherit; font-size:0.95rem; outline:none; }
+.pwd-modal input:focus { border-color:#2aac8a; }
+.pwd-modal .pwd-err { color:#d33; font-size:0.78rem; margin-top:8px; min-height:1em; }
+.pwd-modal .pwd-row { display:flex; gap:10px; margin-top:18px; justify-content:flex-end; }
+.pwd-modal button { padding:9px 18px; border-radius:9px; border:none; font-family:inherit; font-size:0.85rem; font-weight:700; cursor:pointer; }
+.pwd-modal .pwd-ok { background:linear-gradient(135deg,#2aac8a,#1a9fbe); color:#fff; }
+.pwd-modal .pwd-cancel { background:#eef2f0; color:var(--text-muted); }
 .clinic-total-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin-top: 6px; }
 .clinic-total-grid .ct-stat { background: linear-gradient(135deg, #f7fcf9, #eefbf5); border: 1.5px solid var(--border); border-radius: 12px; padding: 16px 18px; text-align: center; }
 .clinic-total-grid .ct-val { font-size: 1.7rem; font-weight: 800; color: var(--text); font-variant-numeric: tabular-nums; line-height: 1.1; }
@@ -1180,6 +1195,7 @@ footer {
               <th class="num">開立筆數</th><th class="num">選課或執行</th>
               <th class="num">比率</th><th class="num">純執行數</th>
               <th class="num">執行率</th><th style="min-width:130px;">執行率視覺</th>
+              <th style="width:120px;text-align:center;">處方紀錄</th>
             </tr>
           </thead>
           <tbody id="clinicTableBody"></tbody>
@@ -2494,7 +2510,9 @@ function buildClinicTable(sorted) {
       <td class="num" style="color:#e8930a;font-weight:700;">${(row.執行數||0).toLocaleString()}</td>
       <td class="num" style="color:#e8930a;">${row.執行率||0}%</td>
       <td class="rate-bar-cell"><div class="rate-bar-bg exec"><div class="rate-bar-fill exec" style="width:${row.執行率||0}%"></div></div></td>
+      <td style="text-align:center;"><button class="clinic-dl-btn" title="下載「${row.診所名稱}」逐筆處方紀錄與民眾完成度 Excel">↓ Excel</button></td>
     `;
+    tr.querySelector('.clinic-dl-btn').addEventListener('click', (e)=>requestClinicExport(row.診所名稱, e.currentTarget));
     tbody.appendChild(tr);
   });
 }
@@ -2516,6 +2534,118 @@ function exportClinicTable() {
   ws['!cols'] = [{wch:6},{wch:24},{wch:10},{wch:14},{wch:10},{wch:12},{wch:10}];
   XLSX.utils.book_append_sheet(wb, ws, '診所統計');
   XLSX.writeFile(wb, '診所統計.xlsx');
+}
+
+// ══════════════════════════════════════════════
+//  診所逐筆處方紀錄下載(佇列:前端請求 → 本機 Python 即時拓取 → 回傳)
+//  個資不進 raw_rows;密碼後端校驗;下載後立即刪除該 request row。
+// ══════════════════════════════════════════════
+// 取得下載密碼:同一分頁輸入一次後記在 sessionStorage,不再問
+function ensureExportPassword() {
+  return new Promise((resolve) => {
+    const cached = sessionStorage.getItem('clinicExportPwd');
+    if (cached) { resolve(cached); return; }
+    const mask = document.createElement('div');
+    mask.className = 'pwd-modal-mask';
+    mask.innerHTML = `
+      <div class="pwd-modal">
+        <h3>下載診所處方紀錄</h3>
+        <p>此資料含民眾個資，請輸入下載密碼。<br>本分頁輸入一次後即可重複下載，關閉分頁後需再輸入。</p>
+        <input type="password" id="pwdInput" placeholder="請輸入下載密碼" autocomplete="off" />
+        <div class="pwd-err" id="pwdErr"></div>
+        <div class="pwd-row">
+          <button class="pwd-cancel" id="pwdCancel">取消</button>
+          <button class="pwd-ok" id="pwdOk">確認</button>
+        </div>
+      </div>`;
+    document.body.appendChild(mask);
+    const input = mask.querySelector('#pwdInput');
+    input.focus();
+    const close = (val) => { mask.remove(); resolve(val); };
+    const submit = () => {
+      const v = input.value.trim();
+      if (!v) { mask.querySelector('#pwdErr').textContent = '請輸入密碼'; return; }
+      sessionStorage.setItem('clinicExportPwd', v);
+      close(v);
+    };
+    mask.querySelector('#pwdOk').onclick = submit;
+    mask.querySelector('#pwdCancel').onclick = () => close(null);
+    input.addEventListener('keydown', (e) => { if (e.key === 'Enter') submit(); if (e.key === 'Escape') close(null); });
+    mask.addEventListener('click', (e) => { if (e.target === mask) close(null); });
+  });
+}
+
+function _downloadB64Xlsx(b64, filename) {
+  const bin = atob(b64);
+  const u8 = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) u8[i] = bin.charCodeAt(i);
+  const blob = new Blob([u8], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = filename || '診所處方紀錄.xlsx';
+  document.body.appendChild(a); a.click();
+  setTimeout(() => { URL.revokeObjectURL(url); a.remove(); }, 100);
+}
+
+async function requestClinicExport(clinicName, btn) {
+  if (!sbClient) { alert('Supabase 未設定，無法下載'); return; }
+  if (!clinicName) return;
+  if (btn && btn.disabled) return;
+
+  const pwd = await ensureExportPassword();
+  if (pwd === null) return;  // 使用者取消
+
+  const orig = btn ? btn.textContent : '';
+  if (btn) { btn.disabled = true; btn.textContent = '送出中…'; }
+
+  let requestId = null;
+  try {
+    const { data, error } = await sbClient
+      .from('clinic_export_requests')
+      .insert({ clinic_name: clinicName, password: pwd, status: 'pending' })
+      .select('id').single();
+    if (error || !data) throw new Error(error && error.message || '請確認 clinic_export_requests 表已建立');
+    requestId = data.id;
+  } catch (e) {
+    if (btn) { btn.disabled = false; btn.textContent = orig; }
+    alert('❌ 觸發失敗：' + (e.message || e));
+    return;
+  }
+
+  let elapsed = 0;
+  const timer = setInterval(async () => {
+    elapsed += 3;
+    if (elapsed > 300) {
+      clearInterval(timer);
+      if (btn) { btn.disabled = false; btn.textContent = orig; }
+      alert('⚠️ 下載逾時（>5 分鐘）。請確認本機「ClinicExportPoll」工作排程器任務有在執行。');
+      return;
+    }
+    try {
+      const { data } = await sbClient
+        .from('clinic_export_requests')
+        .select('status, error_message, result_b64, result_filename, row_count')
+        .eq('id', requestId).single();
+      if (!data) return;
+      if (data.status === 'done') {
+        clearInterval(timer);
+        if (data.result_b64) _downloadB64Xlsx(data.result_b64, data.result_filename);
+        if (btn) { btn.textContent = `✓ ${data.row_count || 0} 筆`; }
+        // 下載後立即刪除該 row,縮短個資暴露窗口
+        try { await sbClient.from('clinic_export_requests').delete().eq('id', requestId); } catch (e) {}
+        setTimeout(() => { if (btn) { btn.disabled = false; btn.textContent = orig; } }, 2500);
+      } else if (data.status === 'error') {
+        clearInterval(timer);
+        if (btn) { btn.disabled = false; btn.textContent = orig; }
+        const msg = data.error_message || '未知錯誤';
+        if (msg.includes('密碼')) sessionStorage.removeItem('clinicExportPwd');  // 密碼錯就清掉,下次重問
+        alert('❌ 下載失敗：' + msg);
+        try { await sbClient.from('clinic_export_requests').delete().eq('id', requestId); } catch (e) {}
+      } else if (btn) {
+        btn.textContent = data.status === 'running' ? `抓取中…${elapsed}s` : `等待中…${elapsed}s`;
+      }
+    } catch (e) { /* 連線抖動下次再試 */ }
+  }, 3000);
 }
 
 // ══════════════════════════════════════════════
