@@ -48,13 +48,13 @@
   .dot{width:10px;height:10px;border-radius:50%;display:inline-block}
 
   /* Calendar */
-  .cal{background:var(--card);border-radius:16px;box-shadow:var(--shadow);padding:12px;overflow:visible}
+  .cal{background:var(--card);border-radius:16px;box-shadow:var(--shadow);padding:12px;overflow:auto}
   .dow{display:grid;grid-template-columns:repeat(7,1fr);gap:4px;margin-bottom:4px}
   .dow div{text-align:center;font-size:.78rem;color:var(--muted);font-weight:700;padding:4px 0}
   .dow div.we{color:#c0392b}
-  .grid{display:grid;grid-template-columns:repeat(7,1fr);gap:4px;align-items:start}
-  .cell{min-height:62px;border-radius:10px;border:1.5px solid transparent;background:#fafdfb;
-    padding:5px 5px 6px;cursor:default;text-align:left;font-family:inherit;color:inherit}
+  .grid{display:grid;grid-template-columns:repeat(7,1fr);gap:4px;align-items:start;width:100%;max-width:100%}
+  .cell{min-height:120px;border-radius:10px;border:1.5px solid transparent;background:#fafdfb;
+    padding:5px 5px 6px;cursor:default;text-align:left;font-family:inherit;color:inherit;overflow:hidden}
   .cell.blank{background:transparent;border:none}
   .cell.has{cursor:pointer;background:#fff;border-color:var(--line)}
   .cell.has:hover{border-color:var(--teal)}
