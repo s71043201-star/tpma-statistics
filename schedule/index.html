@@ -30,7 +30,7 @@
 
   /* Controls */
   .controls{display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:center;margin:6px 0 16px}
-  .regions{display:flex;gap:6px;flex-wrap:wrap;justify-content:center}
+  .regions,.types{display:flex;gap:6px;flex-wrap:wrap;justify-content:center}
   .rbtn{border:1.5px solid var(--line);background:var(--card);color:var(--muted);
     padding:7px 16px;border-radius:22px;font-size:.9rem;font-weight:700;cursor:pointer;font-family:inherit;transition:.15s}
   .rbtn:hover{border-color:var(--teal)}
@@ -48,7 +48,7 @@
   .dot{width:10px;height:10px;border-radius:50%;display:inline-block}
 
   /* Calendar */
-  .cal{background:var(--card);border-radius:16px;box-shadow:var(--shadow);padding:12px;overflow:hidden}
+  .cal{background:var(--card);border-radius:16px;box-shadow:var(--shadow);padding:12px;overflow:visible}
   .dow{display:grid;grid-template-columns:repeat(7,1fr);gap:4px;margin-bottom:4px}
   .dow div{text-align:center;font-size:.78rem;color:var(--muted);font-weight:700;padding:4px 0}
   .dow div.we{color:#c0392b}
@@ -119,6 +119,7 @@
 
   <div class="controls">
     <div class="regions" id="regions"></div>
+    <div class="types" id="types"></div>
     <div class="month-nav">
       <button id="prevM" aria-label="上個月">‹</button>
       <span class="mlabel" id="mlabel">—</span>
@@ -148,11 +149,11 @@ const SUPABASE_URL = 'https://ilcnqpywxaseeyasiwws.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlsY25xcHl3eGFzZWV5YXNpd3dzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM4MzIzODgsImV4cCI6MjA4OTQwODM4OH0.TrjIr4IMdvpstkN8tNBQtAEvvNDTLg3XcXXIpptJIs0';
 
 const TYPE = {
-  exercise:{lbl:'運動',  c:'var(--c-ex)', soft:'var(--c-ex-soft)', ink:'#9c6206'},
-  nutrition:{lbl:'營養', c:'var(--c-nu)', soft:'var(--c-nu-soft)', ink:'#157a5a'},
-  mental:{lbl:'情緒調適',c:'var(--c-me)', soft:'var(--c-me-soft)', ink:'#5a32b0'},
-  social:{lbl:'社會',    c:'var(--c-so)', soft:'var(--c-so-soft)', ink:'#0f6f86'},
-  other:{lbl:'其他',     c:'var(--c-ot)', soft:'var(--c-ot-soft)', ink:'#52605c'}
+  exercise:{lbl:'運動',  c:'var(--c-ex)', hex:'#e8930a', soft:'var(--c-ex-soft)', ink:'#9c6206'},
+  nutrition:{lbl:'營養', c:'var(--c-nu)', hex:'#2aac8a', soft:'var(--c-nu-soft)', ink:'#157a5a'},
+  mental:{lbl:'情緒調適',c:'var(--c-me)', hex:'#7c3aed', soft:'var(--c-me-soft)', ink:'#5a32b0'},
+  social:{lbl:'社會',    c:'var(--c-so)', hex:'#1a9fbe', soft:'var(--c-so-soft)', ink:'#0f6f86'},
+  other:{lbl:'其他',     c:'var(--c-ot)', hex:'#9aa5b1', soft:'var(--c-ot-soft)', ink:'#52605c'}
 };
 const typeKey = ct => TYPE[ct] ? ct : 'other';
 
@@ -179,8 +180,17 @@ const REGIONS = [
   {key:'中山區', lbl:'中山'}
 ];
 
+const TYPES = [
+  {key:'all', lbl:'全部'},
+  {key:'mental', lbl:'情緒調適'},
+  {key:'nutrition', lbl:'營養'},
+  {key:'social', lbl:'社會'},
+  {key:'exercise', lbl:'運動'}
+];
+
 let allSlots = [];
 let curRegion = 'all';
+let curType = 'all';
 let curYear, curMonth;       // month: 0-11
 let selectedDate = null;     // 'YYYY-MM-DD'
 let today = new Date();
@@ -191,7 +201,9 @@ function pad(n){ return String(n).padStart(2,'0'); }
 function hhmm(t){ return (t||'').slice(0,5); }
 
 function regionFiltered(){
-  return curRegion==='all' ? allSlots : allSlots.filter(s => getSlotRegion(s)===curRegion);
+  let res = curRegion==='all' ? allSlots : allSlots.filter(s => getSlotRegion(s)===curRegion);
+  if(curType!=='all') res = res.filter(s => typeKey(s.course_type)===curType);
+  return res;
 }
 function slotsOfDay(dateStr){
   return regionFiltered()
@@ -203,7 +215,15 @@ function renderRegions(){
   document.getElementById('regions').innerHTML = REGIONS.map(r =>
     `<button class="rbtn${r.key===curRegion?' on':''}" data-r="${r.key}">${r.lbl}</button>`).join('');
   document.querySelectorAll('#regions .rbtn').forEach(b=>{
-    b.onclick = ()=>{ curRegion=b.dataset.r; selectedDate=null; renderRegions(); renderCalendar(); renderDetail(); };
+    b.onclick = ()=>{ curRegion=b.dataset.r; selectedDate=null; renderRegions(); renderTypeFilters(); renderCalendar(); renderDetail(); };
+  });
+}
+
+function renderTypeFilters(){
+  document.getElementById('types').innerHTML = TYPES.map(t =>
+    `<button class="rbtn${t.key===curType?' on':''}" data-t="${t.key}">${t.lbl}</button>`).join('');
+  document.querySelectorAll('#types .rbtn').forEach(b=>{
+    b.onclick = ()=>{ curType=b.dataset.t; selectedDate=null; renderCalendar(); renderDetail(); };
   });
 }
 
@@ -285,7 +305,16 @@ function renderDetail(){
   const title = `${d.getMonth()+1} 月 ${d.getDate()} 日（${WD[d.getDay()]}）`;
   if(!list.length){ el.innerHTML = `<h2>${title}</h2><div class="empty">這天目前沒有課程。</div>`; return; }
 
-  const cards = list.map(s=>{
+  // 按課程類型分組
+  const typeOrder = ['mental','nutrition','social','exercise','other'];
+  const grouped = {};
+  typeOrder.forEach(tk => grouped[tk] = []);
+  list.forEach(s => {
+    const tk = typeKey(s.course_type);
+    grouped[tk].push(s);
+  });
+
+  const renderCard = s => {
     const t = TYPE[typeKey(s.course_type)];
     const region = getSlotRegion(s).replace(/區$/,'');
     const time = hhmm(s.start_time) + (s.end_time ? ' – '+hhmm(s.end_time) : '');
@@ -302,9 +331,19 @@ function renderDetail(){
       </div>
       ${seatBadge(s)}
     </div>`;
+  };
+
+  const sections = typeOrder.map(tk => {
+    const slots = grouped[tk];
+    if(!slots.length) return '';
+    const t = TYPE[tk];
+    return `<div style="margin-top:16px">
+      <div style="font-size:0.95rem;font-weight:700;color:${t.hex};margin-bottom:8px">${t.lbl}</div>
+      <div class="cards">${slots.map(renderCard).join('')}</div>
+    </div>`;
   }).join('');
 
-  el.innerHTML = `<h2>${title}</h2><div class="dsub">共 ${list.length} 場活動</div><div class="cards">${cards}</div>`;
+  el.innerHTML = `<h2>${title}</h2><div class="dsub">共 ${list.length} 場活動</div>${sections}`;
 }
 
 function esc(str){ return String(str).replace(/[&<>"]/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
@@ -327,6 +366,7 @@ function pickInitialDate(){
 
 async function init(){
   renderRegions();
+  renderTypeFilters();
   // 預設月份：當月
   curYear = today.getFullYear(); curMonth = today.getMonth();
 
