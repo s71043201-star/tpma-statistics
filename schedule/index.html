@@ -1,0 +1,364 @@
+<!DOCTYPE html>
+<html lang="zh-Hant-TW">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>健康處方 · 課程月曆</title>
+<meta name="description" content="本月健康處方課程一覽，點選日期查看當天活動與報名名額。">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<style>
+  :root{
+    --bg:#f4f8f6; --card:#ffffff; --ink:#1f2d2a; --muted:#6b7d78; --line:#e2ece8;
+    --teal:#1a9d7a; --teal-soft:#e6f5ef;
+    --c-ex:#e8930a; --c-nu:#2aac8a; --c-me:#7c3aed; --c-so:#1a9fbe; --c-ot:#9aa5b1;
+    --c-ex-soft:#fdf0dd; --c-nu-soft:#e3f5ee; --c-me-soft:#efe9fb; --c-so-soft:#e2f4f8; --c-ot-soft:#eef1f0;
+    --shadow:0 1px 3px rgba(20,60,50,.06),0 6px 18px rgba(20,60,50,.06);
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0}
+  body{
+    font-family:-apple-system,"PingFang TC","Microsoft JhengHei","Noto Sans TC",sans-serif;
+    background:var(--bg); color:var(--ink); line-height:1.55;
+    -webkit-font-smoothing:antialiased;
+  }
+  .wrap{max-width:1040px;margin:0 auto;padding:20px 16px 64px}
+
+  /* Header */
+  .head{text-align:center;padding:14px 0 18px}
+  .head h1{margin:0;font-size:1.6rem;font-weight:800;letter-spacing:.5px;color:var(--ink)}
+  .head .sub{margin-top:4px;color:var(--muted);font-size:.92rem}
+
+  /* Controls */
+  .controls{display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:center;margin:6px 0 16px}
+  .regions{display:flex;gap:6px;flex-wrap:wrap;justify-content:center}
+  .rbtn{border:1.5px solid var(--line);background:var(--card);color:var(--muted);
+    padding:7px 16px;border-radius:22px;font-size:.9rem;font-weight:700;cursor:pointer;font-family:inherit;transition:.15s}
+  .rbtn:hover{border-color:var(--teal)}
+  .rbtn.on{background:var(--teal);border-color:var(--teal);color:#fff}
+  .month-nav{display:flex;align-items:center;gap:10px;background:var(--card);border:1.5px solid var(--line);
+    border-radius:22px;padding:4px 6px}
+  .month-nav button{border:none;background:transparent;cursor:pointer;font-size:1.1rem;color:var(--teal);
+    width:34px;height:34px;border-radius:50%;font-family:inherit;display:grid;place-items:center}
+  .month-nav button:hover{background:var(--teal-soft)}
+  .month-nav .mlabel{font-weight:800;font-size:1rem;min-width:118px;text-align:center}
+
+  /* Legend */
+  .legend{display:flex;gap:14px;flex-wrap:wrap;justify-content:center;margin:0 0 14px;font-size:.82rem;color:var(--muted)}
+  .legend span{display:inline-flex;align-items:center;gap:5px}
+  .dot{width:10px;height:10px;border-radius:50%;display:inline-block}
+
+  /* Calendar */
+  .cal{background:var(--card);border-radius:16px;box-shadow:var(--shadow);padding:12px;overflow:hidden}
+  .dow{display:grid;grid-template-columns:repeat(7,1fr);gap:4px;margin-bottom:4px}
+  .dow div{text-align:center;font-size:.78rem;color:var(--muted);font-weight:700;padding:4px 0}
+  .dow div.we{color:#c0392b}
+  .grid{display:grid;grid-template-columns:repeat(7,1fr);gap:4px;align-items:start}
+  .cell{min-height:62px;border-radius:10px;border:1.5px solid transparent;background:#fafdfb;
+    padding:5px 5px 6px;cursor:default;text-align:left;font-family:inherit;color:inherit}
+  .cell.blank{background:transparent;border:none}
+  .cell.has{cursor:pointer;background:#fff;border-color:var(--line)}
+  .cell.has:hover{border-color:var(--teal)}
+  .cell.sel{border-color:var(--teal);background:var(--teal-soft);box-shadow:0 0 0 2px var(--teal) inset}
+  .cell.past{opacity:.45}
+  .cell .dnum{font-size:.82rem;font-weight:800;color:var(--ink)}
+  .cell.today .dnum{background:var(--teal);color:#fff;border-radius:50%;width:22px;height:22px;
+    display:inline-grid;place-items:center;font-size:.76rem}
+  .cell .cnt{float:right;font-size:.68rem;color:var(--teal);font-weight:800}
+  .dots{display:flex;flex-wrap:wrap;gap:3px;margin-top:5px}
+  .dots i{width:7px;height:7px;border-radius:50%}
+  .minis{margin-top:4px;display:none}
+  .mini{display:flex;align-items:center;gap:4px;font-size:.7rem;border-radius:5px;padding:2px 4px;margin-top:2px;
+    background:#f3f7f5;color:var(--ink);overflow:hidden}
+  .mini i{flex:none;width:6px;height:6px;border-radius:50%}
+  .mini span{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+  /* Day detail */
+  .detail{margin-top:18px}
+  .detail h2{font-size:1.15rem;font-weight:800;margin:0 0 4px;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+  .detail .dsub{color:var(--muted);font-size:.88rem;margin-bottom:12px}
+  .cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(290px,1fr));gap:12px}
+  .pcard{background:var(--card);border-radius:14px;box-shadow:var(--shadow);padding:14px 16px;
+    border-left:5px solid var(--c-ot)}
+  .pcard .ptop{display:flex;align-items:center;gap:8px;margin-bottom:7px;flex-wrap:wrap}
+  .badge{font-size:.74rem;font-weight:800;padding:3px 10px;border-radius:20px}
+  .rbadge{font-size:.74rem;font-weight:700;padding:3px 10px;border-radius:20px;background:#eef1f0;color:#52605c}
+  .ptime{font-size:.86rem;font-weight:800;color:var(--teal)}
+  .pname{font-size:1.05rem;font-weight:800;line-height:1.35;margin:2px 0 6px}
+  .ploc{font-size:.86rem;color:var(--muted);display:flex;align-items:flex-start;gap:5px}
+  .ploc svg{flex:none;width:15px;height:15px;margin-top:2px;stroke:var(--muted);fill:none;stroke-width:2}
+  .seats{margin-top:10px;display:inline-flex;align-items:center;gap:6px;font-size:.86rem;font-weight:800;
+    padding:5px 12px;border-radius:20px}
+  .seats.ok{background:#e3f5ee;color:#157a5a}
+  .seats.few{background:#fdf0dd;color:#b56a08}
+  .seats.full{background:#fdecec;color:#c0392b}
+  .seats.open{background:#eef1f0;color:#52605c}
+  .seats.done{background:#f0f2f1;color:#9aa5b1}
+
+  .empty{text-align:center;color:var(--muted);padding:40px 16px;font-size:.95rem}
+  .loading{text-align:center;color:var(--muted);padding:60px 16px}
+  .foot{text-align:center;color:var(--muted);font-size:.76rem;margin-top:30px}
+
+  @media (min-width:680px){
+    .cell{min-height:96px}
+    .minis{display:block}
+    .dots{display:none}
+  }
+  @media (max-width:679px){
+    .head h1{font-size:1.32rem}
+    .cell{min-height:54px}
+    .cards{grid-template-columns:1fr}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="head">
+    <h1>健康處方 · 課程月曆</h1>
+    <div class="sub">點選有課程的日期，查看當天活動與報名名額</div>
+  </div>
+
+  <div class="controls">
+    <div class="regions" id="regions"></div>
+    <div class="month-nav">
+      <button id="prevM" aria-label="上個月">‹</button>
+      <span class="mlabel" id="mlabel">—</span>
+      <button id="nextM" aria-label="下個月">›</button>
+    </div>
+  </div>
+
+  <div class="legend">
+    <span><i class="dot" style="background:var(--c-ex)"></i>運動</span>
+    <span><i class="dot" style="background:var(--c-nu)"></i>營養</span>
+    <span><i class="dot" style="background:var(--c-me)"></i>情緒調適</span>
+    <span><i class="dot" style="background:var(--c-so)"></i>社會</span>
+    <span><i class="dot" style="background:var(--c-ot)"></i>其他</span>
+  </div>
+
+  <div id="calWrap">
+    <div class="loading">課程資料載入中…</div>
+  </div>
+
+  <div class="detail" id="detail"></div>
+
+  <div class="foot">資料同步自健康處方系統，名額為即時概況，實際以現場為準。</div>
+</div>
+
+<script>
+const SUPABASE_URL = 'https://ilcnqpywxaseeyasiwws.supabase.co';
+const SUPABASE_ANON_KEY = '{KEY}';
+
+const TYPE = {
+  exercise:{lbl:'運動',  c:'var(--c-ex)', soft:'var(--c-ex-soft)', ink:'#9c6206'},
+  nutrition:{lbl:'營養', c:'var(--c-nu)', soft:'var(--c-nu-soft)', ink:'#157a5a'},
+  mental:{lbl:'情緒調適',c:'var(--c-me)', soft:'var(--c-me-soft)', ink:'#5a32b0'},
+  social:{lbl:'社會',    c:'var(--c-so)', soft:'var(--c-so-soft)', ink:'#0f6f86'},
+  other:{lbl:'其他',     c:'var(--c-ot)', soft:'var(--c-ot-soft)', ink:'#52605c'}
+};
+const typeKey = ct => TYPE[ct] ? ct : 'other';
+
+let clinicRegionMap = {};
+function _regionOfText(txt){
+  if(!txt) return null;
+  for(const [clinic, region] of Object.entries(clinicRegionMap)){
+    if(clinic && txt.includes(clinic)) return region;
+  }
+  if(txt.includes('北投區')) return '北投區';
+  if(txt.includes('士林區')) return '士林區';
+  if(txt.includes('中山區')) return '中山區';
+  if(/北投|石牌|泉源/.test(txt)) return '北投區';
+  if(/士林|天母|百齡|美崙|社子/.test(txt)) return '士林區';
+  if(/中山|圓山|劍南|大直/.test(txt)) return '中山區';
+  return null;
+}
+const getSlotRegion = s => _regionOfText(s.course_location) || _regionOfText(s.course_name) || '其他';
+
+const REGIONS = [
+  {key:'all',  lbl:'全部'},
+  {key:'北投區', lbl:'北投'},
+  {key:'士林區', lbl:'士林'},
+  {key:'中山區', lbl:'中山'}
+];
+
+let allSlots = [];
+let curRegion = 'all';
+let curYear, curMonth;       // month: 0-11
+let selectedDate = null;     // 'YYYY-MM-DD'
+let today = new Date();
+const todayStr = ymd(today);
+
+function ymd(d){ return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; }
+function pad(n){ return String(n).padStart(2,'0'); }
+function hhmm(t){ return (t||'').slice(0,5); }
+
+function regionFiltered(){
+  return curRegion==='all' ? allSlots : allSlots.filter(s => getSlotRegion(s)===curRegion);
+}
+function slotsOfDay(dateStr){
+  return regionFiltered()
+    .filter(s => s.slot_date===dateStr && s.status!=='cancelled')
+    .sort((a,b)=> (a.start_time||'').localeCompare(b.start_time||'') || (a.course_name||'').localeCompare(b.course_name||'','zh-Hant'));
+}
+
+function renderRegions(){
+  document.getElementById('regions').innerHTML = REGIONS.map(r =>
+    `<button class="rbtn${r.key===curRegion?' on':''}" data-r="${r.key}">${r.lbl}</button>`).join('');
+  document.querySelectorAll('#regions .rbtn').forEach(b=>{
+    b.onclick = ()=>{ curRegion=b.dataset.r; selectedDate=null; renderRegions(); renderCalendar(); renderDetail(); };
+  });
+}
+
+function renderCalendar(){
+  const wrap = document.getElementById('calWrap');
+  document.getElementById('mlabel').textContent = `${curYear} 年 ${curMonth+1} 月`;
+
+  const first = new Date(curYear, curMonth, 1);
+  const firstDow = first.getDay();
+  const lastDay = new Date(curYear, curMonth+1, 0).getDate();
+
+  // count per day (region filtered, exclude cancelled)
+  const byDay = {};
+  regionFiltered().forEach(s=>{
+    if(s.status==='cancelled') return;
+    if(!s.slot_date || s.slot_date.slice(0,7) !== `${curYear}-${pad(curMonth+1)}`) return;
+    (byDay[s.slot_date] = byDay[s.slot_date] || []).push(s);
+  });
+
+  const WD = ['日','一','二','三','四','五','六'];
+  let dow = '<div class="dow">' + WD.map((w,i)=>`<div class="${i===0||i===6?'we':''}">${w}</div>`).join('') + '</div>';
+
+  let cells = '';
+  for(let i=0;i<firstDow;i++) cells += '<div class="cell blank"></div>';
+  for(let d=1; d<=lastDay; d++){
+    const ds = `${curYear}-${pad(curMonth+1)}-${pad(d)}`;
+    const list = (byDay[ds]||[]).slice().sort((a,b)=>(a.start_time||'').localeCompare(b.start_time||''));
+    const has = list.length>0;
+    const isPast = ds < todayStr;
+    const isToday = ds === todayStr;
+    const isSel = ds === selectedDate;
+    let cls = 'cell';
+    if(!has) cls += ''; else cls += ' has';
+    if(isSel) cls += ' sel';
+    if(isPast) cls += ' past';
+    if(isToday) cls += ' today';
+
+    let inner = `<span class="dnum">${d}</span>`;
+    if(has) inner += `<span class="cnt">${list.length}</span>`;
+    if(has){
+      // mobile: dots
+      inner += '<div class="dots">' + list.slice(0,8).map(s=>{
+        const t = TYPE[typeKey(s.course_type)];
+        return `<i style="background:${t.c}"></i>`;
+      }).join('') + '</div>';
+      // desktop: mini names
+      inner += '<div class="minis">' + list.slice(0,4).map(s=>{
+        const t = TYPE[typeKey(s.course_type)];
+        return `<div class="mini"><i style="background:${t.c}"></i><span>${esc(s.course_name||'課程')}</span></div>`;
+      }).join('') + (list.length>4 ? `<div class="mini" style="background:transparent;color:var(--muted)">＋${list.length-4} 場…</div>` : '') + '</div>';
+    }
+    const tag = has ? 'button' : 'div';
+    cells += `<${tag} class="${cls}" ${has?`data-d="${ds}"`:''}>${inner}</${tag}>`;
+  }
+
+  wrap.innerHTML = `<div class="cal">${dow}<div class="grid">${cells}</div></div>`;
+  wrap.querySelectorAll('.cell.has').forEach(c=>{
+    c.onclick = ()=>{ selectedDate = c.dataset.d; renderCalendar(); renderDetail();
+      document.getElementById('detail').scrollIntoView({behavior:'smooth',block:'start'}); };
+  });
+}
+
+function seatBadge(s){
+  const cap = s.capacity||0, bk = s.booked_count||0, left = cap - bk;
+  const isPast = s.slot_date < todayStr;
+  if(s.status==='completed' || isPast) return `<span class="seats done">已結束</span>`;
+  if(cap<=0) return `<span class="seats open">開放報名</span>`;
+  if(left<=0) return `<span class="seats full">已額滿</span>`;
+  if(left<=3) return `<span class="seats few">僅剩 ${left} 位</span>`;
+  return `<span class="seats ok">尚有 ${left} 位</span>`;
+}
+
+function renderDetail(){
+  const el = document.getElementById('detail');
+  if(!selectedDate){ el.innerHTML = `<div class="empty">請點選上方有課程的日期，查看當天活動。</div>`; return; }
+  const list = slotsOfDay(selectedDate);
+  const d = new Date(selectedDate+'T00:00:00');
+  const WD = ['日','一','二','三','四','五','六'];
+  const title = `${d.getMonth()+1} 月 ${d.getDate()} 日（${WD[d.getDay()]}）`;
+  if(!list.length){ el.innerHTML = `<h2>${title}</h2><div class="empty">這天目前沒有課程。</div>`; return; }
+
+  const cards = list.map(s=>{
+    const t = TYPE[typeKey(s.course_type)];
+    const region = getSlotRegion(s).replace(/區$/,'');
+    const time = hhmm(s.start_time) + (s.end_time ? ' – '+hhmm(s.end_time) : '');
+    return `<div class="pcard" style="border-left-color:${t.c}">
+      <div class="ptop">
+        <span class="badge" style="background:${t.soft};color:${t.ink}">${t.lbl}</span>
+        <span class="rbadge">${region}</span>
+        ${time ? `<span class="ptime">${time}</span>` : ''}
+      </div>
+      <div class="pname">${esc(s.course_name||'課程')}</div>
+      <div class="ploc">
+        <svg viewBox="0 0 24 24"><path d="M21 10c0 7-9 12-9 12s-9-5-9-12a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+        <span>${esc(s.course_location||'地點未定')}</span>
+      </div>
+      ${seatBadge(s)}
+    </div>`;
+  }).join('');
+
+  el.innerHTML = `<h2>${title}</h2><div class="dsub">共 ${list.length} 場活動</div><div class="cards">${cards}</div>`;
+}
+
+function esc(str){ return String(str).replace(/[&<>"]/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+
+function shiftMonth(delta){
+  let m = curMonth + delta, y = curYear;
+  if(m<0){ m=11; y--; } if(m>11){ m=0; y++; }
+  curMonth=m; curYear=y; selectedDate=null;
+  renderCalendar(); renderDetail();
+}
+
+function pickInitialDate(){
+  // 預設選當月「今天之後最近一個有課的日」，否則當月第一個有課的日
+  const days = [...new Set(regionFiltered()
+    .filter(s=>s.status!=='cancelled' && s.slot_date && s.slot_date.slice(0,7)===`${curYear}-${pad(curMonth+1)}`)
+    .map(s=>s.slot_date))].sort();
+  if(!days.length) return null;
+  return days.find(d=>d>=todayStr) || days[0];
+}
+
+async function init(){
+  renderRegions();
+  // 預設月份：當月
+  curYear = today.getFullYear(); curMonth = today.getMonth();
+
+  try{
+    const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    const { data, error } = await sb.from('prescription_data').select('*')
+      .order('uploaded_at',{ascending:false}).limit(1).maybeSingle();
+    if(error) throw error;
+    allSlots = Array.isArray(data && data.course_slots) ? data.course_slots : [];
+    clinicRegionMap = (data && data.clinic_region_map && typeof data.clinic_region_map==='object') ? data.clinic_region_map : {};
+  }catch(e){
+    document.getElementById('calWrap').innerHTML =
+      `<div class="empty">課程資料載入失敗，請稍後再試。<br><small>${esc(e.message||e)}</small></div>`;
+    return;
+  }
+
+  // 若當月沒有任何課程，跳到最近一個有課的月份
+  const monthsWithData = [...new Set(allSlots.filter(s=>s.status!=='cancelled' && s.slot_date).map(s=>s.slot_date.slice(0,7)))].sort();
+  const curKey = `${curYear}-${pad(curMonth+1)}`;
+  if(monthsWithData.length && !monthsWithData.includes(curKey)){
+    const future = monthsWithData.find(m=>m>=curKey) || monthsWithData[monthsWithData.length-1];
+    curYear = +future.slice(0,4); curMonth = +future.slice(5,7)-1;
+  }
+
+  selectedDate = pickInitialDate();
+  renderCalendar();
+  renderDetail();
+}
+
+document.getElementById('prevM').onclick = ()=>shiftMonth(-1);
+document.getElementById('nextM').onclick = ()=>shiftMonth(1);
+init();
+</script>
+</body>
+</html>
