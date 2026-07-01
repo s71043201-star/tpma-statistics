@@ -2408,8 +2408,8 @@ function computeClinicEnrollByType(sortedStats) {
   return { typeSet, matrix };
 }
 
-function getSortedClinicStats() {
-  const data = [...clinicStats];
+function sortClinicStats(data) {
+  data = [...data];
   switch(currentClinicSort){
     case 'prescribe': return data.sort((a,b)=>b.開立數-a.開立數);
     case 'enroll':    return data.sort((a,b)=>b.選課或執行-a.選課或執行);
@@ -2418,6 +2418,23 @@ function getSortedClinicStats() {
     case 'name':      return data.sort((a,b)=>a.診所名稱.localeCompare(b.診所名稱,'zh-TW'));
     default:          return data;
   }
+}
+
+function getSortedClinicStats() {
+  return sortClinicStats(clinicStats);
+}
+
+// 詳細統計表用:把分區表裡有、但無任何處方紀錄的診所補成 0/0 列
+function getClinicStatsWithZeros() {
+  const existing = new Set(clinicStats.map(c=>(c.診所名稱||'').toString().trim()));
+  const merged = [...clinicStats];
+  Object.keys(clinicRegionMap).forEach(name=>{
+    const k = (name||'').toString().trim();
+    if(!k || existing.has(k)) return;
+    if(currentRegion !== 'all' && getRegionOfClinic(k) !== currentRegion) return;
+    merged.push({ 診所名稱:k, 開立數:0, 選課或執行:0, 比率:0, 執行數:0, 執行率:0 });
+  });
+  return merged;
 }
 
 function buildClinicCharts() {
@@ -2493,7 +2510,7 @@ function buildClinicCharts() {
     data: { labels: names, datasets: [{ label: '執行率%', data: execRateData, backgroundColor: execBgColors, borderColor: '#e8930a', borderWidth: 1, borderRadius: 4 }] },
     options: { responsive: true, maintainAspectRatio: false, layout: { padding: { top: 30 } }, plugins: { legend: { display: false }, tooltip: { callbacks: { label: c => ` 執行率：${c.parsed.y}%` } } }, scales: { y: { ticks:{font:defaultFont, callback:v=>v+'%'}, max:100, beginAtZero:true, grid:{color:'#e3eee8'} }, x: { ticks:{font:Object.assign({}, defaultFont, {size:12}), autoSkip:false, maxRotation:45, minRotation:45}, grid:{display:false} } } }
   });
-  buildClinicTable(sorted);
+  buildClinicTable(sortClinicStats(getClinicStatsWithZeros()));
 }
 
 function buildClinicTable(sorted) {
@@ -2528,7 +2545,7 @@ function setClinicSort(sort, btn) {
 
 function exportClinicTable() {
   if (!clinicStats.length) { alert('尚無診所資料'); return; }
-  const sorted = getSortedClinicStats();
+  const sorted = sortClinicStats(getClinicStatsWithZeros());
   const wsData = [['排名','診所名稱','開立筆數','選課或執行筆數','比率(%)','純執行筆數','執行率(%)']];
   sorted.forEach((row, i) => { wsData.push([i+1, row.診所名稱, row.開立數, row.選課或執行, row.比率, row.執行數||0, row.執行率||0]); });
   const wb = XLSX.utils.book_new();
