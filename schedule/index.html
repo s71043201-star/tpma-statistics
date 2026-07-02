@@ -6,125 +6,275 @@
 <title>健康處方 · 課程月曆</title>
 <meta name="description" content="本月健康處方課程一覽，點選日期查看當天活動與報名名額。">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700;900&family=Noto+Serif+TC:wght@700;900&display=swap" rel="stylesheet">
 <style>
+  /* ============ 主題變數 ============ */
   :root{
-    --bg:#f4f8f6; --card:#ffffff; --ink:#1f2d2a; --muted:#6b7d78; --line:#e2ece8;
-    --teal:#1a9d7a; --teal-soft:#e6f5ef;
-    --c-ex:#e8930a; --c-nu:#2aac8a; --c-me:#7c3aed; --c-so:#1a9fbe; --c-ot:#9aa5b1;
-    --c-ex-soft:#fdf0dd; --c-nu-soft:#e3f5ee; --c-me-soft:#efe9fb; --c-so-soft:#e2f4f8; --c-ot-soft:#eef1f0;
-    --shadow:0 1px 3px rgba(20,60,50,.06),0 6px 18px rgba(20,60,50,.06);
+    --font-body:"Noto Sans TC",-apple-system,"PingFang TC","Microsoft JhengHei",sans-serif;
   }
+  /* A 儀表板綠 · 同品牌延續 */
+  body[data-theme="a"]{
+    --font-display:"Noto Sans TC",sans-serif;
+    --bg:#f2f5f1; --card:#ffffff; --ink:#22332c; --muted:#6b7a72; --line:#dfe6dd;
+    --brand:#1f8f7a; --brand-deep:#14705f; --brand-soft:#e2f1ec;
+    --accent:#cd6f27; --accent-deep:#b25d1b;
+    --head-bg:linear-gradient(105deg,#9dbd5e -5%,#4fa375 48%,#2e9184 100%);
+    --head-ink:#ffffff; --head-sub:rgba(255,255,255,.88);
+    --we:#b3552e;
+    --c-ex:#dd8500; --c-nu:#2e9d6a; --c-me:#7a5bd0; --c-so:#2492b5; --c-ot:#8b958f;
+    --c-ex-ink:#8a5300; --c-nu-ink:#1c7047; --c-me-ink:#5940a3; --c-so-ink:#186a84; --c-ot-ink:#5d6660;
+    --c-ex-soft:#faeedb; --c-nu-soft:#e2f2e8; --c-me-soft:#ece7f9; --c-so-soft:#e0f1f6; --c-ot-soft:#eceeea;
+    --shadow:0 1px 2px rgba(30,55,45,.05),0 8px 24px rgba(30,55,45,.07);
+  }
+  /* B 暖陽 · 米紙 */
+  body[data-theme="b"]{
+    --font-display:"Noto Serif TC","Noto Sans TC",serif;
+    --bg:#f9f1e4; --card:#fffcf5; --ink:#3b2d20; --muted:#8a7a66; --line:#eadfc9;
+    --brand:#bc5427; --brand-deep:#9c4118; --brand-soft:#f6e3d6;
+    --accent:#bc5427; --accent-deep:#9c4118;
+    --head-bg:transparent; --head-ink:#3b2d20; --head-sub:#8a7a66;
+    --we:#c25e2a;
+    --c-ex:#d9820b; --c-nu:#57923c; --c-me:#9a5bb0; --c-so:#2f8fa3; --c-ot:#998f7f;
+    --c-ex-ink:#93560a; --c-nu-ink:#3c6b28; --c-me-ink:#71407f; --c-so-ink:#1f6675; --c-ot-ink:#6b6355;
+    --c-ex-soft:#f8ead3; --c-nu-soft:#e9f0dd; --c-me-soft:#f2e6f6; --c-so-soft:#dff0f3; --c-ot-soft:#efeae0;
+    --shadow:0 1px 2px rgba(80,50,20,.05),0 8px 24px rgba(80,50,20,.08);
+  }
+  /* C 靛青 · 晨報 */
+  body[data-theme="c"]{
+    --font-display:"Noto Sans TC",sans-serif;
+    --bg:#eef0ee; --card:#ffffff; --ink:#1b2537; --muted:#5f6b7d; --line:#d9dde3;
+    --brand:#33518f; --brand-deep:#22355f; --brand-soft:#e2e8f4;
+    --accent:#d97a00; --accent-deep:#b56400;
+    --head-bg:#22355f; --head-ink:#ffffff; --head-sub:#c6d2ea;
+    --we:#b0432f;
+    --c-ex:#d97a00; --c-nu:#2c8c5e; --c-me:#6f5fc9; --c-so:#1f8ca8; --c-ot:#7f8896;
+    --c-ex-ink:#8f5000; --c-nu-ink:#1d6543; --c-me-ink:#4f429c; --c-so-ink:#14647a; --c-ot-ink:#565e6a;
+    --c-ex-soft:#f8ead6; --c-nu-soft:#e0f0e7; --c-me-soft:#e9e6f8; --c-so-soft:#def0f5; --c-ot-soft:#eaedf1;
+    --shadow:0 1px 2px rgba(25,40,70,.06),0 8px 24px rgba(25,40,70,.08);
+  }
+
   *{box-sizing:border-box}
+  html{font-size:18px}
   html,body{margin:0;padding:0}
   body{
-    font-family:-apple-system,"PingFang TC","Microsoft JhengHei","Noto Sans TC",sans-serif;
-    background:var(--bg); color:var(--ink); line-height:1.55;
+    font-family:var(--font-body);
+    background:var(--bg); color:var(--ink); line-height:1.6;
     -webkit-font-smoothing:antialiased;
   }
-  .wrap{max-width:100%;margin:0 auto;padding:20px 40px 64px}
+  .wrap{max-width:1240px;margin:0 auto;padding:22px 40px 64px}
 
   /* Header */
-  .head{text-align:center;padding:14px 0 18px}
-  .head h1{margin:0;font-size:1.6rem;font-weight:800;letter-spacing:.5px;color:var(--ink)}
-  .head .sub{margin-top:4px;color:var(--muted);font-size:.92rem}
+  .head{text-align:center;padding:16px 0 20px;background:var(--head-bg);color:var(--head-ink)}
+  body[data-theme="a"] .head, body[data-theme="c"] .head{
+    border-radius:18px;padding:30px 16px 28px;margin-bottom:18px;box-shadow:var(--shadow);
+    position:relative;overflow:hidden;z-index:0}
+  body[data-theme="a"] .head::before{content:"";position:absolute;z-index:-1;right:-70px;bottom:-150px;
+    width:300px;height:300px;border-radius:50%;background:rgba(10,80,72,.16)}
+  body[data-theme="a"] .head::after{content:"";position:absolute;z-index:-1;right:170px;bottom:-190px;
+    width:240px;height:240px;border-radius:50%;background:rgba(10,80,72,.12)}
+  .head .eyebrow{display:inline-flex;align-items:center;gap:10px;font-size:.9rem;font-weight:700;
+    letter-spacing:.35em;text-indent:.35em;color:var(--brand);margin-bottom:8px}
+  body[data-theme="a"] .head .eyebrow{color:rgba(255,255,255,.82)}
+  body[data-theme="c"] .head .eyebrow{color:#9db4e4}
+  .head .eyebrow::before,.head .eyebrow::after{content:"";width:26px;height:1.5px;background:currentColor;opacity:.5}
+  .head h1{margin:0;font-family:var(--font-display);font-size:2rem;font-weight:900;letter-spacing:.06em;color:var(--head-ink)}
+  .head .sub{margin-top:8px;color:var(--head-sub);font-size:1rem}
 
   /* Controls */
-  .controls{display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:center;margin:6px 0 16px}
-  .regions,.types{display:flex;gap:6px;flex-wrap:wrap;justify-content:center}
+  .controls{display:flex;flex-direction:column;gap:12px;align-items:center;margin:10px 0 16px}
+  .crow1{display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:center}
+  .regions,.types{display:flex;gap:8px;flex-wrap:wrap;justify-content:center}
   .rbtn{border:1.5px solid var(--line);background:var(--card);color:var(--muted);
-    padding:7px 16px;border-radius:22px;font-size:.9rem;font-weight:700;cursor:pointer;font-family:inherit;transition:.15s}
-  .rbtn:hover{border-color:var(--teal)}
-  .rbtn.on{background:var(--teal);border-color:var(--teal);color:#fff}
-  .month-nav{display:flex;align-items:center;gap:10px;background:var(--card);border:1.5px solid var(--line);
-    border-radius:22px;padding:4px 6px}
-  .month-nav button{border:none;background:transparent;cursor:pointer;font-size:1.1rem;color:var(--teal);
-    width:34px;height:34px;border-radius:50%;font-family:inherit;display:grid;place-items:center}
-  .month-nav button:hover{background:var(--teal-soft)}
-  .month-nav .mlabel{font-weight:800;font-size:1rem;min-width:118px;text-align:center}
+    padding:9px 20px;border-radius:24px;font-size:1rem;font-weight:700;cursor:pointer;font-family:inherit;transition:.15s}
+  .rbtn:hover{border-color:var(--brand);color:var(--brand)}
+  .rbtn.on{background:var(--brand);border-color:var(--brand);color:#fff}
+  .month-nav{display:flex;align-items:center;gap:8px;background:var(--card);border:1.5px solid var(--line);
+    border-radius:24px;padding:5px 8px;box-shadow:var(--shadow)}
+  .month-nav button{border:none;background:transparent;cursor:pointer;font-size:1.25rem;color:var(--brand);
+    width:38px;height:38px;border-radius:50%;font-family:inherit;display:grid;place-items:center}
+  .month-nav button:hover{background:var(--brand-soft)}
+  .month-nav .mlabel{font-family:var(--font-display);font-weight:900;font-size:1.15rem;min-width:128px;text-align:center;letter-spacing:.03em}
+  .abtn{display:inline-flex;align-items:center;gap:7px;border:1.5px solid var(--line);background:var(--card);color:var(--ink);
+    padding:10px 18px;border-radius:24px;font-size:1rem;font-weight:700;cursor:pointer;font-family:inherit;transition:.15s;box-shadow:var(--shadow)}
+  .abtn:hover{border-color:var(--brand);color:var(--brand)}
+  .abtn.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+  .abtn.primary:hover{background:var(--accent-deep);border-color:var(--accent-deep);color:#fff}
+  .abtn svg{width:17px;height:17px;stroke:currentColor;fill:none;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round}
+  .seg{display:flex;background:var(--card);border:1.5px solid var(--line);border-radius:24px;padding:4px;box-shadow:var(--shadow)}
+  .seg button{border:none;background:transparent;color:var(--muted);padding:7px 18px;border-radius:20px;
+    font-size:1rem;font-weight:700;cursor:pointer;font-family:inherit;transition:.15s}
+  .seg button.on{background:var(--brand);color:#fff}
+
+  /* 處方日標籤 */
+  .rxtags{display:flex;flex-wrap:wrap;gap:3px;margin-top:4px}
+  .rxtag{display:inline-flex;align-items:center;font-size:.8rem;font-weight:800;color:#fff;
+    background:var(--brand);border-radius:6px;padding:2px 9px;line-height:1.55;letter-spacing:.02em}
+  .rxcnt{font-size:.85rem;color:var(--muted);font-weight:600;margin-top:5px}
+  .cell.rx:not(.sel){background:color-mix(in srgb,var(--brand-soft) 55%,var(--card))}
+
+  /* 處方日設定彈窗 */
+  .modal-mask{position:fixed;inset:0;background:rgba(15,35,30,.45);display:grid;place-items:center;z-index:100;padding:16px}
+  .modal-mask[hidden]{display:none}
+  .modal{background:var(--card);border-radius:18px;box-shadow:0 12px 48px rgba(0,0,0,.22);
+    padding:22px 24px;width:min(560px,94vw);max-height:86vh;overflow:auto}
+  .modal h3{margin:0;font-size:1.3rem;font-family:var(--font-display);font-weight:900;letter-spacing:.03em}
+  .mnote{color:var(--muted);font-size:.92rem;margin:6px 0 14px}
+  .rxrow{border-top:1.5px solid var(--line);padding:14px 0 12px}
+  .rxlabel{font-weight:800;margin-bottom:8px;display:flex;align-items:center;gap:7px}
+  .rxadd{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+  .rxadd input[type="date"]{font-family:inherit;font-size:1rem;padding:8px 12px;border:1.5px solid var(--line);
+    border-radius:10px;background:var(--card);color:var(--ink)}
+  .abtn.small{padding:7px 16px;font-size:.95rem;box-shadow:none}
+  .chips{display:flex;flex-wrap:wrap;gap:7px;margin-top:10px}
+  .chip{display:inline-flex;align-items:center;gap:7px;background:var(--brand-soft);color:var(--brand-deep);
+    font-weight:700;font-size:.95rem;border-radius:18px;padding:5px 7px 5px 14px}
+  .chip button{border:none;background:rgba(255,255,255,.85);width:22px;height:22px;border-radius:50%;cursor:pointer;
+    font-size:.9rem;color:var(--brand-deep);display:grid;place-items:center;font-family:inherit;line-height:1}
+  .chip button:hover{background:#fff}
+  .mfoot{display:flex;justify-content:flex-end;gap:10px;margin-top:16px}
 
   /* Legend */
-  .legend{display:flex;gap:14px;flex-wrap:wrap;justify-content:center;margin:0 0 14px;font-size:.82rem;color:var(--muted)}
-  .legend span{display:inline-flex;align-items:center;gap:5px}
-  .dot{width:10px;height:10px;border-radius:50%;display:inline-block}
+  .legend{display:flex;gap:16px;flex-wrap:wrap;justify-content:center;margin:0 0 16px;font-size:.95rem;color:var(--muted);font-weight:500}
+  .legend span{display:inline-flex;align-items:center;gap:6px}
+  .dot{width:11px;height:11px;border-radius:50%;display:inline-block}
 
   /* Calendar */
-  .cal{background:var(--card);border-radius:16px;box-shadow:var(--shadow);padding:8px 20px;overflow:auto;border:0.5px solid var(--line)}
-  .dow{display:grid;grid-template-columns:repeat(7,calc(100% / 7));gap:2px;margin-bottom:2px}
-  .dow div{text-align:center;font-size:.78rem;color:var(--muted);font-weight:700;padding:4px 0}
-  .dow div.we{color:#c0392b}
-  .grid{display:grid;grid-template-columns:repeat(7,calc(100% / 7));gap:2px;align-items:start;width:100%}
-  .cell{min-height:120px;border-radius:10px;border:1.5px solid transparent;background:#fafdfb;
-    padding:3px 3px 4px;cursor:default;text-align:left;font-family:inherit;color:inherit;overflow:hidden}
+  .cal{background:var(--card);border-radius:18px;box-shadow:var(--shadow);padding:14px 16px;border:1px solid var(--line)}
+  .dow{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:4px;margin-bottom:4px}
+  .dow div{text-align:center;font-size:.9rem;color:var(--muted);font-weight:700;padding:6px 0;letter-spacing:.1em}
+  .dow div.we{color:var(--we)}
+  .grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:4px;align-items:stretch;width:100%}
+  .cell{min-height:126px;border-radius:12px;border:1.5px solid transparent;background:color-mix(in srgb,var(--bg) 45%,transparent);
+    padding:6px 6px 7px;cursor:default;text-align:left;font-family:inherit;color:inherit;overflow:hidden;display:block;width:100%}
   .cell.blank{background:transparent;border:none}
-  .cell.has{cursor:pointer;background:#fff;border-color:var(--line)}
-  .cell.has:hover{border-color:var(--teal)}
-  .cell.sel{border-color:var(--teal);background:var(--teal-soft);box-shadow:0 0 0 2px var(--teal) inset}
-  .cell.past{opacity:.45}
-  .cell .dnum{font-size:1rem;font-weight:800;color:var(--ink)}
-  .cell.today .dnum{background:var(--teal);color:#fff;border-radius:50%;width:26px;height:26px;
-    display:inline-grid;place-items:center;font-size:.9rem}
-  .cell .cnt{float:right;font-size:.8rem;color:var(--teal);font-weight:800}
-  .dots{display:flex;flex-wrap:wrap;gap:3px;margin-top:5px}
-  .dots i{width:8px;height:8px;border-radius:50%}
-  .minis{margin-top:4px;display:none}
-  .mini{display:flex;align-items:center;gap:4px;font-size:.8rem;border-radius:5px;padding:2px 4px;margin-top:2px;
-    background:#f3f7f5;color:var(--ink);overflow:hidden}
-  .mini i{flex:none;width:6px;height:6px;border-radius:50%}
-  .mini span{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .cell.has{cursor:pointer;background:var(--card);border-color:var(--line)}
+  .cell.has:hover{border-color:var(--brand)}
+  .cell.sel{border-color:var(--brand);background:var(--brand-soft);box-shadow:0 0 0 1.5px var(--brand) inset}
+  .cell.past{opacity:.5}
+  .cell .crow{display:flex;align-items:center;justify-content:space-between;gap:4px}
+  .cell .dnum{font-size:1.15rem;font-weight:800;color:var(--ink);line-height:30px}
+  .cell.today .dnum{background:var(--brand);color:#fff;border-radius:50%;width:30px;height:30px;
+    display:inline-grid;place-items:center;font-size:1rem}
+  .cell .cnt{font-size:.82rem;color:var(--brand);font-weight:800;background:var(--brand-soft);border-radius:12px;padding:1px 9px}
+  .cell.sel .cnt{background:var(--card)}
+  .dots{display:flex;flex-wrap:wrap;gap:4px;margin-top:6px}
+  .dots i{width:9px;height:9px;border-radius:50%}
+  .minis{margin-top:5px;display:none}
+  .mini{display:flex;align-items:center;gap:6px;font-size:1rem;border-radius:8px;padding:4px 8px;margin-top:3px;
+    color:var(--ink);overflow:hidden;line-height:1.35}
+  .mini i{flex:none;width:7px;height:7px;border-radius:50%}
+  .mini span{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:500}
+  .mini b{flex:none;font-size:.86rem;font-weight:800;opacity:.85}
+  .mini b.full{color:#c0392b}
+  .mini.more{background:transparent;color:var(--muted)}
+
+  /* List view */
+  .lday{padding:4px 6px 14px;border-bottom:1.5px solid var(--line)}
+  .lday:last-child{border-bottom:none;padding-bottom:4px}
+  .ldate{display:flex;align-items:baseline;gap:10px;font-family:var(--font-display);
+    font-size:1.2rem;font-weight:900;margin:14px 0 8px;letter-spacing:.03em}
+  .ldate .wd{font-size:.95rem;color:var(--muted);font-weight:700;font-family:var(--font-body)}
+  .ldate .wd.we{color:var(--we)}
+  .ldate .tdy{font-size:.8rem;font-weight:800;color:#fff;background:var(--brand);border-radius:12px;
+    padding:2px 10px;font-family:var(--font-body)}
+  .lday.past{opacity:.55}
+  .lrow{display:flex;align-items:center;gap:12px;padding:9px 10px;border-radius:12px;flex-wrap:wrap}
+  .lrow:hover{background:var(--brand-soft)}
+  .lrow .ltime{font-weight:800;color:var(--brand);font-size:.98rem;min-width:104px;font-variant-numeric:tabular-nums}
+  .lrow .lmain{flex:1;min-width:220px}
+  .lrow .lname{font-size:1.08rem;font-weight:700;line-height:1.4}
+  .lrow .lloc{font-size:.9rem;color:var(--muted);margin-top:1px}
+  .lrow .lseat{font-size:.95rem;font-weight:800;color:var(--muted);font-variant-numeric:tabular-nums}
+  .lrow .lseat.full{color:#c0392b}
 
   /* Day detail */
-  .detail{margin-top:18px}
-  .detail h2{font-size:1.15rem;font-weight:800;margin:0 0 4px;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
-  .detail .dsub{color:var(--muted);font-size:.88rem;margin-bottom:12px}
-  .cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(290px,1fr));gap:12px}
-  .pcard{background:var(--card);border-radius:14px;box-shadow:var(--shadow);padding:14px 16px;
-    border-left:5px solid var(--c-ot)}
-  .pcard .ptop{display:flex;align-items:center;gap:8px;margin-bottom:7px;flex-wrap:wrap}
-  .badge{font-size:.74rem;font-weight:800;padding:3px 10px;border-radius:20px}
-  .rbadge{font-size:.74rem;font-weight:700;padding:3px 10px;border-radius:20px;background:#eef1f0;color:#52605c}
-  .ptime{font-size:.86rem;font-weight:800;color:var(--teal)}
-  .pname{font-size:1.05rem;font-weight:800;line-height:1.35;margin:2px 0 6px}
-  .ploc{font-size:.86rem;color:var(--muted);display:flex;align-items:flex-start;gap:5px}
-  .ploc svg{flex:none;width:15px;height:15px;margin-top:2px;stroke:var(--muted);fill:none;stroke-width:2}
-  .seats{margin-top:10px;display:inline-flex;align-items:center;gap:6px;font-size:.86rem;font-weight:800;
-    padding:5px 12px;border-radius:20px}
-  .seats.ok{background:#e3f5ee;color:#157a5a}
-  .seats.few{background:#fdf0dd;color:#b56a08}
+  .detail{margin-top:20px}
+  .detail h2{font-family:var(--font-display);font-size:1.35rem;font-weight:900;margin:0 0 4px;
+    display:flex;align-items:center;gap:8px;flex-wrap:wrap;letter-spacing:.03em}
+  .detail .dsub{color:var(--muted);font-size:.95rem;margin-bottom:12px}
+  .cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:14px}
+  .pcard{background:var(--card);border-radius:14px;box-shadow:var(--shadow);padding:16px 18px;
+    border:1px solid var(--line);border-left:6px solid var(--c-ot)}
+  .pcard .ptop{display:flex;align-items:center;gap:8px;margin-bottom:8px;flex-wrap:wrap}
+  .badge{font-size:.82rem;font-weight:800;padding:3px 12px;border-radius:20px}
+  .rbadge{font-size:.82rem;font-weight:700;padding:3px 12px;border-radius:20px;background:var(--brand-soft);color:var(--brand-deep)}
+  .ptime{font-size:.95rem;font-weight:800;color:var(--brand)}
+  .pname{font-size:1.2rem;font-weight:800;line-height:1.4;margin:2px 0 7px}
+  .ploc{font-size:.95rem;color:var(--muted);display:flex;align-items:flex-start;gap:6px}
+  .ploc svg{flex:none;width:16px;height:16px;margin-top:3px;stroke:var(--muted);fill:none;stroke-width:2}
+  .pfoot{margin-top:12px;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+  .seats{display:inline-flex;align-items:center;gap:6px;font-size:.95rem;font-weight:800;
+    padding:6px 14px;border-radius:20px}
+  .seats.ok{background:var(--c-nu-soft);color:var(--c-nu-ink)}
+  .seats.few{background:var(--c-ex-soft);color:var(--c-ex-ink)}
   .seats.full{background:#fdecec;color:#c0392b}
-  .seats.open{background:#eef1f0;color:#52605c}
-  .seats.done{background:#f0f2f1;color:#9aa5b1}
+  .seats.open{background:var(--brand-soft);color:var(--brand-deep)}
+  .seats.done{background:var(--c-ot-soft);color:var(--c-ot-ink)}
+  .pseat{font-size:.9rem;color:var(--muted);font-weight:600;font-variant-numeric:tabular-nums}
 
-  .empty{text-align:center;color:var(--muted);padding:40px 16px;font-size:.95rem}
+  .tsec{margin-top:18px}
+  .tsec .tlabel{display:flex;align-items:center;gap:8px;font-size:1.02rem;font-weight:800;margin-bottom:9px}
+  .tsec .tlabel::after{content:"";flex:1;height:1.5px;background:var(--line)}
+
+  .empty{text-align:center;color:var(--muted);padding:40px 16px;font-size:1rem}
   .loading{text-align:center;color:var(--muted);padding:60px 16px}
-  .foot{text-align:center;color:var(--muted);font-size:.76rem;margin-top:30px}
+  .foot{text-align:center;color:var(--muted);font-size:.85rem;margin-top:32px}
 
   @media (min-width:680px){
-    .cell{min-height:96px}
+    .cell{min-height:126px}
     .minis{display:block}
     .dots{display:none}
   }
   @media (max-width:679px){
-    .head h1{font-size:1.32rem}
-    .cell{min-height:54px}
+    html{font-size:17px}
+    .wrap{padding:16px 14px 56px}
+    .head h1{font-size:1.55rem}
+    body[data-theme="a"] .head, body[data-theme="c"] .head{padding:20px 14px 18px;border-radius:14px}
+    .cell{min-height:60px;padding:4px}
+    .cell .dnum{font-size:1rem;line-height:26px}
+    .cell.today .dnum{width:26px;height:26px;font-size:.9rem}
+    .cell .cnt{display:none}
     .cards{grid-template-columns:1fr}
+    .lrow{gap:4px 12px}
+    .rxtags{margin-top:3px}
+    .rxtag{font-size:.6rem;padding:0 5px;border-radius:4px}
+    .rxtag .rg{display:none}
   }
 </style>
 </head>
-<body>
+<body data-theme="a">
 <div class="wrap">
   <div class="head">
+    <div class="eyebrow">HEALTH PRESCRIPTION</div>
     <h1>健康處方 · 課程月曆</h1>
-    <div class="sub">點選有課程的日期，查看當天活動與報名名額</div>
+    <div class="sub">點選有課程的日期查看詳情，也可切換清單檢視、一鍵匯出整月課表</div>
   </div>
 
   <div class="controls">
+    <div class="crow1">
+      <div class="month-nav">
+        <button id="prevM" aria-label="上個月">‹</button>
+        <span class="mlabel" id="mlabel">—</span>
+        <button id="nextM" aria-label="下個月">›</button>
+      </div>
+      <button class="abtn" id="todayBtn">回到今天</button>
+      <div class="seg" id="viewSeg">
+        <button data-v="cal" class="on">月曆</button>
+        <button data-v="list">清單</button>
+      </div>
+      <button class="abtn" id="rxBtn">
+        <svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M8 3v4M16 3v4M3 10h18M12 14v4M10 16h4"/></svg>
+        處方日設定
+      </button>
+      <button class="abtn primary" id="exportBtn">
+        <svg viewBox="0 0 24 24"><path d="M12 3v12m0 0l-4.5-4.5M12 15l4.5-4.5M4 19h16"/></svg>
+        匯出課表 PDF
+      </button>
+    </div>
     <div class="regions" id="regions"></div>
     <div class="types" id="types"></div>
-    <div class="month-nav">
-      <button id="prevM" aria-label="上個月">‹</button>
-      <span class="mlabel" id="mlabel">—</span>
-      <button id="nextM" aria-label="下個月">›</button>
-    </div>
   </div>
 
   <div class="legend">
@@ -144,18 +294,34 @@
   <div class="foot">資料同步自健康處方系統，名額為即時概況，實際以現場為準。</div>
 </div>
 
+<div class="modal-mask" id="rxMask" hidden>
+  <div class="modal">
+    <h3>設定各區處方日</h3>
+    <p class="mnote">設定後，月曆、清單與匒出的課表都會標示該日為處方日。設定儲存在這台裝置。</p>
+    <div id="rxRows"></div>
+    <div class="mfoot">
+      <button class="abtn" id="rxClear">清除全部</button>
+      <button class="abtn primary" id="rxDone">完成</button>
+    </div>
+  </div>
+</div>
+
 <script>
 const SUPABASE_URL = 'https://ilcnqpywxaseeyasiwws.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlsY25xcHl3eGFzZWV5YXNpd3dzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM4MzIzODgsImV4cCI6MjA4OTQwODM4OH0.TrjIr4IMdvpstkN8tNBQtAEvvNDTLg3XcXXIpptJIs0';
 
 const TYPE = {
-  exercise:{lbl:'運動',  c:'var(--c-ex)', hex:'#e8930a', soft:'var(--c-ex-soft)', ink:'#9c6206'},
-  nutrition:{lbl:'營養', c:'var(--c-nu)', hex:'#2aac8a', soft:'var(--c-nu-soft)', ink:'#157a5a'},
-  mental:{lbl:'情緒調適',c:'var(--c-me)', hex:'#7c3aed', soft:'var(--c-me-soft)', ink:'#5a32b0'},
-  social:{lbl:'社會',    c:'var(--c-so)', hex:'#1a9fbe', soft:'var(--c-so-soft)', ink:'#0f6f86'},
-  other:{lbl:'其他',     c:'var(--c-ot)', hex:'#9aa5b1', soft:'var(--c-ot-soft)', ink:'#52605c'}
+  exercise:{lbl:'運動',  k:'ex'},
+  nutrition:{lbl:'營養', k:'nu'},
+  mental:{lbl:'情緒調適',k:'me'},
+  social:{lbl:'社會',    k:'so'},
+  other:{lbl:'其他',     k:'ot'}
 };
 const typeKey = ct => TYPE[ct] ? ct : 'other';
+const cvar = n => getComputedStyle(document.body).getPropertyValue(n).trim();
+const tCol  = tk => cvar('--c-'+TYPE[tk].k);
+const tSoft = tk => cvar('--c-'+TYPE[tk].k+'-soft');
+const tInk  = tk => cvar('--c-'+TYPE[tk].k+'-ink');
 
 let clinicRegionMap = {};
 function _regionOfText(txt){
@@ -179,7 +345,6 @@ const REGIONS = [
   {key:'士林區', lbl:'士林'},
   {key:'中山區', lbl:'中山'}
 ];
-
 const TYPES = [
   {key:'all', lbl:'全部'},
   {key:'mental', lbl:'情緒調適'},
@@ -191,89 +356,152 @@ const TYPES = [
 let allSlots = [];
 let curRegion = 'all';
 let curType = 'all';
+let curView = 'cal';         // 'cal' | 'list'
 let curYear, curMonth;       // month: 0-11
 let selectedDate = null;     // 'YYYY-MM-DD'
 let today = new Date();
 const todayStr = ymd(today);
+const WD = ['日','一','二','三','四','五','六'];
 
 function ymd(d){ return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; }
 function pad(n){ return String(n).padStart(2,'0'); }
 function hhmm(t){ return (t||'').slice(0,5); }
+function esc(str){ return String(str).replace(/[&<>"]/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
 
 function regionFiltered(){
   let res = curRegion==='all' ? allSlots : allSlots.filter(s => getSlotRegion(s)===curRegion);
   if(curType!=='all') res = res.filter(s => typeKey(s.course_type)===curType);
   return res;
 }
+function monthKey(){ return `${curYear}-${pad(curMonth+1)}`; }
+function monthByDay(){
+  const byDay = {};
+  regionFiltered().forEach(s=>{
+    if(s.status==='cancelled') return;
+    if(!s.slot_date || s.slot_date.slice(0,7) !== monthKey()) return;
+    (byDay[s.slot_date] = byDay[s.slot_date] || []).push(s);
+  });
+  Object.values(byDay).forEach(list => list.sort((a,b)=>
+    (a.start_time||'').localeCompare(b.start_time||'') || (a.course_name||'').localeCompare(b.course_name||'','zh-Hant')));
+  return byDay;
+}
 function slotsOfDay(dateStr){
   return regionFiltered()
     .filter(s => s.slot_date===dateStr && s.status!=='cancelled')
     .sort((a,b)=> (a.start_time||'').localeCompare(b.start_time||'') || (a.course_name||'').localeCompare(b.course_name||'','zh-Hant'));
+}
+function seatTxt(s){
+  const cap = s.capacity||0, bk = s.booked_count||0;
+  return cap>0 ? `${bk}/${cap}` : '';
+}
+
+/* ============ 處方日設定 ============ */
+const RX_KEY = 'tpma_rx_days';
+const RX_REGIONS = ['北投區','士林區','中山區'];
+let rxDays = {};
+try{ rxDays = JSON.parse(localStorage.getItem(RX_KEY)||'{}') || {}; }catch(e){ rxDays = {}; }
+function saveRx(){ localStorage.setItem(RX_KEY, JSON.stringify(rxDays)); }
+function rxForDate(ds){
+  return RX_REGIONS.filter(k => (rxDays[k]||[]).includes(ds) && (curRegion==='all' || curRegion===k));
+}
+function rxTagHtml(k){ return `<span class="rxtag"><b class="rg">${k.replace(/區$/,'')}</b>處方日</span>`; }
+
+function renderRxRows(){
+  document.getElementById('rxRows').innerHTML = RX_REGIONS.map(k=>{
+    const chips = (rxDays[k]||[]).slice().sort().map(ds=>{
+      const d = new Date(ds+'T00:00:00');
+      const yr = d.getFullYear()!==today.getFullYear() ? d.getFullYear()+'/' : '';
+      return `<span class="chip">${yr}${d.getMonth()+1}/${d.getDate()}（${WD[d.getDay()]}）<button data-del="${k}|${ds}" aria-label="移除">×</button></span>`;
+    }).join('') || '<span style="color:var(--muted);font-size:.92rem">尚未設定</span>';
+    return `<div class="rxrow">
+      <div class="rxlabel"><i class="dot" style="background:var(--brand)"></i>${k}</div>
+      <div class="rxadd"><input type="date" id="rxDate-${k}"><button class="abtn small" data-add="${k}">新增日期</button></div>
+      <div class="chips">${chips}</div>
+    </div>`;
+  }).join('');
+  document.querySelectorAll('#rxRows [data-add]').forEach(b=>{
+    b.onclick = ()=>{
+      const k = b.dataset.add;
+      const v = document.getElementById('rxDate-'+k).value;
+      if(!v) return;
+      rxDays[k] = [...new Set([...(rxDays[k]||[]), v])].sort();
+      saveRx(); renderRxRows(); renderMain(); renderDetail();
+    };
+  });
+  document.querySelectorAll('#rxRows [data-del]').forEach(b=>{
+    b.onclick = ()=>{
+      const [k, ds] = b.dataset.del.split('|');
+      rxDays[k] = (rxDays[k]||[]).filter(x=>x!==ds);
+      saveRx(); renderRxRows(); renderMain(); renderDetail();
+    };
+  });
 }
 
 function renderRegions(){
   document.getElementById('regions').innerHTML = REGIONS.map(r =>
     `<button class="rbtn${r.key===curRegion?' on':''}" data-r="${r.key}">${r.lbl}</button>`).join('');
   document.querySelectorAll('#regions .rbtn').forEach(b=>{
-    b.onclick = ()=>{ curRegion=b.dataset.r; selectedDate=null; renderRegions(); renderTypeFilters(); renderCalendar(); renderDetail(); };
+    b.onclick = ()=>{ curRegion=b.dataset.r; selectedDate=null; renderRegions(); renderTypeFilters(); renderMain(); renderDetail(); };
   });
 }
-
 function renderTypeFilters(){
   document.getElementById('types').innerHTML = TYPES.map(t =>
     `<button class="rbtn${t.key===curType?' on':''}" data-t="${t.key}">${t.lbl}</button>`).join('');
   document.querySelectorAll('#types .rbtn').forEach(b=>{
-    b.onclick = ()=>{ curType=b.dataset.t; selectedDate=null; renderCalendar(); renderDetail(); };
+    b.onclick = ()=>{ curType=b.dataset.t; selectedDate=null; renderMain(); renderDetail(); };
   });
+}
+
+function renderMain(){
+  document.getElementById('mlabel').textContent = `${curYear} 年 ${curMonth+1} 月`;
+  if(curView==='cal') renderCalendar(); else renderList();
 }
 
 function renderCalendar(){
   const wrap = document.getElementById('calWrap');
-  document.getElementById('mlabel').textContent = `${curYear} 年 ${curMonth+1} 月`;
-
   const first = new Date(curYear, curMonth, 1);
   const firstDow = first.getDay();
   const lastDay = new Date(curYear, curMonth+1, 0).getDate();
+  const byDay = monthByDay();
 
-  // count per day (region filtered, exclude cancelled)
-  const byDay = {};
-  regionFiltered().forEach(s=>{
-    if(s.status==='cancelled') return;
-    if(!s.slot_date || s.slot_date.slice(0,7) !== `${curYear}-${pad(curMonth+1)}`) return;
-    (byDay[s.slot_date] = byDay[s.slot_date] || []).push(s);
-  });
-
-  const WD = ['日','一','二','三','四','五','六'];
   let dow = '<div class="dow">' + WD.map((w,i)=>`<div class="${i===0||i===6?'we':''}">${w}</div>`).join('') + '</div>';
 
   let cells = '';
   for(let i=0;i<firstDow;i++) cells += '<div class="cell blank"></div>';
   for(let d=1; d<=lastDay; d++){
     const ds = `${curYear}-${pad(curMonth+1)}-${pad(d)}`;
-    const list = (byDay[ds]||[]).slice().sort((a,b)=>(a.start_time||'').localeCompare(b.start_time||''));
+    const list = byDay[ds]||[];
     const has = list.length>0;
     const isPast = ds < todayStr;
     const isToday = ds === todayStr;
     const isSel = ds === selectedDate;
     let cls = 'cell';
-    if(!has) cls += ''; else cls += ' has';
+    if(has) cls += ' has';
     if(isSel) cls += ' sel';
     if(isPast) cls += ' past';
     if(isToday) cls += ' today';
+    const rx = rxForDate(ds);
+    if(rx.length) cls += ' rx';
 
-    let inner = `<span class="dnum">${d}</span>`;
-    if(has) inner += `<span class="cnt">${list.length}</span>`;
-    if(has){
-      // mobile: dots
-      inner += '<div class="dots">' + list.slice(0,8).map(s=>{
-        const t = TYPE[typeKey(s.course_type)];
-        return `<i style="background:${t.c}"></i>`;
-      }).join('') + '</div>';
-      // desktop: mini names
-      inner += '<div class="minis">' + list.slice(0,4).map(s=>{
-        const t = TYPE[typeKey(s.course_type)];
-        return `<div class="mini"><i style="background:${t.c}"></i><span>${esc(s.course_name||'課程')}</span></div>`;
-      }).join('') + (list.length>4 ? `<div class="mini" style="background:transparent;color:var(--muted)">＋${list.length-4} 場…</div>` : '') + '</div>';
+    let inner = `<div class="crow"><span class="dnum">${d}</span>${has?`<span class="cnt">${list.length}</span>`:''}</div>`;
+    if(rx.length) inner += `<div class="rxtags">${rx.map(rxTagHtml).join('')}</div>`;
+    if(has && rx.length){
+      inner += `<div class="rxcnt minis">共 ${list.length} 場課程</div>`;
+    }
+    if(has && !rx.length){
+      inner += '<div class="dots">' + list.slice(0,8).map(s=>
+        `<i style="background:var(--c-${TYPE[typeKey(s.course_type)].k})"></i>`).join('') + '</div>';
+      const maxMini = 4;
+      inner += '<div class="minis">' + list.slice(0,maxMini).map(s=>{
+        const tk = typeKey(s.course_type);
+        const st = seatTxt(s);
+        const full = (s.capacity||0)>0 && (s.booked_count||0)>=(s.capacity||0);
+        return `<div class="mini" style="background:var(--c-${TYPE[tk].k}-soft)">
+          <i style="background:var(--c-${TYPE[tk].k})"></i>
+          <span>${esc(s.course_name||'課程')}</span>
+          ${st?`<b class="${full?'full':''}" style="${full?'':'color:var(--c-'+TYPE[tk].k+'-ink)'}">${st}</b>`:''}
+        </div>`;
+      }).join('') + (list.length>maxMini ? `<div class="mini more">＋${list.length-maxMini} 場…</div>` : '') + '</div>';
     }
     const tag = has ? 'button' : 'div';
     cells += `<${tag} class="${cls}" ${has?`data-d="${ds}"`:''}>${inner}</${tag}>`;
@@ -281,9 +509,46 @@ function renderCalendar(){
 
   wrap.innerHTML = `<div class="cal">${dow}<div class="grid">${cells}</div></div>`;
   wrap.querySelectorAll('.cell.has').forEach(c=>{
-    c.onclick = ()=>{ selectedDate = c.dataset.d; renderCalendar(); renderDetail();
-      document.getElementById('detail').scrollIntoView({behavior:'smooth',block:'start'}); };
+    c.onclick = ()=>{ selectedDate = c.dataset.d; renderCalendar(); renderDetail(); scrollToDetail(); };
   });
+}
+
+function renderList(){
+  const wrap = document.getElementById('calWrap');
+  const byDay = monthByDay();
+  const days = Object.keys(byDay).sort();
+  if(!days.length){
+    wrap.innerHTML = `<div class="cal"><div class="empty">這個月目前沒有符合條件的課程。</div></div>`;
+    return;
+  }
+  const html = days.map(ds=>{
+    const d = new Date(ds+'T00:00:00');
+    const isPast = ds < todayStr;
+    const isToday = ds === todayStr;
+    const isWe = d.getDay()===0 || d.getDay()===6;
+    const rows = byDay[ds].map(s=>{
+      const tk = typeKey(s.course_type);
+      const time = hhmm(s.start_time) + (s.end_time ? '–'+hhmm(s.end_time) : '');
+      const st = seatTxt(s);
+      const full = (s.capacity||0)>0 && (s.booked_count||0)>=(s.capacity||0);
+      return `<div class="lrow">
+        <span class="ltime">${time||'—'}</span>
+        <span class="badge" style="background:var(--c-${TYPE[tk].k}-soft);color:var(--c-${TYPE[tk].k}-ink)">${TYPE[tk].lbl}</span>
+        <div class="lmain">
+          <div class="lname">${esc(s.course_name||'課程')}</div>
+          <div class="lloc">${esc(s.course_location||'地點未定')}</div>
+        </div>
+        ${st?`<span class="lseat ${full?'full':''}">${full?'已額滿 ':''}${st}</span>`:''}
+      </div>`;
+    }).join('');
+    return `<div class="lday${isPast?' past':''}">
+      <div class="ldate">${d.getMonth()+1} 月 ${d.getDate()} 日
+        <span class="wd${isWe?' we':''}">週${WD[d.getDay()]}</span>
+        ${isToday?'<span class="tdy">今天</span>':''}
+        ${rxForDate(ds).map(rxTagHtml).join('')}
+      </div>${rows}</div>`;
+  }).join('');
+  wrap.innerHTML = `<div class="cal">${html}</div>`;
 }
 
 function seatBadge(s){
@@ -298,29 +563,26 @@ function seatBadge(s){
 
 function renderDetail(){
   const el = document.getElementById('detail');
+  if(curView==='list'){ el.innerHTML=''; return; }
   if(!selectedDate){ el.innerHTML = `<div class="empty">請點選上方有課程的日期，查看當天活動。</div>`; return; }
   const list = slotsOfDay(selectedDate);
   const d = new Date(selectedDate+'T00:00:00');
-  const WD = ['日','一','二','三','四','五','六'];
   const title = `${d.getMonth()+1} 月 ${d.getDate()} 日（${WD[d.getDay()]}）`;
   if(!list.length){ el.innerHTML = `<h2>${title}</h2><div class="empty">這天目前沒有課程。</div>`; return; }
 
-  // 按課程類型分組
   const typeOrder = ['mental','nutrition','social','exercise','other'];
   const grouped = {};
   typeOrder.forEach(tk => grouped[tk] = []);
-  list.forEach(s => {
-    const tk = typeKey(s.course_type);
-    grouped[tk].push(s);
-  });
+  list.forEach(s => grouped[typeKey(s.course_type)].push(s));
 
   const renderCard = s => {
-    const t = TYPE[typeKey(s.course_type)];
+    const tk = typeKey(s.course_type);
     const region = getSlotRegion(s).replace(/區$/,'');
     const time = hhmm(s.start_time) + (s.end_time ? ' – '+hhmm(s.end_time) : '');
-    return `<div class="pcard" style="border-left-color:${t.c}">
+    const cap = s.capacity||0, bk = s.booked_count||0;
+    return `<div class="pcard" style="border-left-color:var(--c-${TYPE[tk].k})">
       <div class="ptop">
-        <span class="badge" style="background:${t.soft};color:${t.ink}">${t.lbl}</span>
+        <span class="badge" style="background:var(--c-${TYPE[tk].k}-soft);color:var(--c-${TYPE[tk].k}-ink)">${TYPE[tk].lbl}</span>
         <span class="rbadge">${region}</span>
         ${time ? `<span class="ptime">${time}</span>` : ''}
       </div>
@@ -329,45 +591,328 @@ function renderDetail(){
         <svg viewBox="0 0 24 24"><path d="M21 10c0 7-9 12-9 12s-9-5-9-12a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
         <span>${esc(s.course_location||'地點未定')}</span>
       </div>
-      ${seatBadge(s)}
+      <div class="pfoot">${seatBadge(s)}${cap>0?`<span class="pseat">已報名 ${bk}／名額 ${cap}</span>`:''}</div>
     </div>`;
   };
 
   const sections = typeOrder.map(tk => {
     const slots = grouped[tk];
     if(!slots.length) return '';
-    const t = TYPE[tk];
-    return `<div style="margin-top:16px">
-      <div style="font-size:0.95rem;font-weight:700;color:${t.hex};margin-bottom:8px">${t.lbl}</div>
+    return `<div class="tsec">
+      <div class="tlabel" style="color:var(--c-${TYPE[tk].k}-ink)"><i class="dot" style="background:var(--c-${TYPE[tk].k})"></i>${TYPE[tk].lbl}</div>
       <div class="cards">${slots.map(renderCard).join('')}</div>
     </div>`;
   }).join('');
 
-  el.innerHTML = `<h2>${title}</h2><div class="dsub">共 ${list.length} 場活動</div>${sections}`;
+  el.innerHTML = `<h2>${title}${rxForDate(selectedDate).map(rxTagHtml).join('')}</h2><div class="dsub">共 ${list.length} 場活動</div>${sections}`;
 }
 
-function esc(str){ return String(str).replace(/[&<>"]/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+function scrollToDetail(){
+  const el = document.getElementById('detail');
+  const y = el.getBoundingClientRect().top + window.scrollY - 12;
+  window.scrollTo({top:y, behavior:'smooth'});
+}
 
 function shiftMonth(delta){
   let m = curMonth + delta, y = curYear;
   if(m<0){ m=11; y--; } if(m>11){ m=0; y++; }
   curMonth=m; curYear=y; selectedDate=null;
-  renderCalendar(); renderDetail();
+  renderMain(); renderDetail();
 }
 
 function pickInitialDate(){
-  // 預設選當月「今天之後最近一個有課的日」，否則當月第一個有課的日
   const days = [...new Set(regionFiltered()
-    .filter(s=>s.status!=='cancelled' && s.slot_date && s.slot_date.slice(0,7)===`${curYear}-${pad(curMonth+1)}`)
+    .filter(s=>s.status!=='cancelled' && s.slot_date && s.slot_date.slice(0,7)===monthKey())
     .map(s=>s.slot_date))].sort();
   if(!days.length) return null;
   return days.find(d=>d>=todayStr) || days[0];
 }
 
+/* ============ 匯出單月課表 PNG ============ */
+function wrapText(ctx, text, maxW){
+  const lines = []; let line = '';
+  for(const ch of text){
+    if(ctx.measureText(line+ch).width > maxW && line){ lines.push(line); line = ch; }
+    else line += ch;
+  }
+  if(line) lines.push(line);
+  return lines;
+}
+
+let jspdfPromise = null;
+function loadJsPDF(){
+  if(window.jspdf && window.jspdf.jsPDF) return Promise.resolve();
+  if(!jspdfPromise){
+    jspdfPromise = new Promise((res, rej)=>{
+      const s = document.createElement('script');
+      s.src = 'https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js';
+      s.onload = res;
+      s.onerror = ()=>{ jspdfPromise = null; rej(new Error('PDF 元件載入失敗')); };
+      document.head.appendChild(s);
+    });
+  }
+  return jspdfPromise;
+}
+
+async function exportPNG(){
+  const btn = document.getElementById('exportBtn');
+  btn.disabled = true; const old = btn.innerHTML; btn.innerHTML = '製作中…';
+  try{
+    try{ await document.fonts.ready; }catch(e){}
+    try{ await loadJsPDF(); }catch(e){}
+    const V = n => cvar(n);
+    const displayFont = getComputedStyle(document.querySelector('.head h1')).fontFamily;
+    const byDay = monthByDay();
+
+    const W = 1680, P = 56;
+    const colW = (W - P*2) / 7;
+    const cellPad = 10, innerW = colW - cellPad*2 - 16;
+    const entryFont = '500 19px "Noto Sans TC",sans-serif';
+    const lineH = 26, entryGap = 8, dayHeadH = 38;
+
+    const mcv = document.createElement('canvas');
+    let ctx = mcv.getContext('2d');
+
+    // 計算每格內容高度
+    const firstDow = new Date(curYear, curMonth, 1).getDay();
+    const lastDay = new Date(curYear, curMonth+1, 0).getDate();
+    const totalCells = firstDow + lastDay;
+    const weeks = Math.ceil(totalCells/7);
+
+    ctx.font = entryFont;
+    const dayEntries = {}; // d -> [{tk, lines:[..]}]
+    const dayRx = {};
+    const dayCnt = {};
+    const dayHeights = {};
+    for(let d=1; d<=lastDay; d++){
+      const ds = `${curYear}-${pad(curMonth+1)}-${pad(d)}`;
+      const list = byDay[ds]||[];
+      const rx = rxForDate(ds);
+      const entries = rx.length ? [] : list.map(s=>{
+        const st = seatTxt(s);
+        const txt = `${hhmm(s.start_time)||''} ${s.course_name||'課程'}${st?'　'+st:''}`.trim();
+        return { tk: typeKey(s.course_type), lines: wrapText(ctx, txt, innerW) };
+      });
+      dayEntries[d] = entries;
+      dayRx[d] = rx;
+      dayCnt[d] = rx.length ? list.length : 0;
+      dayHeights[d] = dayHeadH + (rx.length ? rx.length*32 + (list.length?26:0) + 4 : 0)
+        + entries.reduce((h,e)=> h + e.lines.length*lineH + entryGap, 0) + cellPad;
+    }
+    const rowHs = [];
+    for(let w=0; w<weeks; w++){
+      let mx = 120;
+      for(let i=0;i<7;i++){
+        const d = w*7+i - firstDow + 1;
+        if(d>=1 && d<=lastDay) mx = Math.max(mx, dayHeights[d]);
+      }
+      rowHs.push(mx);
+    }
+
+    const headH = 148, dowH = 54, footH = 92;
+
+    // 自動分頁：以「週」為單位，內容太長就換頁
+    const MAX_ROWS_H = 880;
+    const pages = [];
+    { let cur = [], curH = 0;
+      for(let w=0; w<weeks; w++){
+        if(cur.length && curH + rowHs[w] > MAX_ROWS_H){ pages.push(cur); cur = []; curH = 0; }
+        cur.push(w); curH += rowHs[w];
+      }
+      if(cur.length) pages.push(cur);
+    }
+    const hasAny = Object.keys(byDay).length>0;
+    const fbase = `健康處方課程表_${curYear}-${pad(curMonth+1)}`
+      + (curRegion!=='all' ? '_'+curRegion.replace(/區$/,'') : '')
+      + (curType!=='all' ? '_'+TYPE[curType].lbl : '');
+    const pageCanvases = [];
+
+    for(let pi=0; pi<pages.length; pi++){
+    const pageRows = pages[pi];
+    const H = headH + dowH + pageRows.reduce((a,w)=>a+rowHs[w],0) + footH + P;
+    const cv = document.createElement('canvas');
+    ctx = cv.getContext('2d');
+    cv.width = W*2; cv.height = H*2;
+    ctx.scale(2,2);
+
+    // 背景
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0,0,W,H);
+
+    // 標題
+    ctx.fillStyle = V('--brand');
+    ctx.fillRect(P, P, 6, 52);
+    ctx.fillStyle = V('--ink');
+    ctx.font = `900 40px ${displayFont}`;
+    ctx.textBaseline = 'top';
+    ctx.fillText(`${curYear} 年 ${curMonth+1} 月　健康處方課程表`, P+22, P+2);
+    ctx.font = '500 18px "Noto Sans TC",sans-serif';
+    ctx.fillStyle = V('--muted');
+    const fRegion = curRegion==='all' ? '全部院區' : curRegion;
+    const fType = curType==='all' ? '全部類型' : TYPE[curType].lbl;
+    const now = new Date();
+    ctx.fillText(`${fRegion} · ${fType}　｜　課程後方數字為「已報名 / 名額」　｜　製表：${now.getFullYear()}/${pad(now.getMonth()+1)}/${pad(now.getDate())}`, P+22, P+62);
+    if(pages.length>1){
+      ctx.font = '700 22px "Noto Sans TC",sans-serif';
+      ctx.fillStyle = V('--muted');
+      const ptxt = `第 ${pi+1}／${pages.length} 頁`;
+      ctx.fillText(ptxt, W - P - ctx.measureText(ptxt).width, P+12);
+    }
+
+    // 星期列
+    const dowY = headH;
+    ctx.fillStyle = V('--brand-soft');
+    ctx.fillRect(P, dowY, W-P*2, dowH-8);
+    ctx.font = '700 20px "Noto Sans TC",sans-serif';
+    for(let i=0;i<7;i++){
+      ctx.fillStyle = (i===0||i===6) ? V('--we') : V('--ink');
+      const t = '週'+WD[i];
+      const tw = ctx.measureText(t).width;
+      ctx.fillText(t, P + colW*i + (colW-tw)/2, dowY + 11);
+    }
+
+    // 格線與內容
+    let y = headH + dowH;
+    const line = V('--line');
+    for(const w of pageRows){
+      const rh = rowHs[w];
+      for(let i=0;i<7;i++){
+        const d = w*7+i - firstDow + 1;
+        const x = P + colW*i;
+        if(d<1 || d>lastDay){
+          ctx.fillStyle = '#fafaf8';
+          ctx.fillRect(x, y, colW, rh);
+          ctx.strokeStyle = line; ctx.lineWidth = 1;
+          ctx.strokeRect(x+.5, y+.5, colW, rh);
+          continue;
+        }
+        const ds = `${curYear}-${pad(curMonth+1)}-${pad(d)}`;
+        const isToday = ds === todayStr;
+        // 底
+        ctx.fillStyle = isToday ? V('--brand-soft') : '#ffffff';
+        ctx.fillRect(x, y, colW, rh);
+        if(dayRx[d].length){
+          ctx.globalAlpha = .45;
+          ctx.fillStyle = V('--brand-soft');
+          ctx.fillRect(x, y, colW, rh);
+          ctx.globalAlpha = 1;
+        }
+        ctx.strokeStyle = line; ctx.lineWidth = 1;
+        ctx.strokeRect(x+.5, y+.5, colW, rh);
+        if(isToday){ ctx.strokeStyle = V('--brand'); ctx.lineWidth = 2; ctx.strokeRect(x+1, y+1, colW-2, rh-2); }
+        // 日期數字
+        ctx.font = '800 23px "Noto Sans TC",sans-serif';
+        ctx.fillStyle = (i===0||i===6) ? V('--we') : V('--ink');
+        ctx.fillText(String(d), x+cellPad, y+8);
+        if(isToday){
+          ctx.font = '800 14px "Noto Sans TC",sans-serif';
+          ctx.fillStyle = V('--brand');
+          ctx.fillText('今天', x+cellPad+36, y+15);
+        }
+        // 處方日標籤
+        let ey = y + dayHeadH + 2;
+        if(dayRx[d].length){
+          ctx.font = '800 16px "Noto Sans TC",sans-serif';
+          for(const k of dayRx[d]){
+            const t = k.replace(/區$/,'') + '處方日';
+            const tw = ctx.measureText(t).width;
+            ctx.fillStyle = V('--brand');
+            ctx.beginPath();
+            if(ctx.roundRect) ctx.roundRect(x+cellPad, ey-2, tw+20, 26, 13);
+            else ctx.rect(x+cellPad, ey-2, tw+20, 26);
+            ctx.fill();
+            ctx.fillStyle = '#ffffff';
+            ctx.fillText(t, x+cellPad+10, ey+2);
+            ey += 32;
+          }
+          if(dayCnt[d]){
+            ctx.font = '500 17px "Noto Sans TC",sans-serif';
+            ctx.fillStyle = V('--muted');
+            ctx.fillText(`共 ${dayCnt[d]} 場課程`, x+cellPad+2, ey+1);
+            ey += 26;
+          }
+          ey += 4;
+        }
+        // 課程
+        ctx.font = entryFont;
+        for(const e of dayEntries[d]){
+          ctx.fillStyle = V('--c-'+TYPE[e.tk].k);
+          ctx.beginPath();
+          ctx.arc(x+cellPad+6, ey+lineH/2, 5.5, 0, Math.PI*2);
+          ctx.fill();
+          ctx.fillStyle = '#333b38';
+          e.lines.forEach((ln,li)=>{
+            ctx.fillText(ln, x+cellPad+19, ey + li*lineH + 4);
+          });
+          ey += e.lines.length*lineH + entryGap;
+        }
+      }
+      y += rh;
+    }
+
+    // 頁尾圖例
+    let lx = P; const ly = y + 28;
+    ctx.font = '700 18px "Noto Sans TC",sans-serif';
+    for(const tk of ['exercise','nutrition','mental','social','other']){
+      ctx.fillStyle = V('--c-'+TYPE[tk].k);
+      ctx.beginPath(); ctx.arc(lx+7, ly+11, 7, 0, Math.PI*2); ctx.fill();
+      ctx.fillStyle = V('--ink');
+      ctx.fillText(TYPE[tk].lbl, lx+20, ly);
+      lx += 20 + ctx.measureText(TYPE[tk].lbl).width + 30;
+    }
+    ctx.fillStyle = V('--muted');
+    ctx.font = '500 16px "Noto Sans TC",sans-serif';
+    const note = '名額為製表當下概況，實際以現場為準。';
+    ctx.fillText(note, W - P - ctx.measureText(note).width, ly+1);
+
+    // 無課程提示
+    if(!hasAny && pi===0){
+      ctx.fillStyle = V('--muted');
+      ctx.font = '700 26px "Noto Sans TC",sans-serif';
+      const msg = '本月目前沒有符合條件的課程';
+      ctx.fillText(msg, (W-ctx.measureText(msg).width)/2, headH + dowH + 60);
+    }
+
+    pageCanvases.push({ cv, w: W, h: H });
+    } // 頁迴圈結束
+
+    // 合併輸出：單一 PDF（多頁）；若 PDF 元件載入失敗則退回逐頁 PNG
+    if(window.jspdf && window.jspdf.jsPDF){
+      const { jsPDF } = window.jspdf;
+      const first = pageCanvases[0];
+      const pdf = new jsPDF({
+        orientation: first.w >= first.h ? 'l' : 'p',
+        unit: 'px', format: [first.w, first.h], hotfixes: ['px_scaling'], compress: true
+      });
+      pageCanvases.forEach((p, i)=>{
+        if(i>0) pdf.addPage([p.w, p.h], p.w >= p.h ? 'l' : 'p');
+        pdf.addImage(p.cv.toDataURL('image/jpeg', .92), 'JPEG', 0, 0, p.w, p.h);
+      });
+      pdf.save(fbase + '.pdf');
+    }else{
+      for(let i=0; i<pageCanvases.length; i++){
+        const fname = fbase + (pageCanvases.length>1 ? `_第${i+1}頁` : '') + '.png';
+        await new Promise(resolve=>{
+          pageCanvases[i].cv.toBlob(blob=>{
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(blob);
+            a.download = fname;
+            a.click();
+            setTimeout(()=>URL.revokeObjectURL(a.href), 3000);
+            resolve();
+          }, 'image/png');
+        });
+        if(i < pageCanvases.length-1) await new Promise(r=>setTimeout(r, 400));
+      }
+    }
+  } finally {
+    btn.disabled = false; btn.innerHTML = old;
+  }
+}
+
 async function init(){
   renderRegions();
   renderTypeFilters();
-  // 預設月份：當月
   curYear = today.getFullYear(); curMonth = today.getMonth();
 
   try{
@@ -383,21 +928,38 @@ async function init(){
     return;
   }
 
-  // 若當月沒有任何課程，跳到最近一個有課的月份
   const monthsWithData = [...new Set(allSlots.filter(s=>s.status!=='cancelled' && s.slot_date).map(s=>s.slot_date.slice(0,7)))].sort();
-  const curKey = `${curYear}-${pad(curMonth+1)}`;
+  const curKey = monthKey();
   if(monthsWithData.length && !monthsWithData.includes(curKey)){
     const future = monthsWithData.find(m=>m>=curKey) || monthsWithData[monthsWithData.length-1];
     curYear = +future.slice(0,4); curMonth = +future.slice(5,7)-1;
   }
 
   selectedDate = pickInitialDate();
-  renderCalendar();
+  renderMain();
   renderDetail();
 }
 
 document.getElementById('prevM').onclick = ()=>shiftMonth(-1);
 document.getElementById('nextM').onclick = ()=>shiftMonth(1);
+document.getElementById('todayBtn').onclick = ()=>{
+  curYear = today.getFullYear(); curMonth = today.getMonth();
+  selectedDate = todayStr;
+  renderMain(); renderDetail();
+};
+document.querySelectorAll('#viewSeg button').forEach(b=>{
+  b.onclick = ()=>{
+    curView = b.dataset.v;
+    document.querySelectorAll('#viewSeg button').forEach(x=>x.classList.toggle('on', x===b));
+    renderMain(); renderDetail();
+  };
+});
+document.getElementById('exportBtn').onclick = exportPNG;
+const rxMask = document.getElementById('rxMask');
+document.getElementById('rxBtn').onclick = ()=>{ renderRxRows(); rxMask.hidden = false; };
+document.getElementById('rxDone').onclick = ()=>{ rxMask.hidden = true; };
+document.getElementById('rxClear').onclick = ()=>{ rxDays = {}; saveRx(); renderRxRows(); renderMain(); renderDetail(); };
+rxMask.onclick = e=>{ if(e.target===rxMask) rxMask.hidden = true; };
 init();
 </script>
 </body>
