@@ -63,7 +63,7 @@
     background:var(--bg); color:var(--ink); line-height:1.6;
     -webkit-font-smoothing:antialiased;
   }
-  .wrap{max-width:1240px;margin:0 auto;padding:22px 40px 64px}
+  .wrap{max-width:min(1800px,97vw);margin:0 auto;padding:22px 40px 64px}
 
   /* Header */
   .head{text-align:center;padding:16px 0 20px;background:var(--head-bg);color:var(--head-ink)}
@@ -162,10 +162,10 @@
   .dots{display:flex;flex-wrap:wrap;gap:4px;margin-top:6px}
   .dots i{width:9px;height:9px;border-radius:50%}
   .minis{margin-top:5px;display:none}
-  .mini{display:flex;align-items:center;gap:6px;font-size:1rem;border-radius:8px;padding:4px 8px;margin-top:3px;
+  .mini{display:flex;align-items:flex-start;gap:6px;font-size:1rem;border-radius:8px;padding:4px 8px;margin-top:3px;
     color:var(--ink);overflow:hidden;line-height:1.35}
-  .mini i{flex:none;width:7px;height:7px;border-radius:50%}
-  .mini span{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:500}
+  .mini i{flex:none;width:7px;height:7px;border-radius:50%;margin-top:6px}
+  .mini span{flex:1;min-width:0;overflow-wrap:break-word;word-break:break-word;font-weight:500}
   .mini b{flex:none;font-size:.86rem;font-weight:800;opacity:.85}
   .mini b.full{color:#c0392b}
   .mini.more{background:transparent;color:var(--muted)}
@@ -297,8 +297,9 @@
 <div class="modal-mask" id="rxMask" hidden>
   <div class="modal">
     <h3>設定各區處方日</h3>
-    <p class="mnote">設定後，月曆、清單與匒出的課表都會標示該日為處方日。設定儲存在這台裝置。</p>
+    <p class="mnote">設定後，月曆、清單與匯出的課表都會標示該日為處方日。此設定會同步到雲端，所有診所開啟時都會看到同一份。</p>
     <div id="rxRows"></div>
+    <div id="rxStatus" style="font-size:.88rem;margin-top:8px;min-height:1.2em"></div>
     <div class="mfoot">
       <button class="abtn" id="rxClear">清除全部</button>
       <button class="abtn primary" id="rxDone">完成</button>
@@ -353,6 +354,7 @@ const TYPES = [
   {key:'exercise', lbl:'運動'}
 ];
 
+let sbClient = null;
 let allSlots = [];
 let curRegion = 'all';
 let curType = 'all';
@@ -398,9 +400,35 @@ function seatTxt(s){
 /* ============ 處方日設定 ============ */
 const RX_KEY = 'tpma_rx_days';
 const RX_REGIONS = ['北投區','士林區','中山區'];
+const _q = new URLSearchParams(location.search);
+const IS_ADMIN = _q.has('admin') && _q.get('admin') !== '0';
 let rxDays = {};
 try{ rxDays = JSON.parse(localStorage.getItem(RX_KEY)||'{}') || {}; }catch(e){ rxDays = {}; }
-function saveRx(){ localStorage.setItem(RX_KEY, JSON.stringify(rxDays)); }
+function saveRx(){
+  localStorage.setItem(RX_KEY, JSON.stringify(rxDays));
+  pushRxToCloud();
+}
+async function pushRxToCloud(){
+  if(!sbClient) return;
+  setRxStatus('同步中…', false);
+  try{
+    const { error } = await sbClient.from('prescription_data')
+      .upsert({ id:'main', rx_days: rxDays }, { onConflict:'id' });
+    if(error) throw error;
+    setRxStatus('✓ 已同步到雲端，所有診所都會看到', false);
+  }catch(e){
+    const miss = /rx_days|column|schema cache/i.test(e.message||'');
+    setRxStatus(miss
+      ? '⚠️ 雲端尚未建立欄位，目前僅存本機。請在 Supabase SQL Editor 執行：ALTER TABLE prescription_data ADD COLUMN IF NOT EXISTS rx_days jsonb;'
+      : '⚠️ 雲端同步失敗（僅存本機）：'+(e.message||e), true);
+  }
+}
+function setRxStatus(msg, err){
+  const el = document.getElementById('rxStatus');
+  if(!el) return;
+  el.textContent = msg;
+  el.style.color = err ? '#c0392b' : 'var(--brand)';
+}
 function rxForDate(ds){
   return RX_REGIONS.filter(k => (rxDays[k]||[]).includes(ds) && (curRegion==='all' || curRegion===k));
 }
@@ -916,12 +944,17 @@ async function init(){
   curYear = today.getFullYear(); curMonth = today.getMonth();
 
   try{
-    const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-    const { data, error } = await sb.from('prescription_data').select('*')
+    sbClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    const { data, error } = await sbClient.from('prescription_data').select('*')
       .order('uploaded_at',{ascending:false}).limit(1).maybeSingle();
     if(error) throw error;
     allSlots = Array.isArray(data && data.course_slots) ? data.course_slots : [];
     clinicRegionMap = (data && data.clinic_region_map && typeof data.clinic_region_map==='object') ? data.clinic_region_map : {};
+    // 處方日：以雲端共用設定為準（由管理者統一設定，其他診所自動吃到）
+    if(data && data.rx_days && typeof data.rx_days==='object' && !Array.isArray(data.rx_days)){
+      rxDays = data.rx_days;
+      try{ localStorage.setItem(RX_KEY, JSON.stringify(rxDays)); }catch(e){}
+    }
   }catch(e){
     document.getElementById('calWrap').innerHTML =
       `<div class="empty">課程資料載入失敗，請稍後再試。<br><small>${esc(e.message||e)}</small></div>`;
@@ -956,7 +989,12 @@ document.querySelectorAll('#viewSeg button').forEach(b=>{
 });
 document.getElementById('exportBtn').onclick = exportPNG;
 const rxMask = document.getElementById('rxMask');
-document.getElementById('rxBtn').onclick = ()=>{ renderRxRows(); rxMask.hidden = false; };
+const rxBtn = document.getElementById('rxBtn');
+if(IS_ADMIN){
+  rxBtn.onclick = ()=>{ setRxStatus('', false); renderRxRows(); rxMask.hidden = false; };
+}else{
+  rxBtn.style.display = 'none';   // 一般診所僅讀取管理者設定，不顯示編輯入口
+}
 document.getElementById('rxDone').onclick = ()=>{ rxMask.hidden = true; };
 document.getElementById('rxClear').onclick = ()=>{ rxDays = {}; saveRx(); renderRxRows(); renderMain(); renderDetail(); };
 rxMask.onclick = e=>{ if(e.target===rxMask) rxMask.hidden = true; };
