@@ -1335,6 +1335,14 @@ footer {
         <button class="pdf-tab-btn" data-region="other" onclick="filterSlotsRegion('other',this)">其他</button>
       </div>
     </div>
+    <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-top:8px">
+      <span style="font-size:0.78rem;font-weight:700;color:var(--text-muted);margin-right:2px">課程種類:</span>
+      <div id="slotsKindFilterBar" style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
+        <button class="pdf-tab-btn active" data-kind="all" onclick="filterSlotsKind('all',this)">全部課程</button>
+        <button class="pdf-tab-btn" data-kind="activity" onclick="filterSlotsKind('activity',this)">活動課程</button>
+        <button class="pdf-tab-btn" data-kind="weekly" onclick="filterSlotsKind('weekly',this)">週間課程</button>
+      </div>
+    </div>
     <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-top:8px;margin-bottom:12px">
       <input type="text" id="slotsFilterSearch" placeholder="搜尋課程名稱或地點…" oninput="renderSlotsTable()" style="flex:1;min-width:240px;padding:7px 12px;border-radius:8px;border:1.5px solid var(--border);font-family:inherit;font-size:0.86rem;background:var(--surface);color:var(--text);outline:none">
       <button onclick="clearSlotsAllFilters()" style="padding:6px 10px;border-radius:6px;border:1.5px solid var(--border);background:var(--surface);color:var(--text-muted);font-size:0.78rem;cursor:pointer">清除所有篩選</button>
@@ -3631,7 +3639,7 @@ function buildCourseCharts(){
   setText('csFullSlots',   (stats.full_slots||0).toLocaleString());
 
   // 處方類型未完成 / 場次狀態:套頂層日期區間 + 場次明細的地區/處方類型篩選
-  const inRange = applySlotsTypeFilter(applySlotsRegionFilter(filteredCourseSlots()));
+  const inRange = applySlotsKindFilter(applySlotsTypeFilter(applySlotsRegionFilter(filteredCourseSlots())));
   const statusMap = {};
   inRange.forEach(s => {
     const sk = s.status || 'unknown';
@@ -3918,7 +3926,7 @@ function renderDaySchedule(){
 
   const q = (document.getElementById('slotsFilterSearch')?.value || '').toLowerCase().trim();
   let slots = courseSlots.filter(s => s.slot_date === from);
-  slots = applySlotsTypeFilter(applySlotsRegionFilter(slots));
+  slots = applySlotsKindFilter(applySlotsTypeFilter(applySlotsRegionFilter(slots)));
   // 也跟著頂部「區域篩選」下拉一起過濾(北投/士林/中山)
   if(currentRegion !== 'all') slots = slots.filter(s => getSlotRegion(s) === currentRegion);
   if(q) slots = slots.filter(s => (((s.course_name||'') + ' ' + (s.course_location||'')).toLowerCase().includes(q)));
@@ -4033,6 +4041,20 @@ function filterSlotsRegion(r, btn){
   if(btn) btn.classList.add('active');
   buildCourseCharts(); // 地區篩選同時影響下方分析圖表(內含 renderSlotsTable)
 }
+// 課程種類:課名含「處方日」= 活動課程(處方日主題課),其餘為週間課程。
+// 與課表月曆(schedule/index.html)、週報用同一條規則。
+function isSlotActivity(s){ return (s && s.course_name ? s.course_name : '').includes('處方日'); }
+function filterSlotsKind(k, btn){
+  window._slotsKindFilter = k;
+  document.querySelectorAll('#slotsKindFilterBar .pdf-tab-btn').forEach(b => b.classList.remove('active'));
+  if(btn) btn.classList.add('active');
+  buildCourseCharts(); // 種類篩選同時影響下方分析圖表(內含 renderSlotsTable)
+}
+function applySlotsKindFilter(arr){
+  const kf = window._slotsKindFilter || 'all';
+  if(kf === 'all') return arr;
+  return arr.filter(s => kf === 'activity' ? isSlotActivity(s) : !isSlotActivity(s));
+}
 // 場次地點 → 區域。許多地點沒寫區名(如「石牌鄭身心醫學診所」),
 // 先比對診所分區表(clinicRegionMap),再用地標關鍵字推斷。
 function _regionOfText(txt){
@@ -4077,6 +4099,7 @@ function clearSlotsAllFilters(){
   const s = document.getElementById('slotsFilterSearch'); if(s) s.value='';
   filterSlotsType('all', document.querySelector('#slotsTypeFilterBar [data-type=all]'));
   filterSlotsRegion('all', document.querySelector('#slotsRegionFilterBar [data-region=all]'));
+  filterSlotsKind('all', document.querySelector('#slotsKindFilterBar [data-kind=all]'));
   filterSlotsTable('all', document.querySelector('#slotsFilterBar [data-filter=all]'));
 }
 function toggleSlotExpand(slotId, evt){
@@ -4280,6 +4303,7 @@ function renderSlotsTable(){
   const f = window._slotsFilter || 'all';
   const tf = window._slotsTypeFilter || 'all';
   const rf = window._slotsRegionFilter || 'all';
+  const kf = window._slotsKindFilter || 'all';
   const {from: dFrom, to: dTo} = getCourseDateRange();
   const q = (document.getElementById('slotsFilterSearch')?.value || '').toLowerCase().trim();
   // 同步 filter 狀態文字
@@ -4310,6 +4334,10 @@ function renderSlotsTable(){
       if(rf === 'other'){
         if(reg !== '其他') return false;
       } else if(reg !== rf) return false;
+    }
+    if(kf !== 'all'){
+      const act = isSlotActivity(s);
+      if(kf === 'activity' ? !act : act) return false;
     }
     if(dFrom && s.slot_date < dFrom) return false;
     if(dTo   && s.slot_date > dTo)   return false;
