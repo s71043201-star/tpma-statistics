@@ -85,7 +85,7 @@
   /* Controls */
   .controls{display:flex;flex-direction:column;gap:12px;align-items:center;margin:10px 0 16px}
   .crow1{display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:center}
-  .regions,.types{display:flex;gap:8px;flex-wrap:wrap;justify-content:center}
+  .regions,.types,.kinds{display:flex;gap:8px;flex-wrap:wrap;justify-content:center}
   .rbtn{border:1.5px solid var(--line);background:var(--card);color:var(--muted);
     padding:9px 20px;border-radius:24px;font-size:1rem;font-weight:700;cursor:pointer;font-family:inherit;transition:.15s}
   .rbtn:hover{border-color:var(--brand);color:var(--brand)}
@@ -275,6 +275,7 @@
     </div>
     <div class="regions" id="regions"></div>
     <div class="types" id="types"></div>
+    <div class="kinds" id="kinds"></div>
   </div>
 
   <div class="legend">
@@ -352,10 +353,19 @@ const TYPES = [
   {key:'social', lbl:'社會'},
   {key:'exercise', lbl:'運動'}
 ];
+// 課程種類：活動課程（處方日主題課）vs 週間課程（每週固定課）
+// 判斷規則集中在此，日後要改認定方式只需動 isActivity
+const KINDS = [
+  {key:'all',      lbl:'全部課程'},
+  {key:'activity', lbl:'活動課程'},
+  {key:'weekly',   lbl:'週間課程'}
+];
+const isActivity = s => (s.course_name||'').includes('處方日');
 
 let allSlots = [];
 let curRegion = 'all';
 let curType = 'all';
+let curKind = 'all';
 let curView = 'cal';         // 'cal' | 'list'
 let curYear, curMonth;       // month: 0-11
 let selectedDate = null;     // 'YYYY-MM-DD'
@@ -371,6 +381,8 @@ function esc(str){ return String(str).replace(/[&<>"]/g, c=>({'&':'&amp;','<':'&
 function regionFiltered(){
   let res = curRegion==='all' ? allSlots : allSlots.filter(s => getSlotRegion(s)===curRegion);
   if(curType!=='all') res = res.filter(s => typeKey(s.course_type)===curType);
+  if(curKind==='activity') res = res.filter(isActivity);
+  else if(curKind==='weekly') res = res.filter(s => !isActivity(s));
   return res;
 }
 function monthKey(){ return `${curYear}-${pad(curMonth+1)}`; }
@@ -449,6 +461,13 @@ function renderTypeFilters(){
     `<button class="rbtn${t.key===curType?' on':''}" data-t="${t.key}">${t.lbl}</button>`).join('');
   document.querySelectorAll('#types .rbtn').forEach(b=>{
     b.onclick = ()=>{ curType=b.dataset.t; selectedDate=null; renderMain(); renderDetail(); };
+  });
+}
+function renderKindFilters(){
+  document.getElementById('kinds').innerHTML = KINDS.map(k =>
+    `<button class="rbtn${k.key===curKind?' on':''}" data-k="${k.key}">${k.lbl}</button>`).join('');
+  document.querySelectorAll('#kinds .rbtn').forEach(b=>{
+    b.onclick = ()=>{ curKind=b.dataset.k; selectedDate=pickInitialDate(); renderKindFilters(); renderMain(); renderDetail(); };
   });
 }
 
@@ -913,6 +932,7 @@ async function exportPNG(){
 async function init(){
   renderRegions();
   renderTypeFilters();
+  renderKindFilters();
   curYear = today.getFullYear(); curMonth = today.getMonth();
 
   try{
