@@ -1555,6 +1555,9 @@ let currentRegion   = 'all'; // 'all'|'北投區'|'士林區'|'中山區'
 let weeklyData = [], typeStats = [], typeWeeklyRaw = [], clinicStats = [];
 let monthlyData = [], typeMonthlyRaw = [];
 let rawRows = []; // 原始 row 資料，供日期篩選用
+// 測試資料:開立診所為 ITRI(工研院自測),不列入任何統計
+const TEST_CLINICS = ['ITRI'];
+const stripTestRows = rows => (rows || []).filter(r => !TEST_CLINICS.includes(r.clinic));
 let courseSlots = []; // 課程時段資料(從 admin/slots/summary 來)
 let courseSlotStats = null; // 課程總計
 let pinnedDates = new Set(); // 處方日等需置頂的日期(雲端同步)
@@ -1590,7 +1593,7 @@ async function loadFromCloud(auto) {
       setCloudStatus('error', '❌ 讀取失敗：' + (error && error.message || '資料表尚無資料，請先上傳 Excel'));
       return;
     }
-    rawRows = data.raw_rows || [];
+    rawRows = stripTestRows(data.raw_rows);
     if(rawRows.length){
       // 有 raw_rows 就以它為單一資料來源,即時重算所有聚合
       const agg = aggregateRawRows(rawRows);
@@ -3514,9 +3517,9 @@ function parseExcel(file){
           const enrolled=!!(colEnroll&&row[colEnroll]&&row[colEnroll].toString().trim().toUpperCase()==='V');
           parsed.push({prescDate:pd.toISOString().slice(0,10),execDate:edDate?edDate.toISOString().slice(0,10):null,type,clinic,ex,enrolled});
         });
-        rawRows=parsed;
+        rawRows=stripTestRows(parsed);
         updateDateFilterRange();
-        resolve(aggregateRawRows(parsed));
+        resolve(aggregateRawRows(rawRows));
       }catch(err){reject('解析失敗：'+err.message);}
     };
     reader.onerror=()=>reject('檔案讀取失敗');
