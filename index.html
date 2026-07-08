@@ -7,6 +7,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 <!-- PDF 相關套件 -->
 <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
@@ -1186,7 +1187,16 @@ footer {
       <div class="chart-wrap" id="clinicExecRateWrap" style="height:360px"><canvas id="clinicExecRateChart"></canvas></div>
     </div>
     <div class="chart-section">
-      <div class="chart-header"><h2>各診所詳細統計表</h2><button class="dl-btn" onclick="exportClinicTable()">↓ 匯出 Excel</button></div>
+      <div class="chart-header" style="flex-wrap:wrap;gap:8px;">
+        <h2>各診所詳細統計表</h2>
+        <div style="display:flex;align-items:center;gap:8px;margin-left:auto;flex-wrap:wrap;">
+          <label style="display:flex;align-items:center;gap:4px;font-size:0.8rem;color:var(--text-soft,#556);white-space:nowrap;">執行率低於
+            <input id="bulkExecThreshold" type="number" value="30" min="0" max="100" step="1" style="width:52px;padding:4px 6px;border:1.5px solid var(--border);border-radius:var(--radius-sm);text-align:center;font-family:inherit;font-size:0.8rem;">%
+          </label>
+          <button class="dl-btn" onclick="requestBulkClinicExport(this)" title="下載所有執行率低於設定值的診所逐筆處方紀錄，打包成一個 ZIP 一次下載">↓ 一鍵下載低執行率診所</button>
+          <button class="dl-btn" onclick="exportClinicTable()">↓ 匯出統計表</button>
+        </div>
+      </div>
       <div class="clinic-table-wrap">
         <table class="clinic-table" id="clinicTable">
           <thead>
@@ -2671,6 +2681,129 @@ async function requestClinicExport(clinicName, btn) {
       } else if (btn) {
         btn.textContent = data.status === 'running' ? `抓取中…${elapsed}s` : `等待中…${elapsed}s`;
       }
+    } catch (e) { /* 連線抖動下次再試 */ }
+  }, 3000);
+}
+
+function _b64ToU8(b64) {
+  const bin = atob(b64);
+  const u8 = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) u8[i] = bin.charCodeAt(i);
+  return u8;
+}
+
+// 一鍵下載：所有執行率低於門檻的診所 → 各自佇列拓取 → 全數完成後打包成一個 ZIP
+async function requestBulkClinicExport(btn) {
+  if (!sbClient) { alert('Supabase 未設定，無法下載'); return; }
+  if (typeof JSZip === 'undefined') { alert('打包元件（JSZip）未載入，請重新整理頁面'); return; }
+  if (btn && btn.disabled) return;
+
+  const thInput = document.getElementById('bulkExecThreshold');
+  const threshold = parseFloat(thInput && thInput.value);
+  if (isNaN(threshold)) { alert('請輸入執行率門檻（%）'); if (thInput) thInput.focus(); return; }
+
+  const sorted = sortClinicStats(getClinicStatsWithZeros());
+  const targets = sorted.filter(r => (r.開立數 || 0) > 0 && (r.執行率 || 0) < threshold);
+  if (!targets.length) { alert(`沒有執行率低於 ${threshold}% 的診所（僅計算有開立處方的診所）`); return; }
+
+  if (!confirm(`將下載 ${targets.length} 間執行率低於 ${threshold}% 的診所逐筆處方紀錄，打包成一個 ZIP。\n\n診所數較多時可能需要數分鐘，過程中請勿關閉分頁。確定要下載嗎？`)) return;
+
+  const pwd = await ensureExportPassword();
+  if (pwd === null) return;  // 使用者取消
+
+  const orig = btn ? btn.textContent : '';
+  if (btn) { btn.disabled = true; btn.textContent = '送出中…'; }
+
+  // 1) 一次塞入所有 pending 請求
+  let rows = [];
+  try {
+    const { data, error } = await sbClient
+      .from('clinic_export_requests')
+      .insert(targets.map(t => ({ clinic_name: t.診所名稱, password: pwd, status: 'pending' })))
+      .select('id, clinic_name');
+    if (error || !data) throw new Error(error && error.message || '請確認 clinic_export_requests 表已建立');
+    rows = data;
+  } catch (e) {
+    if (btn) { btn.disabled = false; btn.textContent = orig; }
+    alert('❌ 觸發失敗：' + (e.message || e));
+    return;
+  }
+
+  const total = rows.length;
+  const pending = new Set(rows.map(r => r.id));
+  const done = [];   // {filename, u8}
+  const errors = []; // {clinic, msg}
+  let pwdBad = false;
+  let elapsed = 0;
+
+  const finish = async () => {
+    // 收尾：不論成敗都刪除殘留 request（縮短個資暴露窗口）
+    if (pending.size) { try { await sbClient.from('clinic_export_requests').delete().in('id', [...pending]); } catch (e) {} }
+    if (pwdBad) sessionStorage.removeItem('clinicExportPwd');
+
+    if (done.length) {
+      const zip = new JSZip();
+      const used = {};
+      done.forEach(d => {
+        let name = d.filename || '診所處方紀錄.xlsx';
+        if (used[name]) { const n = ++used[name]; name = name.replace(/\.xlsx$/i, '') + `(${n}).xlsx`; }
+        else used[name] = 1;
+        zip.file(name, d.u8);
+      });
+      try {
+        const blob = await zip.generateAsync({ type: 'blob' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `執行率低於${threshold}%診所處方紀錄.zip`;
+        document.body.appendChild(a); a.click();
+        setTimeout(() => { URL.revokeObjectURL(url); a.remove(); }, 100);
+      } catch (e) { alert('❌ ZIP 打包失敗：' + (e.message || e)); }
+    }
+
+    if (btn) {
+      btn.disabled = false;
+      btn.textContent = orig;
+    }
+    const parts = [`✓ 成功下載 ${done.length}/${total} 間診所`];
+    if (errors.length) parts.push(`\n\n以下 ${errors.length} 間失敗：\n` + errors.map(e => `• ${e.clinic}：${e.msg}`).join('\n'));
+    alert(parts.join(''));
+  };
+
+  const timer = setInterval(async () => {
+    elapsed += 3;
+    // 佇列每分鐘跑一輪、每輪最多 20 筆，診所多時可能跨多輪；給足時間
+    if (elapsed > 900) {  // 15 分鐘上限
+      clearInterval(timer);
+      errors.push(...[...pending].map(id => ({ clinic: (rows.find(r => r.id === id) || {}).clinic_name || id, msg: '逾時未完成' })));
+      pending.clear();
+      if (btn) btn.textContent = '逾時';
+      await finish();
+      return;
+    }
+    if (!pending.size) { clearInterval(timer); return; }
+    try {
+      const { data } = await sbClient
+        .from('clinic_export_requests')
+        .select('id, clinic_name, status, error_message, result_b64, result_filename')
+        .in('id', [...pending]);
+      if (data) {
+        for (const d of data) {
+          if (d.status === 'done') {
+            pending.delete(d.id);
+            if (d.result_b64) done.push({ filename: d.result_filename, u8: _b64ToU8(d.result_b64) });
+            try { await sbClient.from('clinic_export_requests').delete().eq('id', d.id); } catch (e) {}
+          } else if (d.status === 'error') {
+            pending.delete(d.id);
+            const msg = d.error_message || '未知錯誤';
+            if (msg.includes('密碼')) pwdBad = true;
+            errors.push({ clinic: d.clinic_name, msg });
+            try { await sbClient.from('clinic_export_requests').delete().eq('id', d.id); } catch (e) {}
+          }
+        }
+      }
+      if (btn) btn.textContent = `處理中 ${done.length + errors.length}/${total}…${elapsed}s`;
+      if (!pending.size) { clearInterval(timer); await finish(); }
     } catch (e) { /* 連線抖動下次再試 */ }
   }, 3000);
 }
