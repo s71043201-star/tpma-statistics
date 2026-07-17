@@ -361,7 +361,19 @@ const KINDS = [
   {key:'activity', lbl:'活動課程'},
   {key:'weekly',   lbl:'週間課程'}
 ];
-const isActivity = s => (s.course_name||'').includes('處方日');
+// 認定規則(與儀表板 index.html 的 isSlotActivity 同步維護):
+//   1) 課名含「處方日」
+//   2) 課名壓了日期(0711、7/25、07.25、7月25日)——週間固定課不會在課名壓日期
+const RX_NAME_DATE_PATTERNS = [
+  /(^|\D)(0[1-9]|1[0-2])(0[1-9]|[12]\d|3[01])(\D|$)/,          // 0711
+  /(^|\D)(0?[1-9]|1[0-2])[\/／](0?[1-9]|[12]\d|3[01])(\D|$)/,  // 7/25、07/25
+  /(^|\D)(0?[1-9]|1[0-2])[.．](0[1-9]|[12]\d|3[01])(\D|$)/,    // 07.25
+  /(0?[1-9]|1[0-2])月(0?[1-9]|[12]\d|3[01])日/                  // 7月25日
+];
+const isActivity = s => {
+  const n = (s.course_name||'');
+  return n.includes('處方日') || RX_NAME_DATE_PATTERNS.some(re => re.test(n));
+};
 
 let sbClient = null;
 let allSlots = [];

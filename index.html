@@ -741,6 +741,11 @@ body.is-loading .chart-wrap::after {
 .dc-top { display: flex; align-items: center; gap: 6px; margin-bottom: 5px; flex-wrap: wrap; }
 .dc-type { padding: 1px 8px; border-radius: 10px; font-size: 0.72rem; font-weight: 700; white-space: nowrap; }
 .dc-region { font-size: 0.72rem; font-weight: 700; }
+/* 課程種類標籤:處方日(活動課) vs 週間課 */
+.dc-kind { padding: 1px 8px; border-radius: 10px; font-size: 0.72rem; font-weight: 700; white-space: nowrap; }
+.dc-kind.rx { background: #fde8ef; color: #c2255c; border: 1px solid #f5c2d4; }
+.dc-kind.wk { background: #eef2f0; color: #6b7a74; border: 1px solid #d7e0db; }
+.day-card.rx { background: #fff8fb; }
 .dc-status { margin-left: auto; font-size: 0.7rem; font-weight: 700; color: #9aa5b1; border: 1px solid #cfd8d3; padding: 0 7px; border-radius: 9px; white-space: nowrap; }
 .dc-status.done { color: var(--teal); border-color: #9adfc8; }
 .dc-name { font-weight: 700; font-size: 0.88rem; line-height: 1.35; margin-bottom: 3px; color: var(--text); }
@@ -1292,7 +1297,12 @@ footer {
   <div id="daySchedule" class="chart-section" data-collapse-key="daySchedule" style="margin:14px 36px;display:none">
     <div class="chart-header" style="flex-wrap:wrap;gap:10px">
       <h2 id="dayScheduleTitle">單日課表</h2>
-      <div style="display:flex;align-items:center;gap:4px">
+      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+        <div id="dayKindFilterBar" style="display:flex;gap:6px;align-items:center">
+          <button class="pdf-tab-btn active" data-kind="all" onclick="filterDayKind('all',this)">全部</button>
+          <button class="pdf-tab-btn" data-kind="activity" onclick="filterDayKind('activity',this)">處方日課程</button>
+          <button class="pdf-tab-btn" data-kind="weekly" onclick="filterDayKind('weekly',this)">週間課程</button>
+        </div>
         <span style="font-size:0.78rem;color:var(--text-muted)">跟隨頂部「區域篩選」與下方「處方類型／地區／搜尋」</span>
         <button class="sec-toggle" onclick="toggleSection(this)" title="收合 / 展開"><svg class="ic" viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg></button>
       </div>
@@ -3933,14 +3943,18 @@ function renderDaySchedule(){
   // 也跟著頂部「區域篩選」下拉一起過濾(北投/士林/中山)
   if(currentRegion !== 'all') slots = slots.filter(s => getSlotRegion(s) === currentRegion);
   if(q) slots = slots.filter(s => (((s.course_name||'') + ' ' + (s.course_location||'')).toLowerCase().includes(q)));
+  // 單日課表自己的課程種類切換(處方日/週間),獨立於場次明細的種類篩選
+  const dayKind = window._dayKindFilter || 'all';
+  if(dayKind !== 'all') slots = slots.filter(s => dayKind === 'activity' ? isSlotActivity(s) : !isSlotActivity(s));
   if(!slots.length){
     body.innerHTML = '<div style="padding:18px;text-align:center;color:var(--text-muted)">這天沒有符合篩選的場次</div>';
     return;
   }
   // 當日彙總
-  let sumBk = 0, sumCk = 0, sumCap = 0, cancelledCnt = 0, fullCnt = 0;
+  let sumBk = 0, sumCk = 0, sumCap = 0, cancelledCnt = 0, fullCnt = 0, rxCnt = 0, wkCnt = 0;
   slots.forEach(s => {
     if(s.status === 'cancelled'){ cancelledCnt++; return; }
+    if(isSlotActivity(s)) rxCnt++; else wkCnt++;
     sumBk += s.booked_count || 0;
     sumCk += s.checked_count || 0;
     sumCap += s.capacity || 0;
@@ -3960,6 +3974,8 @@ function renderDaySchedule(){
   const times = Object.keys(byTime).sort();
   let html = `<div class="day-summary">
     <span><b>${slots.length}</b> 場${cancelledCnt ? `（另 ${cancelledCnt} 場取消未列出）` : ''}</span>
+    <span><span class="dc-kind rx">處方日</span> <b>${rxCnt}</b> 場</span>
+    <span><span class="dc-kind wk">週間</span> <b>${wkCnt}</b> 場</span>
     <span>報名 <b>${sumBk.toLocaleString()}</b></span>
     <span>已到 <b>${sumCk.toLocaleString()}</b></span>
     <span>總容量 <b>${sumCap.toLocaleString()}</b></span>
@@ -3995,8 +4011,10 @@ function renderDaySchedule(){
             }).join('') + `</div>`;
         }
         const endT = (s.end_time||'').slice(0,5);
-        return `<div class="day-card${cancelled?' cancelled':''}" style="border-left-color:${tc}" ${hasEntries ? `onclick="toggleSlotExpand('${s.slot_id}',event)"` : ''} title="${hasEntries ? '點擊展開/收合預約名單' : ''}">
+        const isRx = isSlotActivity(s);
+        return `<div class="day-card${cancelled?' cancelled':''}${isRx?' rx':''}" style="border-left-color:${tc}" ${hasEntries ? `onclick="toggleSlotExpand('${s.slot_id}',event)"` : ''} title="${hasEntries ? '點擊展開/收合預約名單' : ''}">
           <div class="dc-top">
+            <span class="dc-kind ${isRx?'rx':'wk'}">${isRx?'處方日':'週間'}</span>
             <span class="dc-type" style="background:${tc}22;color:${tc}">${typeLabels[s.course_type]||'其他'}</span>
             <span class="dc-region" style="color:${rc}">${region.replace(/區$/,'')}</span>
             ${cancelled ? '<span class="dc-status">已取消</span>' : ''}${completed ? '<span class="dc-status done">已完成</span>' : ''}
@@ -4044,9 +4062,27 @@ function filterSlotsRegion(r, btn){
   if(btn) btn.classList.add('active');
   buildCourseCharts(); // 地區篩選同時影響下方分析圖表(內含 renderSlotsTable)
 }
-// 課程種類:課名含「處方日」= 活動課程(處方日主題課),其餘為週間課程。
-// 與課表月曆(schedule/index.html)、週報用同一條規則。
-function isSlotActivity(s){ return (s && s.course_name ? s.course_name : '').includes('處方日'); }
+// 課程種類:活動課程(處方日主題課) vs 週間課程(每週固定課)。
+// 認定規則(與課表月曆 schedule/index.html 同步維護):
+//   1) 課名含「處方日」
+//   2) 課名壓了日期(0711、7/25、07.25、7月25日)——週間固定課不會在課名壓日期
+const RX_NAME_DATE_PATTERNS = [
+  /(^|\D)(0[1-9]|1[0-2])(0[1-9]|[12]\d|3[01])(\D|$)/,          // 0711
+  /(^|\D)(0?[1-9]|1[0-2])[\/／](0?[1-9]|[12]\d|3[01])(\D|$)/,  // 7/25、07/25
+  /(^|\D)(0?[1-9]|1[0-2])[.．](0[1-9]|[12]\d|3[01])(\D|$)/,    // 07.25
+  /(0?[1-9]|1[0-2])月(0?[1-9]|[12]\d|3[01])日/                  // 7月25日
+];
+function isSlotActivity(s){
+  const n = (s && s.course_name ? s.course_name : '');
+  return n.includes('處方日') || RX_NAME_DATE_PATTERNS.some(re => re.test(n));
+}
+// 單日課表標題列的課程種類切換(只影響單日課表,不動下方圖表/明細)
+function filterDayKind(k, btn){
+  window._dayKindFilter = k;
+  document.querySelectorAll('#dayKindFilterBar .pdf-tab-btn').forEach(b => b.classList.remove('active'));
+  if(btn) btn.classList.add('active');
+  renderDaySchedule();
+}
 function filterSlotsKind(k, btn){
   window._slotsKindFilter = k;
   document.querySelectorAll('#slotsKindFilterBar .pdf-tab-btn').forEach(b => b.classList.remove('active'));
