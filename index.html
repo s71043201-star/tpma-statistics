@@ -948,6 +948,8 @@ footer {
     <button id="manualSyncBtn" class="act-btn cyan" onclick="triggerManualSync()" title="立即從健康處方管理系統抓最新資料(平常每天 09:30 / 15:00 自動跑)">立即同步</button>
     <button class="act-btn orange" onclick="openNotesEditor()" title="編輯各診所備註並立即重新產出週報"><svg class="ic" viewBox="0 0 24 24"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>編輯備註</button>
     <button id="weeklyReportBtn" class="act-btn" onclick="downloadLatestWeeklyReport()" style="display:none">下載最新週報</button>
+    <button id="weeklyHistoryBtn" class="act-btn" onclick="openWeeklyHistory()" title="下載歷史週報與各週延伸分析" style="display:none">歷史週報</button>
+    <button id="weeklyAlertBtn" class="act-btn" onclick="showWeeklyAlert()" title="上次週報產出有提醒事項" style="display:none;border-color:#c2410c;color:#c2410c">⚠ 產出提醒</button>
     <button id="pdf-export-btn" onclick="openPdfModal()" title="勾選想要的圖表，每張圖表獨立一頁，合併下載"><svg class="ic" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>匯出 PDF</button>
     <div id="view-counter"></div>
   </div>
@@ -1406,7 +1408,12 @@ footer {
       <button onclick="closeNotesEditor()" style="background:none;border:none;font-size:1.4rem;color:var(--text-muted);cursor:pointer;line-height:1">✕</button>
     </div>
     <div style="padding:14px 24px 0;font-size:0.82rem;color:var(--text-muted);line-height:1.5">
-      備註會直接寫進每週 docx 的「備註」欄。改完按下方「儲存並立即重新產出」,n8n 會在 2 分鐘內把新版週報產出來,完成時上方下載按鈕會自動更新日期。
+      備註會直接寫進每週 docx 的「備註」欄。改完按下方「儲存並立即重新產出」,本機排程(Windows 工作排程器,每分鐘檢查一次)會在 2 分鐘內開始產出,下方會顯示即時進度,完成時上方下載按鈕會自動更新日期。
+      <div style="margin-top:8px;display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+        <label for="regen-week-input" style="font-weight:600;color:var(--text)">重產週別(選填)</label>
+        <input type="date" id="regen-week-input" style="padding:5px 8px;border-radius:6px;border:1.5px solid var(--border);background:var(--surface);color:var(--text);font-family:inherit;font-size:0.8rem">
+        <span>留空 = 最新一週;要補產舊的一週請選該週的<strong>星期日</strong>。</span>
+      </div>
     </div>
     <div id="notes-modal-body" style="padding:14px 24px;overflow-y:auto;flex:1"></div>
     <div style="padding:16px 24px;border-top:1.5px solid var(--border);display:flex;gap:10px;align-items:center;flex-wrap:wrap">
@@ -1415,6 +1422,20 @@ footer {
       <button onclick="saveNotesOnly()" style="padding:8px 16px;border-radius:8px;border:1.5px solid var(--teal);background:#fff;color:var(--teal);font-family:inherit;font-size:0.84rem;font-weight:700;cursor:pointer">僅儲存(下週一才套用)</button>
       <button onclick="saveNotesAndRegen()" style="padding:8px 16px;border-radius:8px;border:none;background:linear-gradient(135deg,#e8930a,#f5c03a);color:#fff;font-family:inherit;font-size:0.84rem;font-weight:700;cursor:pointer">儲存並立即重新產出</button>
     </div>
+  </div>
+</div>
+
+<!-- 歷史週報 -->
+<div id="weekly-history-overlay" onclick="closeWeeklyHistoryOutside(event)" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:100;align-items:flex-start;justify-content:center;padding:40px 20px;overflow-y:auto">
+  <div style="background:var(--surface);border-radius:14px;max-width:820px;width:100%;box-shadow:var(--shadow-lg);max-height:calc(100vh - 80px);display:flex;flex-direction:column">
+    <div style="display:flex;justify-content:space-between;align-items:center;padding:18px 24px;border-bottom:1.5px solid var(--border)">
+      <h3 style="font-size:1.08rem;font-weight:800;color:var(--text);margin:0">歷史週報</h3>
+      <button onclick="closeWeeklyHistory()" style="background:none;border:none;font-size:1.4rem;color:var(--text-muted);cursor:pointer;line-height:1">✕</button>
+    </div>
+    <div style="padding:14px 24px 0;font-size:0.82rem;color:var(--text-muted);line-height:1.5">
+      每週產出的 docx 都會留一份。「本週摘要」是額外的文字摘要附件(總量與執行率、四類處方、三區進度、課程場次),<strong>不影響週報 docx 的定版內容</strong>。
+    </div>
+    <div id="weekly-history-body" style="padding:14px 24px;overflow-y:auto;flex:1"></div>
   </div>
 </div>
 
@@ -1584,6 +1605,8 @@ let pinnedDates = new Set(); // 處方日等需置頂的日期(雲端同步)
 let latestWeeklyReport = null; // 每週一自動產出的 docx(base64)
 let clinicNotes = {};          // 診所備註(從 Google Sheets 同步)
 let _regenPollTimer = null;    // 重新產出進度輪詢
+let weeklyReportHistory = [];  // 歷史週報清單(weekly_reports 表)
+let weeklyReportAlert = null;  // 上次產出的 sanity check 結果
 const NOTES_APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbw7O8Y5fjBYMHIZ9G7jK-eWu1XXfaYhlqyZUg-BGNteQ-qlPGpTLu5lAnWygn12hj6b9A/exec';
 
 // ══════════════════════════════════════════════
@@ -1644,6 +1667,7 @@ async function loadFromCloud(auto) {
     courseSlotStats = data.course_slot_stats || null;
     // 最新週報
     latestWeeklyReport = (data.latest_weekly_report && data.latest_weekly_report.b64) ? data.latest_weekly_report : null;
+    weeklyReportAlert = (data.weekly_report_alert && typeof data.weekly_report_alert === 'object') ? data.weekly_report_alert : null;
     updateWeeklyReportButton();
     // 診所備註
     clinicNotes = data.clinic_notes && typeof data.clinic_notes === 'object' ? data.clinic_notes : {};
@@ -4374,14 +4398,22 @@ async function _saveNotes(alsoRegen){
       return false;
     }
   }
-  // 3) 若要重新產出,設 regen_request_at(n8n quick-poll workflow 偵測到後跑 Python)
+  // 3) 若要重新產出,設 regen_request_at(本機排程 run_weekly.py --regen-check 每分鐘偵測)
   if(alsoRegen && sbClient){
-    const { error } = await sbClient.from('prescription_data')
-      .upsert({ id:'main', regen_request_at: new Date().toISOString() }, { onConflict:'id' });
+    const weekInput = document.getElementById('regen-week-input');
+    const wanted = weekInput && weekInput.value ? weekInput.value : null;
+    const base = { id:'main', regen_request_at: new Date().toISOString() };
+    // 先帶 regen_request_date(指定週別);若還沒建這個欄位就退回只送 regen_request_at
+    let { error } = await sbClient.from('prescription_data')
+      .upsert({ ...base, regen_request_date: wanted }, { onConflict:'id' });
+    if(error && (error.message||'').toLowerCase().includes('regen_request_date')){
+      if(wanted) alert('⚠️ Supabase 還沒有 regen_request_date 欄位,這次會重產「最新一週」。\n\n要用指定週別請先執行 scripts/supabase_migration.sql。');
+      ({ error } = await sbClient.from('prescription_data').upsert(base, { onConflict:'id' }));
+    }
     if(error){
       const isMissingCol = (error.message||'').toLowerCase().includes('column');
       status.textContent = '⚠️ 備註已存 Sheet+Supabase,但觸發重新產出失敗:' + error.message;
-      alert(isMissingCol ? '⚠️ Supabase 缺欄位\n\nALTER TABLE prescription_data ADD COLUMN IF NOT EXISTS regen_request_at timestamptz, ADD COLUMN IF NOT EXISTS regen_last_run_at timestamptz;'
+      alert(isMissingCol ? '⚠️ Supabase 缺欄位\n\n請執行 C:\\prescription\\scripts\\supabase_migration.sql'
                         : '⚠️ 觸發失敗:' + error.message);
       return false;
     }
@@ -4393,33 +4425,62 @@ async function saveNotesOnly(){
     setTimeout(closeNotesEditor, 600);
   }
 }
+// 產出階段 → 給人看的字。run_weekly.py 會把 regen_status 寫進 Supabase。
+const REGEN_STAGE_LABEL = {
+  fetching:   '① 抓取處方資料與診所備註',
+  generating: '② 計算數字並產出報表',
+  uploading:  '③ 上傳結果',
+  done:       '✓ 完成',
+  error:      '⛔ 產出失敗',
+};
 async function saveNotesAndRegen(){
   if(!(await _saveNotes(true))) return;
   const status = document.getElementById('notes-modal-status');
-  status.textContent = '🔄 已送出重新產出請求,n8n 將在 2 分鐘內處理…';
+  const week = document.getElementById('regen-week-input');
+  const target = week && week.value ? week.value : '最新一週';
+  status.textContent = `🔄 已送出重新產出請求(${target}),本機排程最多 1 分鐘後開始…`;
   const beforeStamp = latestWeeklyReport?.generated_at || '';
-  // 開始輪詢:看 latest_weekly_report.generated_at 是否變新
+  // 輪詢:latest_weekly_report.generated_at 變新 = 完成;regen_status 用來顯示進度
   if(_regenPollTimer) clearInterval(_regenPollTimer);
   let elapsed = 0;
   _regenPollTimer = setInterval(async () => {
     elapsed += 15;
-    if(elapsed > 300){
+    const { data, error } = await sbClient.from('prescription_data')
+      .select('*').eq('id','main').single();
+    if(error){ status.textContent = `⚠️ 讀取狀態失敗(${elapsed}s):${error.message}`; return; }
+
+    const st = (data.regen_status && typeof data.regen_status === 'object') ? data.regen_status : null;
+    const newStamp = (data.latest_weekly_report && data.latest_weekly_report.generated_at) || '';
+
+    if(st && st.stage === 'error'){
       clearInterval(_regenPollTimer); _regenPollTimer = null;
-      status.textContent = '⚠️ 超過 5 分鐘還沒完成,請查 n8n executions';
+      weeklyReportAlert = data.weekly_report_alert || null;
+      updateWeeklyReportButton();
+      status.textContent = `⛔ 產出失敗:${st.message || '(無訊息)'}`;
+      alert('⛔ 週報產出失敗,已保留原本的週報與 template。\n\n'
+        + (st.message || '') + '\n\n詳細請看 C:\\prescription\\logs\\alerts.log');
       return;
     }
-    const { data } = await sbClient.from('prescription_data').select('latest_weekly_report,regen_last_run_at').eq('id','main').single();
-    const newStamp = data && data.latest_weekly_report && data.latest_weekly_report.generated_at || '';
     if(newStamp && newStamp !== beforeStamp){
       clearInterval(_regenPollTimer); _regenPollTimer = null;
       latestWeeklyReport = data.latest_weekly_report;
+      weeklyReportAlert = data.weekly_report_alert || null;
       updateWeeklyReportButton();
-      status.textContent = `✓ 新版本已產出(${data.latest_weekly_report.report_date}),點上方下載按鈕`;
-      // 自動關閉 modal
-      setTimeout(closeNotesEditor, 1200);
-    } else {
-      status.textContent = `🔄 等候 n8n 產出中… (${elapsed}s)`;
+      const warns = (weeklyReportAlert && weeklyReportAlert.warnings) || [];
+      status.textContent = `✓ 新版本已產出(${data.latest_weekly_report.report_date})`
+        + (warns.length ? `,有 ${warns.length} 項提醒(見上方「產出提醒」)` : ',點上方下載按鈕');
+      setTimeout(closeNotesEditor, warns.length ? 2600 : 1200);
+      return;
     }
+    if(elapsed > 300){
+      clearInterval(_regenPollTimer); _regenPollTimer = null;
+      status.textContent = '⚠️ 超過 5 分鐘還沒完成,請查 C:\\prescription\\logs\\regen-check.log'
+        + '(重新產出是由 Windows 工作排程器跑 run_weekly.py,不是 n8n)';
+      return;
+    }
+    const label = st ? (REGEN_STAGE_LABEL[st.stage] || st.stage) : '等候排程接手';
+    const detail = st && st.message ? `　${st.message}` : '';
+    status.textContent = `🔄 ${label}${detail} (${elapsed}s)`;
   }, 15000);
 }
 
@@ -4433,22 +4494,113 @@ function updateWeeklyReportButton(){
   } else {
     btn.style.display = 'none';
   }
+  const hist = document.getElementById('weeklyHistoryBtn');
+  if(hist) hist.style.display = (latestWeeklyReport && latestWeeklyReport.b64) ? 'inline-block' : 'none';
+  // 產出提醒(sanity check 的 warning / hard error)
+  const alertBtn = document.getElementById('weeklyAlertBtn');
+  if(alertBtn){
+    const lv = weeklyReportAlert && weeklyReportAlert.level;
+    const show = lv === 'warn' || lv === 'error';
+    alertBtn.style.display = show ? 'inline-block' : 'none';
+    if(show){
+      const n = (weeklyReportAlert.hard||[]).length + (weeklyReportAlert.warnings||[]).length;
+      alertBtn.textContent = (lv === 'error' ? '⛔ 產出異常' : '⚠ 產出提醒') + `(${n})`;
+    }
+  }
 }
-function downloadLatestWeeklyReport(){
-  if(!latestWeeklyReport || !latestWeeklyReport.b64) return;
-  // base64 → Blob → 觸發下載
-  const bin = atob(latestWeeklyReport.b64);
-  const len = bin.length;
-  const u8 = new Uint8Array(len);
-  for(let i=0; i<len; i++) u8[i] = bin.charCodeAt(i);
+// base64 → Blob → 觸發下載(最新週報與歷史週報共用)
+function _downloadDocxB64(b64, filename){
+  const bin = atob(b64);
+  const u8 = new Uint8Array(bin.length);
+  for(let i=0; i<bin.length; i++) u8[i] = bin.charCodeAt(i);
   const blob = new Blob([u8], { type:'application/vnd.openxmlformats-officedocument.wordprocessingml.document' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  a.download = latestWeeklyReport.filename || `處方統計表_${latestWeeklyReport.date}.docx`;
+  a.download = filename || 'weekly_report.docx';
   document.body.appendChild(a);
   a.click();
   setTimeout(() => { URL.revokeObjectURL(url); a.remove(); }, 100);
+}
+function downloadLatestWeeklyReport(){
+  if(!latestWeeklyReport || !latestWeeklyReport.b64) return;
+  _downloadDocxB64(latestWeeklyReport.b64,
+    latestWeeklyReport.filename || `處方統計表_${latestWeeklyReport.date}.docx`);
+}
+
+// ── 歷史週報 ──────────────────────────────
+function showWeeklyAlert(){
+  if(!weeklyReportAlert) return;
+  const hard = weeklyReportAlert.hard || [], warns = weeklyReportAlert.warnings || [];
+  const when = weeklyReportAlert.at ? new Date(weeklyReportAlert.at).toLocaleString('zh-TW') : '—';
+  alert(`週報 ${weeklyReportAlert.report_date || ''} 產出檢查(${when})\n\n`
+    + (hard.length ? '⛔ 異常(已中止覆寫/上傳):\n' + hard.map(s=>'· '+s).join('\n') + '\n\n' : '')
+    + (warns.length ? '⚠ 提醒:\n' + warns.map(s=>'· '+s).join('\n') : '')
+    + (!hard.length && !warns.length ? '一切正常' : ''));
+}
+async function openWeeklyHistory(){
+  const overlay = document.getElementById('weekly-history-overlay');
+  const body = document.getElementById('weekly-history-body');
+  overlay.style.display = 'flex';
+  body.innerHTML = '<div style="color:var(--text-muted);font-size:0.85rem">⏳ 讀取歷史週報…</div>';
+  if(!sbClient){ body.innerHTML = '<div style="color:#c2410c">未連線 Supabase</div>'; return; }
+  const { data, error } = await sbClient.from('weekly_reports')
+    .select('report_date,filename,size,generated_at').order('report_date', { ascending:false });
+  if(error){
+    const missing = (error.message||'').toLowerCase().includes('weekly_reports');
+    body.innerHTML = `<div style="color:#c2410c;font-size:0.85rem;line-height:1.6">${missing
+      ? '尚未建立 <code>weekly_reports</code> 資料表。<br>請在 Supabase SQL Editor 執行 <code>C:\\prescription\\scripts\\supabase_migration.sql</code>,之後每週產出都會自動存一份歷史。'
+      : '讀取失敗:' + error.message}</div>`;
+    return;
+  }
+  weeklyReportHistory = data || [];
+  renderWeeklyHistory();
+}
+function renderWeeklyHistory(){
+  const body = document.getElementById('weekly-history-body');
+  if(!weeklyReportHistory.length){
+    body.innerHTML = '<div style="color:var(--text-muted);font-size:0.85rem">還沒有歷史紀錄(下次週報產出後就會出現)。</div>';
+    return;
+  }
+  body.innerHTML = `<table style="width:100%;border-collapse:collapse;font-size:0.85rem">
+    <thead><tr style="text-align:left;color:var(--text-muted)">
+      <th style="padding:6px 4px">週別(報表日)</th><th style="padding:6px 4px">大小</th>
+      <th style="padding:6px 4px">產出時間</th><th style="padding:6px 4px">下載</th></tr></thead>
+    <tbody>${weeklyReportHistory.map(r => `<tr style="border-top:1px solid var(--border)">
+      <td style="padding:7px 4px;font-weight:700">${r.report_date}</td>
+      <td style="padding:7px 4px">${r.size ? (r.size/1024).toFixed(1)+' KB' : '—'}</td>
+      <td style="padding:7px 4px;color:var(--text-muted)">${r.generated_at ? new Date(r.generated_at).toLocaleString('zh-TW') : '—'}</td>
+      <td style="padding:7px 4px;white-space:nowrap">
+        <button onclick="downloadWeeklyReportByDate('${r.report_date}')" style="padding:4px 10px;border-radius:6px;border:1.5px solid var(--teal);background:#fff;color:var(--teal);font-family:inherit;font-size:0.78rem;font-weight:700;cursor:pointer">docx</button>
+        <button onclick="showWeeklyAnalysis('${r.report_date}')" style="padding:4px 10px;border-radius:6px;border:1.5px solid var(--border);background:var(--surface);color:var(--text);font-family:inherit;font-size:0.78rem;font-weight:600;cursor:pointer;margin-left:4px">本週摘要</button>
+      </td></tr>`).join('')}</tbody></table>`;
+}
+function closeWeeklyHistory(){ document.getElementById('weekly-history-overlay').style.display = 'none'; }
+function closeWeeklyHistoryOutside(e){ if(e.target.id === 'weekly-history-overlay') closeWeeklyHistory(); }
+async function downloadWeeklyReportByDate(date){
+  if(!sbClient) return;
+  const { data, error } = await sbClient.from('weekly_reports')
+    .select('b64,filename').eq('report_date', date).single();
+  if(error || !data || !data.b64){ alert('取得 ' + date + ' 的週報失敗:' + (error ? error.message : '沒有檔案內容')); return; }
+  _downloadDocxB64(data.b64, data.filename || `處方統計表_${date}.docx`);
+}
+async function showWeeklyAnalysis(date){
+  if(!sbClient) return;
+  const body = document.getElementById('weekly-history-body');
+  const prev = body.innerHTML;
+  body.innerHTML = '<div style="color:var(--text-muted);font-size:0.85rem">⏳ 讀取摘要附件…</div>';
+  const { data, error } = await sbClient.from('weekly_reports')
+    .select('analysis_md').eq('report_date', date).single();
+  if(error || !data || !data.analysis_md){
+    body.innerHTML = `<div style="color:#c2410c;font-size:0.85rem">${date} 沒有摘要附件`
+      + `(此週在摘要附件上線前產出)。</div>`
+      + `<button onclick="renderWeeklyHistory()" style="margin-top:12px;padding:6px 12px;border-radius:6px;border:1.5px solid var(--border);background:var(--surface);color:var(--text);font-family:inherit;font-size:0.8rem;cursor:pointer">← 回列表</button>`;
+    return;
+  }
+  body.innerHTML = `<button onclick="renderWeeklyHistory()" style="margin-bottom:12px;padding:6px 12px;border-radius:6px;border:1.5px solid var(--border);background:var(--surface);color:var(--text);font-family:inherit;font-size:0.8rem;cursor:pointer">← 回列表</button>
+    <pre style="white-space:pre-wrap;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:0.78rem;line-height:1.6;color:var(--text);background:var(--bg);padding:14px;border-radius:8px;border:1px solid var(--border);overflow-x:auto">${
+      data.analysis_md.replace(/&/g,'&amp;').replace(/</g,'&lt;')}</pre>`;
+  void prev;
 }
 async function togglePinDate(date, evt){
   if(evt) evt.stopPropagation();
