@@ -1300,8 +1300,8 @@ footer {
   <div class="summary-grid" style="margin-top:20px">
     <div class="card blue">  <span class="icon"><svg class="ic" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg></span><div class="val" id="csTotalSlots">—</div><div class="lbl">總場次</div></div>
     <div class="card green"> <span class="icon"><svg class="ic" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></span><div class="val" id="csTotalEnroll">—</div><div class="lbl">總報名人次</div></div>
-    <div class="card orange"><span class="icon"><svg class="ic" viewBox="0 0 24 24"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/><polyline points="17 11 19 13 23 9"/></svg></span><div class="val" id="csTotalAttend">—</div><div class="lbl">總出席人次</div></div>
-    <div class="card purple"><span class="icon"><svg class="ic" viewBox="0 0 24 24"><line x1="19" y1="5" x2="5" y2="19"/><circle cx="6.5" cy="6.5" r="2.5"/><circle cx="17.5" cy="17.5" r="2.5"/></svg></span><div class="val" id="csAttendRate">—</div><div class="lbl">出席率</div></div>
+    <div class="card orange"><span class="icon"><svg class="ic" viewBox="0 0 24 24"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/><polyline points="17 11 19 13 23 9"/></svg></span><div class="val" id="csTotalAttend">—</div><div class="lbl" title="已預約簽到 + 現場加入(未預約當場報到)的總人次">總出席人次</div></div>
+    <div class="card purple"><span class="icon"><svg class="ic" viewBox="0 0 24 24"><line x1="19" y1="5" x2="5" y2="19"/><circle cx="6.5" cy="6.5" r="2.5"/><circle cx="17.5" cy="17.5" r="2.5"/></svg></span><div class="val" id="csAttendRate">—</div><div class="lbl" title="總出席人次 ÷ 總報名人次。分子含現場加入,分母不含,故可能超過 100%(單日課表的出席率則只算預約者,兩者口徑不同)">出席率</div></div>
     <div class="card violet"><span class="icon"><svg class="ic" viewBox="0 0 24 24"><path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z"/></svg></span><div class="val" id="csFullSlots">—</div><div class="lbl">滿座場次</div></div>
   </div>
 
@@ -4108,12 +4108,15 @@ function renderDaySchedule(){
     return;
   }
   // 當日彙總
-  let sumBk = 0, sumCk = 0, sumCap = 0, cancelledCnt = 0, fullCnt = 0, rxCnt = 0, wkCnt = 0;
+  let sumBk = 0, sumCk = 0, sumCkBooked = 0, sumWalk = 0, sumCap = 0, cancelledCnt = 0, fullCnt = 0, rxCnt = 0, wkCnt = 0;
   slots.forEach(s => {
     if(s.status === 'cancelled'){ cancelledCnt++; return; }
     if(isSlotActivity(s)) rxCnt++; else wkCnt++;
+    const at = slotAttendance(s);
     sumBk += s.booked_count || 0;
-    sumCk += s.checked_count || 0;
+    sumCk += at.total || 0;
+    sumCkBooked += at.booked || 0;
+    sumWalk += at.walkin || 0;
     sumCap += s.capacity || 0;
     if((s.capacity || 0) > 0 && (s.booked_count || 0) >= s.capacity) fullCnt++;
   });
@@ -4134,11 +4137,11 @@ function renderDaySchedule(){
     <span><span class="dc-kind rx">處方日</span> <b>${rxCnt}</b> 場</span>
     <span><span class="dc-kind wk">週間</span> <b>${wkCnt}</b> 場</span>
     <span>報名 <b>${sumBk.toLocaleString()}</b></span>
-    <span>已到 <b>${sumCk.toLocaleString()}</b></span>
+    <span title="已預約簽到 ${sumCkBooked} + 現場加入 ${sumWalk}">已到 <b>${sumCk.toLocaleString()}</b>${sumWalk ? `<span style="color:#1a9fbe;font-size:0.82em">（含現場 ${sumWalk}）</span>` : ''}</span>
     <span>總容量 <b>${sumCap.toLocaleString()}</b></span>
     <span>報名率 <b>${sumCap > 0 ? Math.round(sumBk/sumCap*100) : 0}%</b></span>
     <span>滿座率 <b>${slots.length > 0 ? Math.round(fullCnt/slots.length*100) : 0}%</b></span>
-    <span>出席率 <b>${sumBk > 0 ? Math.round(sumCk/sumBk*100) : 0}%</b></span>
+    <span title="已預約簽到 ${sumCkBooked} ÷ 報名 ${sumBk}(不含現場加入)">出席率 <b>${sumBk > 0 ? Math.round(sumCkBooked/sumBk*100) : 0}%</b></span>
   </div>`;
   // 同時段卡片固定順序:運動 → 營養 → 情緒調適 → 社會 → 其他
   const TYPE_ORDER = { exercise:0, nutrition:1, mental:2, social:3 };
@@ -4148,7 +4151,8 @@ function renderDaySchedule(){
     byTime[t].forEach(s => { const k = TYPE_ORDER[s.course_type] ?? 4; (typeGroups[k] = typeGroups[k] || []).push(s); });
     const renderCard = (s) => {
         const cap = s.capacity || 0, bk = s.booked_count || 0;
-        const ck = s.checked_count != null ? s.checked_count : '—';
+        const at = slotAttendance(s);
+        const ck = at.total != null ? at.total : '—';
         const rate = cap > 0 ? Math.round(bk/cap*100) : 0;
         const tc = typeColors[s.course_type] || '#9aa5b1';
         const region = getSlotRegion(s);
@@ -4161,11 +4165,9 @@ function renderDaySchedule(){
         let entriesHtml = '';
         if(expanded && hasEntries){
           entriesHtml = `<div class="day-card-entries">` + s.entries
-            .slice().sort((a,b)=>(a.ba||'').localeCompare(b.ba||''))
-            .map(e => {
-              const ok = e.cs === 'checked';
-              return `<div class="dce-row"><span class="mono">${e.pn||'—'}</span><span style="color:${ok?'#2aac8a':'#9aa5b1'};font-weight:700">${ok?'✓ 已到':'未到'}</span></div>`;
-            }).join('') + `</div>`;
+            .slice().sort((a,b)=>((a.cs==='added')-(b.cs==='added')) || (a.ba||'').localeCompare(b.ba||''))
+            .map(e => `<div class="dce-row"><span class="mono">${e.pn||'—'}</span><span style="color:${checkinColor(e.cs)};font-weight:700">${checkinLabel(e.cs)}</span></div>`)
+            .join('') + `</div>`;
         }
         const endT = (s.end_time||'').slice(0,5);
         const isRx = isSlotActivity(s);
@@ -4179,7 +4181,7 @@ function renderDaySchedule(){
           <div class="dc-name">${s.course_name||'(未命名課程)'}</div>
           <div class="dc-loc">${endT ? '~ '+endT+' · ' : ''}${s.course_location||'—'}</div>
           <div class="dc-meta">
-            <b>${bk}</b>/${cap} 人 · 已到 ${ck}
+            <b>${bk}</b>/${cap} 人 · <span title="${at.total != null ? `已預約簽到 ${at.booked}＋現場加入 ${at.walkin}` : '無簽到資料'}">已到 ${ck}${at.walkin ? `<span style="color:#1a9fbe">（含現場 ${at.walkin}）</span>` : ''}</span>
             <div class="fill-bar" style="width:54px"><i style="width:${Math.min(rate,100)}%;background:${barColor}"></i></div>
             <span style="color:${barColor};font-weight:700">${rate}%</span>
           </div>
@@ -4269,6 +4271,30 @@ function _regionOfText(txt){
 }
 function getSlotRegion(s){
   return _regionOfText(s.course_location) || _regionOfText(s.course_name) || '其他';
+}
+// 到場口徑:後端 check_in_status 有三種——
+//   checked   已預約簽到
+//   added     現場加入(當天沒預約、直接到現場報到的人)
+//   unchecked 有預約但沒到
+// 「已到」= checked + added(到場總人次);「出席率」分子只算 checked,分母是報名數,
+// 衡量的是預約者的爽約狀況,不會因為現場加入而超過 100%。
+const CHECKIN_LABELS = { checked:'✓ 已到', added:'✓ 現場加入', unchecked:'未到' };
+const CHECKIN_COLORS = { checked:'#2aac8a', added:'#1a9fbe', unchecked:'#9aa5b1' };
+function checkinLabel(cs){ return CHECKIN_LABELS[cs] || (cs || '未到'); }
+function checkinColor(cs){ return CHECKIN_COLORS[cs] || '#9aa5b1'; }
+function slotAttendance(s){
+  // 有名單就自己數,這樣雲端資料還沒重新同步也能算對
+  const en = Array.isArray(s.entries) ? s.entries : null;
+  if(en && en.length){
+    const booked = en.filter(e => e.cs === 'checked').length;
+    const walkin = en.filter(e => e.cs === 'added').length;
+    return { total: booked + walkin, booked, walkin };
+  }
+  // 沒帶名單(超出同步窗)只能吃雲端彙總欄位
+  if(s.checked_count == null) return { total: null, booked: null, walkin: 0 };
+  const walkin = s.walkin_count || 0;
+  const booked = s.booked_checked_count != null ? s.booked_checked_count : Math.max(s.checked_count - walkin, 0);
+  return { total: s.checked_count, booked, walkin };
 }
 function applySlotsRegionFilter(arr){
   const rf = window._slotsRegionFilter || 'all';
@@ -4710,7 +4736,8 @@ function renderSlotsTable(){
     }
     const cap = s.capacity || 0;
     const bk = s.booked_count || 0;
-    const ck = s.checked_count != null ? s.checked_count : '—';
+    const at = slotAttendance(s);
+    const ck = at.total != null ? at.total : '—';
     const rate = cap > 0 ? Math.round(bk/cap*100) : 0;
     const tlbl = typeLabels[s.course_type] || s.course_type || '—';
     const tcolor = typeColors[s.course_type] || '#9aa5b1';
@@ -4735,26 +4762,25 @@ function renderSlotsTable(){
       <td style="font-size:0.82rem;color:var(--text-muted)">${regionTag}${s.course_location||'—'}</td>
       <td class="num" style="white-space:nowrap"><b style="font-size:0.95rem">${bk}</b><span style="color:var(--text-muted)"> / ${cap}</span></td>
       <td class="num"><div class="fill-cell"><div class="fill-bar"><i style="width:${Math.min(rate,100)}%;background:${rateBarColor}"></i></div><span style="color:${rateColor}">${rate}%</span></div></td>
-      <td class="num" style="color:${ck === bk && bk > 0 ? '#2aac8a' : 'var(--text-muted)'}">${ck}</td>
+      <td class="num" style="color:${ck === bk && bk > 0 ? '#2aac8a' : 'var(--text-muted)'}" title="${at.total != null ? `已預約簽到 ${at.booked}＋現場加入 ${at.walkin}` : '無簽到資料'}">${ck}${at.walkin ? `<span style="color:#1a9fbe;font-size:0.82em"> (現${at.walkin})</span>` : ''}</td>
       <td class="num"><span style="display:inline-block;padding:2px 8px;border-radius:10px;background:${scolor}22;color:${scolor};font-size:0.76rem;font-weight:700;white-space:nowrap">${slbl}</span></td>
     </tr>`);
     if(expanded && hasEntries){
       const entriesHtml = s.entries
-        .sort((a,b)=>(a.ba||'').localeCompare(b.ba||''))
+        .sort((a,b)=>((a.cs==='added')-(b.cs==='added')) || (a.ba||'').localeCompare(b.ba||''))
         .map(e => {
           const baLocal = e.ba ? new Date(e.ba).toLocaleString('zh-TW',{hour12:false,year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'}) : '—';
           const ctLocal = e.ct ? new Date(e.ct).toLocaleString('zh-TW',{hour12:false,month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'}) : '—';
-          const ckColor = e.cs === 'checked' ? '#2aac8a' : '#9aa5b1';
-          const ckLbl = e.cs === 'checked' ? '✓ 已到' : (e.cs ? e.cs : '未到');
           return `<div style="display:grid;grid-template-columns:90px 1fr 1fr 110px;gap:10px;padding:7px 0;border-bottom:1px solid #f0f4f1;align-items:center;font-size:0.84rem">
             <div style="font-family:monospace;color:var(--text-muted)">${e.pn||'—'}</div>
-            <div style="color:var(--text-muted)">報名:${baLocal}</div>
+            <div style="color:var(--text-muted)">${e.cs === 'added' ? '未預約(現場加入)' : '報名:'+baLocal}</div>
             <div style="color:var(--text-muted)">${e.ct?'簽到:'+ctLocal:''}</div>
-            <div style="color:${ckColor};font-weight:700;text-align:right">${ckLbl}</div>
+            <div style="color:${checkinColor(e.cs)};font-weight:700;text-align:right">${checkinLabel(e.cs)}</div>
           </div>`;
         }).join('');
+      const walkinCnt = s.entries.filter(e => e.cs === 'added').length;
       rows.push(`<tr><td colspan="9" style="padding:14px 28px;background:#f7fbf9">
-        <div style="font-size:0.78rem;color:var(--text-muted);margin-bottom:6px">— ${s.entries.length} 筆預約 —</div>
+        <div style="font-size:0.78rem;color:var(--text-muted);margin-bottom:6px">— ${s.entries.length - walkinCnt} 筆預約${walkinCnt ? ` ＋ ${walkinCnt} 位現場加入` : ''} —</div>
         ${entriesHtml}
       </td></tr>`);
     }
