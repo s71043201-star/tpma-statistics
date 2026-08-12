@@ -921,6 +921,7 @@ footer {
     <button class="tab-btn" onclick="showTab('clinic',this)"><svg class="ic" viewBox="0 0 24 24"><rect x="4" y="2" width="16" height="20" rx="2"/><path d="M12 6v4"/><path d="M10 8h4"/><path d="M8 22v-4h8v4"/></svg><span class="nav-lbl">診所分析</span></button>
     <button class="tab-btn" onclick="showTab('prescday',this)"><svg class="ic" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/><path d="m9 16 2 2 4-4"/></svg><span class="nav-lbl">處方日執行數</span></button>
     <button class="tab-btn" onclick="showTab('course',this)"><svg class="ic" viewBox="0 0 24 24"><path d="M22 10v6M2 10l10-5 10 5-10 5z"/><path d="M6 12v5c3 3 9 3 12 0v-5"/></svg><span class="nav-lbl">課程選課</span></button>
+    <button class="tab-btn" onclick="showTab('online',this)"><svg class="ic" viewBox="0 0 24 24"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2"/></svg><span class="nav-lbl">線上課程</span></button>
   </nav>
   <div class="sidebar-foot">資料儲存於 Supabase<br>圖表由 Chart.js 製作</div>
 </aside>
@@ -1397,6 +1398,97 @@ footer {
     <div class="chart-header"><h2>各課程場次剩餘可預訂(人次)</h2><button class="dl-btn" onclick="downloadChart(this)">↓ 下載 JPG</button></div>
     <div class="chart-wrap" id="coursePerCourseWrap" style="height:auto"><canvas id="coursePerCourseChart"></canvas></div>
     <div id="coursePerCourseEmpty" style="display:none;padding:24px;text-align:center;color:var(--text-muted)">此區間沒有即將舉辦的場次</div>
+  </div>
+</div>
+
+<!-- ═══ TAB 線上課程 ═══ -->
+<div id="tab-online" class="hidden">
+  <!-- ── 查詢區間(依處方執行日) ── -->
+  <div class="course-query-box" style="margin:20px 36px 0;padding:14px 18px;background:linear-gradient(135deg,#f7fbf9,#fff);border-radius:14px;border:1px solid var(--border);box-shadow:var(--shadow-sm)">
+    <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;font-size:0.85rem">
+      <span style="font-weight:700;color:var(--teal);white-space:nowrap">執行日區間:</span>
+      <input type="date" id="onlineFrom" oninput="onOnlineDateChange()" style="padding:6px 10px;border-radius:6px;border:1.5px solid var(--border);font-family:inherit;font-size:0.84rem;background:var(--surface);color:var(--text)">
+      <span style="color:var(--text-muted)">~</span>
+      <input type="date" id="onlineTo" oninput="onOnlineDateChange()" style="padding:6px 10px;border-radius:6px;border:1.5px solid var(--border);font-family:inherit;font-size:0.84rem;background:var(--surface);color:var(--text)">
+      <button onclick="setOnlineDateQuick('all',this)" class="quick-date-btn active" style="padding:5px 12px;border-radius:14px;border:1.5px solid var(--border);background:var(--surface);font-family:inherit;font-size:0.8rem;cursor:pointer">全部</button>
+      <button onclick="setOnlineDateQuick('past7',this)" class="quick-date-btn" style="padding:5px 12px;border-radius:14px;border:1.5px solid var(--border);background:var(--surface);font-family:inherit;font-size:0.8rem;cursor:pointer">近 7 天</button>
+      <button onclick="setOnlineDateQuick('thismonth',this)" class="quick-date-btn" style="padding:5px 12px;border-radius:14px;border:1.5px solid var(--border);background:var(--surface);font-family:inherit;font-size:0.8rem;cursor:pointer">本月</button>
+      <button onclick="setOnlineDateQuick('past90',this)" class="quick-date-btn" style="padding:5px 12px;border-radius:14px;border:1.5px solid var(--border);background:var(--surface);font-family:inherit;font-size:0.8rem;cursor:pointer">近 90 天</button>
+      <span id="onlineFilterStatus" style="margin-left:auto;color:var(--text-muted);font-size:0.78rem"></span>
+    </div>
+    <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-top:10px;padding-top:10px;border-top:1px dashed var(--border)">
+      <span style="font-size:0.78rem;font-weight:700;color:var(--text-muted);margin-right:2px">處方類型:</span>
+      <div id="onlineTypeFilterBar" style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
+        <button class="pdf-tab-btn active" data-type="all" onclick="filterOnlineType('all',this)">全部</button>
+        <button class="pdf-tab-btn" data-type="mental" onclick="filterOnlineType('mental',this)">情緒調適</button>
+        <button class="pdf-tab-btn" data-type="nutrition" onclick="filterOnlineType('nutrition',this)">營養</button>
+        <button class="pdf-tab-btn" data-type="social" onclick="filterOnlineType('social',this)">社會</button>
+        <button class="pdf-tab-btn" data-type="exercise" onclick="filterOnlineType('exercise',this)">運動</button>
+      </div>
+      <span id="onlineSourceNote" style="margin-left:auto;font-size:0.76rem;color:var(--text-muted)"></span>
+    </div>
+  </div>
+
+  <!-- ── KPIs ── -->
+  <div class="summary-grid" style="margin-top:20px">
+    <div class="card blue">  <span class="icon"><svg class="ic" viewBox="0 0 24 24"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2"/></svg></span><div class="val" id="olExecCount">—</div><div class="lbl" title="已執行處方中,參與課程是線上課的人次">線上課執行人次</div><div class="delta" id="olExecDays"></div></div>
+    <div class="card green"> <span class="icon"><svg class="ic" viewBox="0 0 24 24"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg></span><div class="val" id="olCourseCount">—</div><div class="lbl">上架線上課程</div><div class="delta" id="olCourseUsed"></div></div>
+    <div class="card orange"><span class="icon"><svg class="ic" viewBox="0 0 24 24"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg></span><div class="val" id="olAvgPerCourse">—</div><div class="lbl">平均每門人次</div><div class="delta" id="olTopCourse"></div></div>
+    <div class="card purple"><span class="icon"><svg class="ic" viewBox="0 0 24 24"><line x1="19" y1="5" x2="5" y2="19"/><circle cx="6.5" cy="6.5" r="2.5"/><circle cx="17.5" cy="17.5" r="2.5"/></svg></span><div class="val" id="olShareRate">—</div><div class="lbl" title="線上課執行人次 ÷ 同區間全部處方執行人次">佔全部執行數</div><div class="delta" id="olTotalExec"></div></div>
+    <div class="card violet"><span class="icon"><svg class="ic" viewBox="0 0 24 24"><rect x="4" y="2" width="16" height="20" rx="2"/><path d="M12 6v4"/><path d="M10 8h4"/><path d="M8 22v-4h8v4"/></svg></span><div class="val" id="olClinicCount">—</div><div class="lbl">開立診所數</div><div class="delta" id="olTopClinic"></div></div>
+  </div>
+
+  <!-- ── 尚無線上課執行紀錄時的提示 ── -->
+  <div id="onlineEmptyHint" class="chart-section" style="margin:14px 36px;display:none">
+    <div style="padding:24px;text-align:center;line-height:1.9">
+      <div style="font-size:1.02rem;font-weight:800;color:var(--text)">此區間沒有線上課程的執行紀錄</div>
+      <div id="onlineEmptyDetail" style="margin-top:8px;font-size:0.86rem;color:var(--text-muted)"></div>
+    </div>
+  </div>
+
+  <div id="onlineContent">
+    <!-- ── 分析圖表 ── -->
+    <div class="side-by-side">
+      <div class="chart-section m-hide">
+        <div class="chart-header"><h2>各處方類型執行人次</h2><button class="dl-btn" onclick="downloadChart(this)">↓ 下載 JPG</button></div>
+        <div class="chart-wrap"><canvas id="onlineTypeChart"></canvas></div>
+      </div>
+      <div class="chart-section m-hide">
+        <div class="chart-header"><h2>每日執行人次</h2><button class="dl-btn" onclick="downloadChart(this)">↓ 下載 JPG</button></div>
+        <div class="chart-wrap"><canvas id="onlineTrendChart"></canvas></div>
+      </div>
+    </div>
+
+    <div class="chart-section m-hide">
+      <div class="chart-header"><h2>各線上課程執行人次</h2><button class="dl-btn" onclick="downloadChart(this)">↓ 下載 JPG</button></div>
+      <div class="chart-wrap" id="onlineCourseWrap" style="height:auto"><canvas id="onlineCourseChart"></canvas></div>
+    </div>
+
+    <div class="chart-section m-hide" data-collapse-key="onlineClinic">
+      <div class="chart-header"><h2>開立診所分布(前 15 名)</h2><button class="sec-toggle" onclick="toggleSection(this)" title="收合 / 展開"><svg class="ic" viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg></button></div>
+      <div class="chart-wrap" id="onlineClinicWrap" style="height:auto"><canvas id="onlineClinicChart"></canvas></div>
+    </div>
+
+    <!-- ── 各課程明細 ── -->
+    <div class="chart-section" data-collapse-key="onlineCourseTable" style="margin:14px 36px">
+      <div class="chart-header" style="flex-wrap:wrap;gap:10px">
+        <h2 style="white-space:nowrap">線上課程明細</h2>
+        <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+          <input type="text" id="onlineSearch" placeholder="搜尋課程名稱或講師…" oninput="renderOnlineCourseTable()" style="min-width:220px;padding:7px 12px;border-radius:8px;border:1.5px solid var(--border);font-family:inherit;font-size:0.86rem;background:var(--surface);color:var(--text);outline:none">
+          <span id="onlineCountBadge" style="font-size:0.82rem;color:var(--text-muted)"></span>
+          <button class="sec-toggle" onclick="toggleSection(this)" title="收合 / 展開"><svg class="ic" viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg></button>
+        </div>
+      </div>
+      <div style="overflow-x:auto;max-height:560px;overflow-y:auto;margin-top:12px">
+        <table class="data-table" style="width:100%;font-size:0.86rem">
+          <thead>
+            <tr><th style="width:34px">#</th><th>課程</th><th>類型</th><th>講師</th><th>平台 / 時長</th><th class="num">執行人次</th><th class="num" style="min-width:130px">佔比</th><th class="num">影片</th></tr>
+          </thead>
+          <tbody id="onlineCourseBody"></tbody>
+        </table>
+      </div>
+      <div id="onlineCourseEmpty" style="display:none;padding:24px;text-align:center;color:var(--text-muted)">沒有符合的課程</div>
+    </div>
   </div>
 </div>
 
@@ -3255,6 +3347,7 @@ function buildAllCharts(){
   buildPrescDayCharts();
   // 若正停在課程分頁,雲端資料更新後也要重畫(否則停在該頁時載入完成畫面會是空的)
   if(currentActiveTab === 'course') buildCourseCharts();
+  if(currentActiveTab === 'online') buildOnlineCharts();
 }
 
 // ══════════════════════════════════════════════
@@ -3770,16 +3863,17 @@ function rebuildTabCharts(name){
     case 'clinic':     buildClinicCharts(); break;
     case 'prescday':   buildPrescDayCharts(); break;
     case 'course':     buildCourseCharts(); break;
+    case 'online':     buildOnlineCharts(); break;
   }
 }
 function showTab(name, btn){
-  ['weekly','daily','type','typeweekly','clinic','prescday','course'].forEach(t=>document.getElementById('tab-'+t).classList.add('hidden'));
+  ['weekly','daily','type','typeweekly','clinic','prescday','course','online'].forEach(t=>document.getElementById('tab-'+t).classList.add('hidden'));
   document.getElementById('tab-'+name).classList.remove('hidden');
   document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
   if(btn) btn.classList.add('active');
   currentActiveTab = name;
   const bar = document.getElementById('dateFilterBar');
-  if(bar) bar.style.display = (name!=='prescday' && name!=='course') ? 'flex' : 'none';
+  if(bar) bar.style.display = (name!=='prescday' && name!=='course' && name!=='online') ? 'flex' : 'none';
   updateTabControls(name);
   const tabEl = document.getElementById('tab-'+name);
   // 同步(重)建該分頁圖表。刻意「不」用 requestAnimationFrame 延後:
@@ -4296,6 +4390,21 @@ function slotAttendance(s){
   const booked = s.booked_checked_count != null ? s.booked_checked_count : Math.max(s.checked_count - walkin, 0);
   return { total: s.checked_count, booked, walkin };
 }
+// 展開列的預約名單(場次明細 / 線上課程明細共用)
+function slotEntriesHtml(s){
+  return (s.entries || []).slice()
+    .sort((a,b)=>((a.cs==='added')-(b.cs==='added')) || (a.ba||'').localeCompare(b.ba||''))
+    .map(e => {
+      const baLocal = e.ba ? new Date(e.ba).toLocaleString('zh-TW',{hour12:false,year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'}) : '—';
+      const ctLocal = e.ct ? new Date(e.ct).toLocaleString('zh-TW',{hour12:false,month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'}) : '—';
+      return `<div style="display:grid;grid-template-columns:90px 1fr 1fr 110px;gap:10px;padding:7px 0;border-bottom:1px solid #f0f4f1;align-items:center;font-size:0.84rem">
+        <div style="font-family:monospace;color:var(--text-muted)">${e.pn||'—'}</div>
+        <div style="color:var(--text-muted)">${e.cs === 'added' ? '未預約(現場加入)' : '報名:'+baLocal}</div>
+        <div style="color:var(--text-muted)">${e.ct?'簽到:'+ctLocal:''}</div>
+        <div style="color:${checkinColor(e.cs)};font-weight:700;text-align:right">${checkinLabel(e.cs)}</div>
+      </div>`;
+    }).join('');
+}
 function applySlotsRegionFilter(arr){
   const rf = window._slotsRegionFilter || 'all';
   if(rf === 'all') return arr;
@@ -4329,6 +4438,308 @@ function toggleSlotExpand(slotId, evt){
   _expandedSlot = (_expandedSlot === slotId) ? null : slotId;
   renderSlotsTable();
 }
+
+// ══════════════════════════════════════════════
+//  TAB 線上課程(執行制)
+// ══════════════════════════════════════════════
+// 線上課(課程管理「形式」= online_external)沒有場次、也沒有預約:民眾直接點開
+// YouTube 影片就算上課。所以執行狀況不能看 course_slots,只能從「已執行處方」認:
+// n8n 同步時比對課程管理裡 delivery_mode !== 'offline' 的課名,命中 participated_course
+// 的處方才在 raw_row 帶 oc(課名)欄位;線上課清單放在 course_slot_stats.online_courses。
+const RX_TYPE_KEY = { '情緒調適處方':'mental', '營養處方':'nutrition', '社會處方':'social', '運動處方':'exercise' };
+const OL_TYPE_LABEL = { mental:'情緒調適', nutrition:'營養', social:'社會', exercise:'運動', other:'其他' };
+const OL_TYPE_COLOR = { mental:'#7c3aed', nutrition:'#2aac8a', social:'#1a9fbe', exercise:'#e8930a', other:'#9aa5b1' };
+function rxTypeKey(t){ return RX_TYPE_KEY[(t || '').trim()] || 'other'; }
+function onlineCourseList(){ return (courseSlotStats && courseSlotStats.online_courses) || []; }
+
+// 日期(本地時區,不用 toISOString 以免 UTC 位移跳日)
+function _ymd(d){ return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
+function getOnlineDateRange(){
+  return {
+    from: document.getElementById('onlineFrom')?.value || '',
+    to:   document.getElementById('onlineTo')?.value   || '',
+  };
+}
+function _saveOnlineDateRange(){
+  try{ localStorage.setItem('onlineDateRange', JSON.stringify(getOnlineDateRange())); }catch(e){}
+}
+function onOnlineDateChange(){
+  document.querySelectorAll('#tab-online .quick-date-btn').forEach(b => b.classList.remove('active'));
+  _saveOnlineDateRange();
+  buildOnlineCharts();
+}
+function setOnlineDateQuick(type, btn){
+  const today = new Date();
+  let from = '', to = '';
+  if(type === 'past7'){
+    from = _ymd(new Date(today.getTime() - 6 * 86400000));
+    to   = _ymd(today);
+  } else if(type === 'thismonth'){
+    const y = today.getFullYear(), m = today.getMonth();
+    from = _ymd(new Date(y, m, 1));
+    to   = _ymd(new Date(y, m + 1, 0));
+  } else if(type === 'past90'){
+    from = _ymd(new Date(today.getTime() - 89 * 86400000));
+    to   = _ymd(today);
+  }
+  document.getElementById('onlineFrom').value = from;
+  document.getElementById('onlineTo').value   = to;
+  document.querySelectorAll('#tab-online .quick-date-btn').forEach(b => b.classList.remove('active'));
+  if(btn) btn.classList.add('active');
+  _saveOnlineDateRange();
+  buildOnlineCharts();
+}
+function filterOnlineType(t, btn){
+  window._onlineTypeFilter = t;
+  document.querySelectorAll('#onlineTypeFilterBar .pdf-tab-btn').forEach(b => b.classList.remove('active'));
+  if(btn) btn.classList.add('active');
+  buildOnlineCharts();
+}
+// 區間內「已執行」的處方(execDate 為準,沒有 execDate 的用開立日兜底)
+function _inOnlineRange(r){
+  const {from, to} = getOnlineDateRange();
+  const d = r.execDate || r.prescDate;
+  if(from && (!d || d < from)) return false;
+  if(to   && (!d || d > to))   return false;
+  return true;
+}
+function onlineExecRows(){
+  const tf = window._onlineTypeFilter || 'all';
+  return rawRows.filter(r => {
+    if(!r.oc || !r.ex) return false;                     // 只算「參與線上課」且「已執行」
+    if(tf !== 'all' && rxTypeKey(r.type) !== tf) return false;
+    return _inOnlineRange(r);
+  });
+}
+
+function buildOnlineCharts(){
+  const courses = onlineCourseList();
+  const rows    = onlineExecRows();
+  const tf      = window._onlineTypeFilter || 'all';
+  // 同區間的全部執行數(算佔比用,不套處方類型篩選以外的條件)
+  const allExec = rawRows.filter(r => r.ex && _inOnlineRange(r) && (tf === 'all' || rxTypeKey(r.type) === tf));
+
+  const byCourse = {};
+  rows.forEach(r => { byCourse[r.oc] = (byCourse[r.oc] || 0) + 1; });
+  const byType = {};
+  rows.forEach(r => { const k = rxTypeKey(r.type); byType[k] = (byType[k] || 0) + 1; });
+  const byDate = {};
+  rows.forEach(r => { const d = r.execDate || r.prescDate; if(d) byDate[d] = (byDate[d] || 0) + 1; });
+  const byClinic = {};
+  rows.forEach(r => { const c = r.clinic || '(未填)'; byClinic[c] = (byClinic[c] || 0) + 1; });
+
+  // 課程清單沒同步進來時(舊資料),就用實際出現過的課名兜出清單
+  const courseRows = (courses.length ? courses : Object.keys(byCourse).map(n => ({ name:n })))
+    .filter(c => tf === 'all' || !c.type || c.type === tf)
+    .map(c => ({ ...c, count: byCourse[c.name] || 0 }))
+    .sort((a, b) => b.count - a.count || (a.name || '').localeCompare(b.name || '', 'zh-Hant'));
+
+  const setText  = (id, v) => setAnimatedText(id, v);
+  const setDelta = (id, txt) => { const el = document.getElementById(id); if(el) el.textContent = txt; };
+  const usedCount = courseRows.filter(c => c.count > 0).length;
+  const top = courseRows[0];
+  const clinicSorted = Object.entries(byClinic).sort((a, b) => b[1] - a[1]);
+
+  setText('olExecCount',   rows.length.toLocaleString());
+  setDelta('olExecDays',   Object.keys(byDate).length ? `分布於 ${Object.keys(byDate).length} 天` : '');
+  setText('olCourseCount', courseRows.length.toLocaleString());
+  setDelta('olCourseUsed', courseRows.length ? `已有人上 ${usedCount} 門` : '課程清單尚未同步');
+  setText('olAvgPerCourse', courseRows.length ? (rows.length / courseRows.length).toFixed(1) : '—');
+  setDelta('olTopCourse',  (top && top.count) ? `最高 ${top.count} 人次` : '');
+  setText('olShareRate',   allExec.length ? Math.round(rows.length / allExec.length * 100) + '%' : '—');
+  setDelta('olTotalExec',  allExec.length ? `全部執行 ${allExec.length.toLocaleString()} 人次` : '');
+  setText('olClinicCount', clinicSorted.length.toLocaleString());
+  setDelta('olTopClinic',  clinicSorted.length ? `最多:${clinicSorted[0][0]} ${clinicSorted[0][1]} 人次` : '');
+
+  const note = document.getElementById('onlineSourceNote');
+  if(note) note.textContent = '口徑:已執行處方的「參與課程」比對線上課名(線上課無場次、無預約)';
+
+  const hint    = document.getElementById('onlineEmptyHint');
+  const content = document.getElementById('onlineContent');
+  if(rows.length === 0){
+    if(hint){
+      hint.style.display = '';
+      const {from, to} = getOnlineDateRange();
+      const rangeTxt = (from || to) ? `${from || '最早'} ~ ${to || '最新'}` : '全部時間';
+      const detail = document.getElementById('onlineEmptyDetail');
+      const totalOnline = rawRows.filter(r => r.oc && r.ex).length;
+      if(detail) detail.textContent = courses.length === 0 && totalOnline === 0
+        ? '同步資料還沒帶入線上課程欄位(n8n 需重啟後重新同步一次),或目前還沒有人上過線上課。'
+        : `區間:${rangeTxt};不限區間共有 ${totalOnline.toLocaleString()} 人次線上課執行紀錄。`;
+    }
+    if(content) content.style.display = 'none';
+    ['onlineTypeChart','onlineTrendChart','onlineCourseChart','onlineClinicChart'].forEach(destroyChart);
+    renderOnlineCourseTable();
+    return;
+  }
+  if(hint)    hint.style.display = 'none';
+  if(content) content.style.display = '';
+
+  // ── 圖1:各處方類型執行人次 ──
+  const typeOrder = ['mental','nutrition','social','exercise','other'].filter(k => byType[k]);
+  destroyChart('onlineTypeChart');
+  const ctxT = document.getElementById('onlineTypeChart');
+  if(ctxT){
+    chartInstances.onlineTypeChart = new Chart(ctxT, {
+      type:'doughnut',
+      data:{
+        labels: typeOrder.map(k => OL_TYPE_LABEL[k]),
+        datasets:[{ data: typeOrder.map(k => byType[k]), backgroundColor: typeOrder.map(k => OL_TYPE_COLOR[k]), borderWidth:2, borderColor:'#fff' }]
+      },
+      options:{
+        responsive:true, maintainAspectRatio:false,
+        plugins:{
+          legend:{position:'right',labels:{font:defaultFont}},
+          datalabels:{ display:true, color:'#fff', font:{family:defaultFont.family,weight:'700',size:13},
+            formatter:(v)=>{ const pct = rows.length ? Math.round(v / rows.length * 100) : 0; return v + '\n(' + pct + '%)'; }, textAlign:'center' }
+        }
+      }
+    });
+  }
+
+  // ── 圖2:每日執行人次 ──
+  const days = Object.keys(byDate).sort();
+  destroyChart('onlineTrendChart');
+  const ctxD = document.getElementById('onlineTrendChart');
+  if(ctxD){
+    chartInstances.onlineTrendChart = new Chart(ctxD, {
+      type:'line',
+      data:{
+        labels: days.map(d => d.slice(5).replace('-','/')),
+        datasets:[{ label:'執行人次', data: days.map(d => byDate[d]), borderColor:'#2aac8a', backgroundColor:'rgba(42,172,138,0.14)', tension:0.3, fill:true, pointRadius: days.length > 40 ? 0 : 3 }]
+      },
+      options:{
+        responsive:true, maintainAspectRatio:false,
+        plugins:{
+          legend:{display:false},
+          tooltip:{callbacks:{ title:(items)=>days[items[0].dataIndex] }},
+          datalabels:{ display: days.length <= 20, anchor:'end', align:'top', color:'#4a5c55', font:{family:defaultFont.family,weight:'700',size:11} }
+        },
+        scales:{ x:{ticks:{font:defaultFont}}, y:{beginAtZero:true,ticks:{font:defaultFont,precision:0}} }
+      }
+    });
+  }
+
+  // ── 圖3:各線上課程執行人次(0 人次的課也要看得到) ──
+  destroyChart('onlineCourseChart');
+  const wrapC = document.getElementById('onlineCourseWrap');
+  const ctxC  = document.getElementById('onlineCourseChart');
+  if(ctxC){
+    if(wrapC) wrapC.style.height = Math.max(220, courseRows.length * 30 + 70) + 'px';
+    chartInstances.onlineCourseChart = new Chart(ctxC, {
+      type:'bar',
+      data:{
+        labels: courseRows.map(c => c.name || '(未命名)'),
+        datasets:[{
+          label:'執行人次',
+          data: courseRows.map(c => c.count),
+          backgroundColor: courseRows.map(c => (OL_TYPE_COLOR[c.type] || '#2aac8a') + 'c4'),
+          borderRadius:4
+        }]
+      },
+      options:{
+        indexAxis:'y', responsive:true, maintainAspectRatio:false,
+        plugins:{
+          legend:{display:false},
+          tooltip:{callbacks:{
+            title:(items)=>courseRows[items[0].dataIndex].name,
+            afterLabel:(c)=>{ const d = courseRows[c.dataIndex]; const pct = rows.length ? Math.round(d.count / rows.length * 100) : 0;
+              return [d.type ? '類型:' + (OL_TYPE_LABEL[d.type] || d.type) : null, d.instructor ? '講師:' + d.instructor : null, '佔線上課 ' + pct + '%'].filter(Boolean); }
+          }},
+          datalabels:{ display:true, anchor:'end', align:'right', color:'#4a5c55', font:{family:defaultFont.family,weight:'700',size:11}, formatter:(v)=>v>0?v:'0' }
+        },
+        layout:{ padding:{ right:26 } },
+        scales:{
+          x:{beginAtZero:true,ticks:{font:defaultFont,precision:0},title:{display:true,text:'人次',font:Object.assign({},defaultFont,{size:12,weight:'600'})}},
+          y:{ticks:{font:defaultFont,autoSkip:false,callback:function(v){ const l = this.getLabelForValue(v); return l.length > 24 ? l.slice(0,23) + '…' : l; }}}
+        }
+      }
+    });
+  }
+
+  // ── 圖4:開立診所分布(前 15) ──
+  const topClinics = clinicSorted.slice(0, 15);
+  destroyChart('onlineClinicChart');
+  const wrapCl = document.getElementById('onlineClinicWrap');
+  const ctxCl  = document.getElementById('onlineClinicChart');
+  if(ctxCl){
+    if(wrapCl) wrapCl.style.height = Math.max(200, topClinics.length * 28 + 70) + 'px';
+    chartInstances.onlineClinicChart = new Chart(ctxCl, {
+      type:'bar',
+      data:{
+        labels: topClinics.map(c => c[0]),
+        datasets:[{ label:'執行人次', data: topClinics.map(c => c[1]), backgroundColor:'rgba(26,159,190,0.78)', borderRadius:4 }]
+      },
+      options:{
+        indexAxis:'y', responsive:true, maintainAspectRatio:false,
+        plugins:{
+          legend:{display:false},
+          datalabels:{ display:true, anchor:'end', align:'right', color:'#4a5c55', font:{family:defaultFont.family,weight:'700',size:11} }
+        },
+        layout:{ padding:{ right:26 } },
+        scales:{
+          x:{beginAtZero:true,ticks:{font:defaultFont,precision:0}},
+          y:{ticks:{font:defaultFont,autoSkip:false,callback:function(v){ const l = this.getLabelForValue(v); return l.length > 18 ? l.slice(0,17) + '…' : l; }}}
+        }
+      }
+    });
+  }
+
+  window._onlineCourseRows = courseRows;
+  window._onlineExecTotal  = rows.length;
+  renderOnlineCourseTable();
+}
+
+function renderOnlineCourseTable(){
+  const tbody = document.getElementById('onlineCourseBody');
+  const empty = document.getElementById('onlineCourseEmpty');
+  if(!tbody) return;
+  const all   = window._onlineCourseRows || [];
+  const total = window._onlineExecTotal || 0;
+  const q = (document.getElementById('onlineSearch')?.value || '').toLowerCase().trim();
+  const list = all.filter(c => !q || ((c.name || '') + ' ' + (c.instructor || '')).toLowerCase().includes(q));
+
+  const statusEl = document.getElementById('onlineFilterStatus');
+  if(statusEl){
+    const {from, to} = getOnlineDateRange();
+    if(from && to)   statusEl.textContent = (from === to) ? '執行日:' + from : from + ' ~ ' + to;
+    else if(from)    statusEl.textContent = '從 ' + from;
+    else if(to)      statusEl.textContent = '至 ' + to;
+    else             statusEl.textContent = '全部時間';
+  }
+  const badge = document.getElementById('onlineCountBadge');
+  // 人次要跟著搜尋結果走,否則「2 門 · 276 人次」會被讀成那 2 門有 276 人次
+  const shown = list.reduce((a, c) => a + c.count, 0);
+  if(badge) badge.textContent = list.length ? `共 ${list.length} 門 · ${shown.toLocaleString()} 人次` : '';
+  if(list.length === 0){
+    tbody.innerHTML = '';
+    if(empty) empty.style.display = 'block';
+    return;
+  }
+  if(empty) empty.style.display = 'none';
+  const maxCount = Math.max(1, ...list.map(c => c.count));
+  tbody.innerHTML = list.map((c, i) => {
+    const tkey  = c.type || 'other';
+    const tlbl  = OL_TYPE_LABEL[tkey] || tkey;
+    const tcolor = OL_TYPE_COLOR[tkey] || '#9aa5b1';
+    const pct   = total ? Math.round(c.count / total * 100) : 0;
+    const barW  = Math.round(c.count / maxCount * 100);
+    const mins  = c.minutes != null ? `${c.minutes} 分鐘` : '';
+    const plat  = [c.platform, mins].filter(Boolean).join(' · ');
+    const link  = c.url ? `<a href="${c.url}" target="_blank" rel="noopener" style="color:#1a9fbe;font-weight:700;text-decoration:none">↗ 開啟</a>` : '—';
+    return `<tr>
+      <td style="color:var(--text-muted);font-size:0.78rem">${i + 1}</td>
+      <td>${c.name || '(未命名)'}${c.status && c.status !== 'published' ? '<span style="margin-left:6px;font-size:0.72rem;color:#c0392b">未上架</span>' : ''}</td>
+      <td><span style="display:inline-block;padding:2px 8px;border-radius:10px;background:${tcolor}22;color:${tcolor};font-size:0.78rem;font-weight:700;white-space:nowrap">${tlbl}</span></td>
+      <td style="font-size:0.84rem;color:var(--text-muted)">${c.instructor || '—'}</td>
+      <td style="font-size:0.82rem;color:var(--text-muted)">${plat || '—'}</td>
+      <td class="num"><b style="font-size:0.95rem;color:${c.count ? 'var(--text)' : 'var(--text-muted)'}">${c.count}</b></td>
+      <td class="num"><div class="fill-cell"><div class="fill-bar"><i style="width:${barW}%;background:${tcolor}"></i></div><span style="color:var(--text-muted)">${pct}%</span></div></td>
+      <td class="num">${link}</td>
+    </tr>`;
+  }).join('');
+}
+
 // ══════════════════════════════════════════════
 //  編輯診所備註 + 重新產出週報
 // ══════════════════════════════════════════════
@@ -4766,22 +5177,10 @@ function renderSlotsTable(){
       <td class="num"><span style="display:inline-block;padding:2px 8px;border-radius:10px;background:${scolor}22;color:${scolor};font-size:0.76rem;font-weight:700;white-space:nowrap">${slbl}</span></td>
     </tr>`);
     if(expanded && hasEntries){
-      const entriesHtml = s.entries
-        .sort((a,b)=>((a.cs==='added')-(b.cs==='added')) || (a.ba||'').localeCompare(b.ba||''))
-        .map(e => {
-          const baLocal = e.ba ? new Date(e.ba).toLocaleString('zh-TW',{hour12:false,year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'}) : '—';
-          const ctLocal = e.ct ? new Date(e.ct).toLocaleString('zh-TW',{hour12:false,month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'}) : '—';
-          return `<div style="display:grid;grid-template-columns:90px 1fr 1fr 110px;gap:10px;padding:7px 0;border-bottom:1px solid #f0f4f1;align-items:center;font-size:0.84rem">
-            <div style="font-family:monospace;color:var(--text-muted)">${e.pn||'—'}</div>
-            <div style="color:var(--text-muted)">${e.cs === 'added' ? '未預約(現場加入)' : '報名:'+baLocal}</div>
-            <div style="color:var(--text-muted)">${e.ct?'簽到:'+ctLocal:''}</div>
-            <div style="color:${checkinColor(e.cs)};font-weight:700;text-align:right">${checkinLabel(e.cs)}</div>
-          </div>`;
-        }).join('');
       const walkinCnt = s.entries.filter(e => e.cs === 'added').length;
       rows.push(`<tr><td colspan="9" style="padding:14px 28px;background:#f7fbf9">
         <div style="font-size:0.78rem;color:var(--text-muted);margin-bottom:6px">— ${s.entries.length - walkinCnt} 筆預約${walkinCnt ? ` ＋ ${walkinCnt} 位現場加入` : ''} —</div>
-        ${entriesHtml}
+        ${slotEntriesHtml(s)}
       </td></tr>`);
     }
   });
@@ -4955,7 +5354,7 @@ function syncRegionFilterBar(){
 
 // 記錄目前 tab
 document.querySelectorAll('.tab-btn').forEach((btn, i) => {
-  const tabs = ['weekly','daily','type','typeweekly','clinic','prescday','course'];
+  const tabs = ['weekly','daily','type','typeweekly','clinic','prescday','course','online'];
   btn.addEventListener('click', () => { if(tabs[i]) currentActiveTab = tabs[i]; });
 });
 
@@ -5415,6 +5814,16 @@ try{
     document.getElementById('courseGlobalFrom').value = savedRange.from || '';
     document.getElementById('courseGlobalTo').value   = savedRange.to || '';
     document.querySelectorAll('#tab-course .quick-date-btn').forEach(b=>b.classList.remove('active'));
+  }
+}catch(e){}
+
+// ── 還原線上課程分頁的查詢區間 ──
+try{
+  const savedOnline = JSON.parse(localStorage.getItem('onlineDateRange') || 'null');
+  if(savedOnline && (savedOnline.from || savedOnline.to)){
+    document.getElementById('onlineFrom').value = savedOnline.from || '';
+    document.getElementById('onlineTo').value   = savedOnline.to || '';
+    document.querySelectorAll('#tab-online .quick-date-btn').forEach(b=>b.classList.remove('active'));
   }
 }catch(e){}
 
