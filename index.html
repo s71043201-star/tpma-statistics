@@ -457,6 +457,9 @@ body.is-loading .chart-wrap::after {
 .card .lbl { font-size: 0.8rem; color: var(--text-muted); margin-top: 7px; font-weight: 500; }
 .card .delta { font-size: 0.72rem; color: var(--teal); margin-top: 4px; font-weight: 700; letter-spacing: 0.02em; }
 .card .delta.zero { color: var(--text-muted); font-weight: 500; }
+/* 實體 / 線上拆分(總執行數卡):比 delta 再淡一級,不搶主數字 */
+.card .split { font-size: 0.7rem; color: var(--text-muted); margin-top: 3px; font-weight: 600; }
+.card .split b { color: var(--cyan); font-weight: 800; }
 
 /* ── 圖表類型選擇 ── */
 .chart-type-bar {
@@ -993,7 +996,7 @@ footer {
 <!-- 摘要卡片（5 張） -->
 <div class="summary-grid">
   <div class="card blue">  <span class="icon"><svg class="ic" viewBox="0 0 24 24"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg></span><div class="val" id="sumTotal">—</div><div class="lbl">總開立數</div><div class="delta" id="sumTotalToday"></div></div>
-  <div class="card green"> <span class="icon"><svg class="ic" viewBox="0 0 24 24"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg></span><div class="val" id="sumExec">—</div><div class="lbl">總執行數</div><div class="delta" id="sumExecToday"></div></div>
+  <div class="card green"> <span class="icon"><svg class="ic" viewBox="0 0 24 24"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg></span><div class="val" id="sumExec">—</div><div class="lbl">總執行數</div><div class="delta" id="sumExecToday"></div><div class="split" id="sumExecSplit" title="線上=已執行處方的參與課程是線上課(YouTube 影片課);其餘計為實體"></div></div>
   <div class="card orange"><span class="icon"><svg class="ic" viewBox="0 0 24 24"><line x1="19" y1="5" x2="5" y2="19"/><circle cx="6.5" cy="6.5" r="2.5"/><circle cx="17.5" cy="17.5" r="2.5"/></svg></span><div class="val" id="sumRate">—</div><div class="lbl">整體執行率</div></div>
   <div class="card purple"><span class="icon"><svg class="ic" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg></span><div class="val" id="sumWeeks">—</div><div class="lbl">統計週數</div></div>
   <div class="card violet"><span class="icon"><svg class="ic" viewBox="0 0 24 24"><path d="M22 10v6M2 10l10-5 10 5-10 5z"/><path d="M6 12v5c3 3 9 3 12 0v-5"/></svg></span><div class="val" id="sumEnroll">—</div><div class="lbl">總選課人次</div><div class="delta" id="sumEnrollToday"></div></div>
@@ -2083,6 +2086,28 @@ function updateSummary(){
   setDelta('sumTotalToday',  todayPresc);
   setDelta('sumExecToday',   todayExec);
   setDelta('sumEnrollToday', todayEnroll);
+
+  // 執行數拆成實體 / 線上。線上課(YouTube 影片課)沒有場次,靠 raw_row 的 oc 認列。
+  // 這裡要用「跟 weeklyData 同一組篩選後的 rawRows」,否則區域/日期篩選一套上,
+  // 實體 + 線上就跟上面那個總執行數對不起來。
+  const splitEl = document.getElementById('sumExecSplit');
+  if(splitEl){
+    // 同步還沒帶 oc 欄位時整行不顯示,否則會被讀成「線上真的是 0」
+    const hasOcField = rawRows.some(r => r.oc);
+    if(!hasOcField){
+      splitEl.textContent = '';
+    } else {
+      const scoped  = getFilteredRawRowsForClinic();
+      const online  = scoped.reduce((s, r) => s + ((r.ex && r.oc) ? 1 : 0), 0);
+      const offline = Math.max(0, exec - online);
+      // 當日那行的基準要跟上面的 (M/D +N) 一致 —— 那個數字刻意不吃 UI 篩選,
+      // 所以這裡也從完整 rawRows 算,兩行才不會互相矛盾。
+      const todayOnline  = rawRows.reduce((s, r) => s + ((r.oc && r.execDate === todayStr) ? 1 : 0), 0);
+      const todayOffline = Math.max(0, todayExec - todayOnline);
+      splitEl.innerHTML = `實體 ${offline.toLocaleString()} · 線上 <b>${online.toLocaleString()}</b>` +
+        (todayExec > 0 ? `<br>${monthDay} 實體 +${todayOffline.toLocaleString()} · 線上 <b>+${todayOnline.toLocaleString()}</b>` : '');
+    }
+  }
 }
 
 // ══════════════════════════════════════════════
@@ -4519,8 +4544,16 @@ function buildOnlineCharts(){
   // 同區間的全部執行數(算佔比用,不套處方類型篩選以外的條件)
   const allExec = rawRows.filter(r => r.ex && _inOnlineRange(r) && (tf === 'all' || rxTypeKey(r.type) === tf));
 
+  // oc 存的是 course_id(2026-08 之前的舊資料存課名),兩種都要能對回同一門課 —— 課名
+  // 每天會被課務在前面加數字,拿課名當聚合 key 會把同一門課拆成好幾門。
+  const courseByKey = {};
+  courses.forEach(c => {
+    if(c.course_id) courseByKey[c.course_id] = c;
+    if(c.name)      courseByKey[c.name]      = c;
+  });
+  const ocKey = r => { const c = courseByKey[r.oc]; return c ? (c.course_id || c.name) : r.oc; };
   const byCourse = {};
-  rows.forEach(r => { byCourse[r.oc] = (byCourse[r.oc] || 0) + 1; });
+  rows.forEach(r => { const k = ocKey(r); byCourse[k] = (byCourse[k] || 0) + 1; });
   const byType = {};
   rows.forEach(r => { const k = rxTypeKey(r.type); byType[k] = (byType[k] || 0) + 1; });
   const byDate = {};
@@ -4528,11 +4561,20 @@ function buildOnlineCharts(){
   const byClinic = {};
   rows.forEach(r => { const c = r.clinic || '(未填)'; byClinic[c] = (byClinic[c] || 0) + 1; });
 
-  // 課程清單沒同步進來時(舊資料),就用實際出現過的課名兜出清單
+  // 課程清單沒同步進來時(舊資料),就用實際出現過的值兜出清單
   const courseRows = (courses.length ? courses : Object.keys(byCourse).map(n => ({ name:n })))
     .filter(c => tf === 'all' || !c.type || c.type === tf)
-    .map(c => ({ ...c, count: byCourse[c.name] || 0 }))
+    .map(c => ({ ...c, count: byCourse[c.course_id || c.name] || 0 }))
     .sort((a, b) => b.count - a.count || (a.name || '').localeCompare(b.name || '', 'zh-Hant'));
+  // 有紀錄但課程已不在清單裡(課程被刪、或改成實體課)——單獨列出來,
+  // 否則這些人次算在 KPI 卻不在明細表,加總會對不上。
+  if(tf === 'all'){
+    const listed = new Set(courseRows.map(c => c.course_id || c.name));
+    Object.keys(byCourse).filter(k => !listed.has(k)).forEach(k => {
+      courseRows.push({ name: '(已不在課程清單中)', type: null, count: byCourse[k] });
+    });
+    courseRows.sort((a, b) => b.count - a.count || (a.name || '').localeCompare(b.name || '', 'zh-Hant'));
+  }
 
   const setText  = (id, v) => setAnimatedText(id, v);
   const setDelta = (id, txt) => { const el = document.getElementById(id); if(el) el.textContent = txt; };
