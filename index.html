@@ -1845,11 +1845,11 @@ async function triggerManualSync() {
   let elapsed = 0;
   _manualSyncTimer = setInterval(async () => {
     elapsed += 3;
-    if (elapsed > 300) {
+    if (elapsed > 900) {
       clearInterval(_manualSyncTimer); _manualSyncTimer = null;
       btn.disabled = false;
       btn.textContent = origLabel;
-      setCloudStatus('error', '⚠️ 同步逾時(>5 分鐘),請查 n8n executions');
+      setCloudStatus('error', '⚠️ 同步逾時(>15 分鐘),請查 n8n executions');
       return;
     }
     try {
@@ -1861,7 +1861,15 @@ async function triggerManualSync() {
       if (!data) return;
       if (data.status === 'done') {
         clearInterval(_manualSyncTimer); _manualSyncTimer = null;
-        btn.textContent = `✓ 完成${data.row_count ? `(${data.row_count} 筆)` : ''}`;
+        // 抓到 0 筆卻回報 done,是 n8n 的 Fetch & Map 中途被砍(逾時/OOM)後
+        // 流程照樣往下走造成的假成功——資料其實沒更新,要當成失敗報出來。
+        if (!data.row_count) {
+          btn.disabled = false;
+          btn.textContent = origLabel;
+          setCloudStatus('error', '⚠️ n8n 回報完成但一筆都沒抓到,資料未更新(多半是抓取逾時),請查 n8n executions');
+          return;
+        }
+        btn.textContent = `✓ 完成(${data.row_count} 筆)`;
         await loadFromCloud();
         setTimeout(() => { btn.disabled = false; btn.textContent = origLabel; }, 3000);
       } else if (data.status === 'error') {
