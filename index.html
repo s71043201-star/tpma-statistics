@@ -3462,6 +3462,7 @@ function buildAllCharts(){
   // 若正停在課程分頁,雲端資料更新後也要重畫(否則停在該頁時載入完成畫面會是空的)
   if(currentActiveTab === 'course') buildCourseCharts();
   if(currentActiveTab === 'online') buildOnlineCharts();
+  if(currentActiveTab === 'plus2')  buildPlus2Charts();
 }
 
 // ══════════════════════════════════════════════
