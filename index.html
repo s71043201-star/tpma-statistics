@@ -925,6 +925,7 @@ footer {
     <button class="tab-btn" onclick="showTab('prescday',this)"><svg class="ic" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/><path d="m9 16 2 2 4-4"/></svg><span class="nav-lbl">處方日執行數</span></button>
     <button class="tab-btn" onclick="showTab('course',this)"><svg class="ic" viewBox="0 0 24 24"><path d="M22 10v6M2 10l10-5 10 5-10 5z"/><path d="M6 12v5c3 3 9 3 12 0v-5"/></svg><span class="nav-lbl">課程選課</span></button>
     <button class="tab-btn" onclick="showTab('online',this)"><svg class="ic" viewBox="0 0 24 24"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2"/></svg><span class="nav-lbl">線上課程</span></button>
+    <button class="tab-btn" onclick="showTab('plus2',this)"><svg class="ic" viewBox="0 0 24 24"><circle cx="12" cy="8" r="6"/><polyline points="8.21 13.89 7 23 12 20 17 23 15.79 13.88"/></svg><span class="nav-lbl">PLUS2 活動</span></button>
   </nav>
   <div class="sidebar-foot">資料儲存於 Supabase<br>圖表由 Chart.js 製作</div>
 </aside>
@@ -1491,6 +1492,86 @@ footer {
         </table>
       </div>
       <div id="onlineCourseEmpty" style="display:none;padding:24px;text-align:center;color:var(--text-muted)">沒有符合的課程</div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ TAB PLUS2 活動成果 ═══ -->
+<!-- 處方 PLUS2 是「一天走完四類處方」的社區活動(課名前綴 PLUS2-)。民眾當場報到、
+     不走預約,所以 booked_count 恆為 0,人次只能看 checked_count(含現場加入)。
+     這頁的定位是成果報告:看總量與效益,不拆四類細項(多數人本來就四項全開)。 -->
+<div id="tab-plus2" class="hidden">
+
+  <!-- ── 成果摘要 ── -->
+  <div class="chart-section" style="margin:20px 36px 0;padding:20px 24px;background:linear-gradient(135deg,#f2fbf7,#fff);border:1px solid var(--border)">
+    <div style="font-size:0.78rem;font-weight:800;letter-spacing:0.08em;color:var(--teal);margin-bottom:8px">PLUS2 活動成果</div>
+    <div id="p2Headline" style="font-size:1.06rem;font-weight:700;color:var(--text);line-height:1.85"></div>
+    <div id="p2Subline" style="margin-top:8px;font-size:0.85rem;color:var(--text-muted);line-height:1.8"></div>
+  </div>
+
+  <!-- ── KPIs ── -->
+  <div class="summary-grid" style="margin-top:18px">
+    <div class="card blue">  <span class="icon"><svg class="ic" viewBox="0 0 24 24"><circle cx="12" cy="8" r="6"/><polyline points="8.21 13.89 7 23 12 20 17 23 15.79 13.88"/></svg></span><div class="val" id="p2Events">—</div><div class="lbl">辦理場數</div><div class="delta" id="p2EventsDetail"></div></div>
+    <div class="card purple"><span class="icon"><svg class="ic" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/></svg></span><div class="val" id="p2People">—</div><div class="lbl" title="每人每類最多上一堂,取各活動單一類型的最大人次相加">服務民眾</div><div class="delta" id="p2PeopleNote"></div></div>
+    <div class="card green"> <span class="icon"><svg class="ic" viewBox="0 0 24 24"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg></span><div class="val" id="p2Exec">—</div><div class="lbl" title="場次到場人次加總(含現場加入),等同當場完成的處方數">完成處方數</div><div class="delta" id="p2ExecDetail"></div></div>
+    <div class="card orange"><span class="icon"><svg class="ic" viewBox="0 0 24 24"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg></span><div class="val" id="p2FullRate">—</div><div class="lbl" title="四類處方全數完成的人數 ÷ 服務民眾">四項全完成率</div><div class="delta" id="p2FullNote"></div></div>
+    <div class="card violet"><span class="icon"><svg class="ic" viewBox="0 0 24 24"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg></span><div class="val" id="p2Share">—</div><div class="lbl" title="PLUS2 完成處方數 ÷ 全體總執行數">佔全體執行數</div><div class="delta" id="p2ShareNote"></div></div>
+  </div>
+
+  <div id="p2EmptyHint" class="chart-section" style="margin:14px 36px;display:none">
+    <div style="padding:24px;text-align:center;line-height:1.9">
+      <div style="font-size:1.02rem;font-weight:800;color:var(--text)">目前沒有 PLUS2 活動的執行紀錄</div>
+      <div id="p2EmptyDetail" style="margin-top:8px;font-size:0.86rem;color:var(--text-muted)"></div>
+    </div>
+  </div>
+
+  <div id="p2Content">
+    <div class="side-by-side">
+      <div class="chart-section m-hide">
+        <div class="chart-header"><h2>各場活動成果</h2><button class="dl-btn" onclick="downloadChart(this)">↓ 下載 JPG</button></div>
+        <div class="chart-wrap"><canvas id="p2EventChart"></canvas></div>
+      </div>
+      <div class="chart-section m-hide">
+        <div class="chart-header"><h2>累積成果(逐場累加)</h2><button class="dl-btn" onclick="downloadChart(this)">↓ 下載 JPG</button></div>
+        <div class="chart-wrap"><canvas id="p2CumChart"></canvas></div>
+      </div>
+    </div>
+
+    <!-- ── 活動明細 ── -->
+    <div class="chart-section" data-collapse-key="p2EventTable" style="margin:14px 36px">
+      <div class="chart-header" style="flex-wrap:wrap;gap:10px">
+        <h2 style="white-space:nowrap">各場活動明細</h2>
+        <button class="sec-toggle" onclick="toggleSection(this)" title="收合 / 展開"><svg class="ic" viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg></button>
+      </div>
+      <div style="overflow-x:auto;margin-top:12px">
+        <table class="data-table" style="width:100%;font-size:0.86rem">
+          <thead>
+            <tr><th style="width:34px">#</th><th>活動 / 場域</th><th>性質</th><th>日期</th><th>地點</th><th class="num">課程</th><th class="num">場次</th><th class="num">服務民眾</th><th class="num">完成處方</th><th class="num">人均</th><th class="num" style="min-width:120px">四項全完成</th></tr>
+          </thead>
+          <tbody id="p2EventBody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ── 課程明細 ── -->
+    <div class="chart-section" data-collapse-key="p2CourseTable" style="margin:14px 36px">
+      <div class="chart-header" style="flex-wrap:wrap;gap:10px">
+        <h2 style="white-space:nowrap">課程明細</h2>
+        <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+          <input type="text" id="p2Search" placeholder="搜尋課程或活動…" oninput="renderPlus2CourseTable()" style="min-width:200px;padding:7px 12px;border-radius:8px;border:1.5px solid var(--border);font-family:inherit;font-size:0.86rem;background:var(--surface);color:var(--text);outline:none">
+          <span id="p2CountBadge" style="font-size:0.82rem;color:var(--text-muted)"></span>
+          <button class="sec-toggle" onclick="toggleSection(this)" title="收合 / 展開"><svg class="ic" viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg></button>
+        </div>
+      </div>
+      <div style="overflow-x:auto;max-height:560px;overflow-y:auto;margin-top:12px">
+        <table class="data-table" style="width:100%;font-size:0.86rem">
+          <thead>
+            <tr><th style="width:34px">#</th><th>課程</th><th>活動 / 場域</th><th>性質</th><th>日期</th><th>地點</th><th class="num">場次</th><th class="num">完成處方</th></tr>
+          </thead>
+          <tbody id="p2CourseBody"></tbody>
+        </table>
+      </div>
+      <div id="p2CourseEmpty" style="display:none;padding:24px;text-align:center;color:var(--text-muted)">沒有符合的課程</div>
     </div>
   </div>
 </div>
@@ -3897,16 +3978,20 @@ function rebuildTabCharts(name){
     case 'prescday':   buildPrescDayCharts(); break;
     case 'course':     buildCourseCharts(); break;
     case 'online':     buildOnlineCharts(); break;
+    case 'plus2':      buildPlus2Charts(); break;
   }
 }
 function showTab(name, btn){
-  ['weekly','daily','type','typeweekly','clinic','prescday','course','online'].forEach(t=>document.getElementById('tab-'+t).classList.add('hidden'));
+  ['weekly','daily','type','typeweekly','clinic','prescday','course','online','plus2'].forEach(t=>document.getElementById('tab-'+t).classList.add('hidden'));
   document.getElementById('tab-'+name).classList.remove('hidden');
   document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
   if(btn) btn.classList.add('active');
   currentActiveTab = name;
   const bar = document.getElementById('dateFilterBar');
-  if(bar) bar.style.display = (name!=='prescday' && name!=='course' && name!=='online') ? 'flex' : 'none';
+  if(bar) bar.style.display = (name!=='prescday' && name!=='course' && name!=='online' && name!=='plus2') ? 'flex' : 'none';
+  // PLUS2 只吃 course_slots(沒有診所欄位),區域篩選對它無效 — 藏起來免得以為篩得動
+  const regionBar = document.getElementById('region-filter-bar');
+  if(regionBar) regionBar.style.display = (name === 'plus2') ? 'none' : '';
   updateTabControls(name);
   const tabEl = document.getElementById('tab-'+name);
   // 同步(重)建該分頁圖表。刻意「不」用 requestAnimationFrame 延後:
@@ -5846,6 +5931,284 @@ function updateTabControls(name){
 })();
 
 // ── 區塊收合(單日課表/場次明細),狀態記在 localStorage ──
+// ══════════════════════════════════════════════
+//  TAB PLUS2 活動成果
+// ══════════════════════════════════════════════
+// PLUS2 = 一天內走完四類處方的社區活動,課名一律 `PLUS2-<日期><里名>-<類型><序>`
+// (早期沒有日期前綴)。民眾當場報到不預約 → booked_count 恆 0,人次只能看
+// checked_count(含現場加入);raw_rows 沒有課名欄位,所以這頁只吃 course_slots。
+// 定位是成果報告 —— 多數人本來就四項全開,拆類型意義不大,改看總量與效益。
+const P2_TYPE_ORDER = ['exercise','nutrition','social','mental'];
+// 除了 PLUS2- 開頭的社區活動,長照機構場域的課也算 PLUS2 成果 —— 這些課名沒有共同
+// 前綴(「園藝課」「Zumba」…),只能靠地點認;地點打字不一(「長照機構」「長趙機構」)
+// 所以比對關鍵字而非全名,課名或地點命中任一即可。
+const P2_VENUES = [
+  {key:'貴族豪門', label:'貴族/豪門機構', kw:['貴族','豪門']},
+  {key:'陽明養護', label:'陽明養護',      kw:['陽明養護']},
+  {key:'彩虹村',   label:'彩虹村家園',    kw:['彩虹村','彩虹家園']},
+];
+function p2Esc(s){ return String(s==null?'':s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+
+function p2VenueOf(s){
+  const hay = String(s.course_name || '') + ' ' + String(s.course_location || '');
+  return P2_VENUES.find(v => v.kw.some(k => hay.includes(k))) || null;
+}
+function plus2Slots(){
+  return (courseSlots || []).filter(s =>
+    (String(s.course_name || '').includes('PLUS2') || p2VenueOf(s)) &&
+    s.status !== 'cancelled');
+}
+// 課名中段就是活動名(去掉開頭的 MMDD),配日期成為一場活動的 key
+function p2EventName(courseName){
+  const m = String(courseName || '').match(/^PLUS2-(.+?)-/);
+  return m ? m[1].replace(/^\d{3,4}/, '') : '未命名';
+}
+// checked_count 缺欄位 ≠ 沒人到 —— n8n 偶爾會漏抓某些場次的名單(實測 2026-07-15
+// 彩虹村四個場次就整個少了這個 key,名單其實各有 15 人)。把「沒同步到」跟「真的
+// 0 人」分開記,才不會把漏抓的場次當成零成果報出去。
+function p2HasChecked(s){ return s.checked_count !== undefined && s.checked_count !== null; }
+function p2Checked(s){ return p2HasChecked(s) ? Number(s.checked_count) || 0 : 0; }
+
+// 聚合成 {events:[…], courses:[…]}。
+// 社區活動(PLUS2-)一天就是一場,依「活動+日期」分;機構場域的課散在多個日期、
+// 屬於同一輪巡迴,依「場域」彙整成一筆,日期顯示區間。
+function plus2Aggregate(){
+  const byCourse = {}, byEvent = {};
+  const today = new Date();
+  const todayStr = today.getFullYear() + '-' + String(today.getMonth()+1).padStart(2,'0')
+                 + '-' + String(today.getDate()).padStart(2,'0');
+  // 未來場次沒名單是正常的,只有「已過的場次缺到場欄位」才是真的沒同步到
+  const isMissing = s => !p2HasChecked(s) && (s.slot_date || '') < todayStr;
+  plus2Slots().forEach(s => {
+    const name  = s.course_name || '(未命名)';
+    const date  = s.slot_date || '';
+    const type  = s.course_type || 'other';
+    const venue = String(name).includes('PLUS2') ? null : p2VenueOf(s);
+    const ev    = venue ? venue.label : p2EventName(name);
+    const kind  = venue ? 'venue' : 'community';
+
+    const ck = name + '|' + (venue ? 'V:' + venue.key : date);
+    const c = byCourse[ck] || (byCourse[ck] = {
+      name, event: ev, kind, type, date, dateTo: date,
+      location: s.course_location || '', slots: 0, exec: 0, missing: 0 });
+    c.slots++; c.exec += p2Checked(s);
+    if(isMissing(s)) c.missing = (c.missing || 0) + 1;
+    if(date){ if(!c.date || date < c.date) c.date = date;
+              if(!c.dateTo || date > c.dateTo) c.dateTo = date; }
+
+    const ek = venue ? 'V:' + venue.key : ev + '|' + date;
+    const e = byEvent[ek] || (byEvent[ek] = {
+      event: ev, kind, date, dateTo: date, location: s.course_location || '',
+      courses: new Set(), slots: 0, exec: 0, missing: 0,
+      byType: {exercise:0, nutrition:0, social:0, mental:0, other:0} });
+    e.courses.add(name); e.slots++; e.exec += p2Checked(s);
+    if(isMissing(s)) e.missing = (e.missing || 0) + 1;
+    e.byType[type] = (e.byType[type] || 0) + p2Checked(s);
+    if(date){ if(!e.date || date < e.date) e.date = date;
+              if(!e.dateTo || date > e.dateTo) e.dateTo = date; }
+  });
+  // 機構場域的人數:取該場域「單一課程」的最高到場人次。同一門課常分兩梯或兩個
+  // 樓層(各自一個場次),同一人只會上一次,所以要以課程為單位加總後再取最大值 ——
+  // 用單一場次取最大會把人數砍半,人均就會膨脹成不可能的數字。
+  const maxCourseExecOf = {};
+  Object.values(byCourse).forEach(c => {
+    maxCourseExecOf[c.event] = Math.max(maxCourseExecOf[c.event] || 0, c.exec);
+  });
+  const events = Object.values(byEvent).map(e => {
+    const counts = P2_TYPE_ORDER.map(t => e.byType[t] || 0).filter(v => v > 0);
+    // 社區活動是「一人一類上一堂」的闖關制,單一類型的人次就是該類參與人數:
+    // 取最大值當服務人數,取最小值當四類全到齊人數。
+    // 機構場域沒有這個限制(同一天同類可能開好幾堂),人數只能估,四項全完成不適用
+    // —— 這兩處都在表格標了「估」。
+    const people = e.kind === 'community'
+      ? (counts.length ? Math.max(...counts) : 0)
+      : (maxCourseExecOf[e.event] || 0);
+    const full = (e.kind === 'community' && counts.length === P2_TYPE_ORDER.length)
+      ? Math.min(...counts) : 0;
+    return {...e, courses: e.courses.size, people, full,
+            perPerson: people ? Math.round(e.exec / people * 100) / 100 : 0,
+            fullRate:  people ? Math.round(full / people * 1000) / 10 : 0};
+  }).sort((a,b) => (a.date || '').localeCompare(b.date || ''));
+  const courses = Object.values(byCourse).sort((a,b) => b.exec - a.exec || a.name.localeCompare(b.name));
+  return {events, courses};
+}
+
+function buildPlus2Charts(){
+  const {events, courses} = plus2Aggregate();
+  const totalExec   = events.reduce((s,e) => s + e.exec, 0);
+  const totalPeople = events.reduce((s,e) => s + e.people, 0);
+  const totalFull   = events.reduce((s,e) => s + e.full, 0);
+  const totalSlots  = events.reduce((s,e) => s + e.slots, 0);
+  const allExec     = (rawRows || []).reduce((s,r) => s + (r.ex ? 1 : 0), 0);
+  const setText = (id,v) => setAnimatedText(id, v);
+  const put = (id,html) => { const el = document.getElementById(id); if(el) el.innerHTML = html; };
+
+  const empty = document.getElementById('p2EmptyHint');
+  const content = document.getElementById('p2Content');
+  if(!events.length){
+    ['p2Events','p2People','p2Exec','p2FullRate','p2Share'].forEach(id => setText(id, '—'));
+    put('p2Headline', '');
+    put('p2Subline', '');
+    if(empty) empty.style.display = '';
+    if(content) content.style.display = 'none';
+    const d = document.getElementById('p2EmptyDetail');
+    if(d) d.textContent = '課程名稱需以「PLUS2-」開頭才會被認列;新活動要等 n8n 同步後才會出現。';
+    ['p2EventChart','p2CumChart'].forEach(destroyChart);
+    return;
+  }
+  if(empty) empty.style.display = 'none';
+  if(content) content.style.display = '';
+
+  const perPerson = totalPeople ? Math.round(totalExec / totalPeople * 100) / 100 : 0;
+  // 四項全完成率的分母只取社區活動 —— 機構場域不是四類闖關制,算進去會把率拉垮
+  const comm      = events.filter(e => e.kind === 'community');
+  const venues    = events.filter(e => e.kind === 'venue');
+  const commPeople = comm.reduce((s,e) => s + e.people, 0);
+  const commExec   = comm.reduce((s,e) => s + e.exec, 0);
+  const venueExec  = venues.reduce((s,e) => s + e.exec, 0);
+  const fullRate  = commPeople ? Math.round(totalFull / commPeople * 1000) / 10 : 0;
+  const share     = allExec ? Math.round(totalExec / allExec * 1000) / 10 : 0;
+
+  setText('p2Events',   events.length.toLocaleString());
+  setText('p2People',   totalPeople.toLocaleString());
+  setText('p2Exec',     totalExec.toLocaleString());
+  setText('p2FullRate', fullRate + '%');
+  setText('p2Share',    share + '%');
+  put('p2EventsDetail', totalSlots.toLocaleString() + ' 個場次 · ' + courses.length + ' 門課程');
+  put('p2PeopleNote',   '平均每場 ' + Math.round(totalPeople / events.length) + ' 人');
+  put('p2ExecDetail',   '人均完成 ' + perPerson.toFixed(2) + ' 項');
+  put('p2FullNote',     totalFull.toLocaleString() + ' 人四項到齊(社區活動)');
+  put('p2ShareNote',    allExec ? '全體執行 ' + allExec.toLocaleString() + ' 項' : '');
+
+  const missingSlots = events.reduce((s,e) => s + (e.missing || 0), 0);
+  const first = events[0], last = events[events.length - 1];
+  const spanTo = events.reduce((m,e) => (e.dateTo || '') > m ? (e.dateTo || '') : m, '');
+  const span = (first.date || '?') === spanTo ? (first.date || '?')
+             : (first.date || '?') + ' ~ ' + (spanTo || last.date || '?');
+  put('p2Headline',
+      span + ' 間辦理 <b style="color:var(--teal)">' + events.length + '</b> 場 PLUS2 課程活動,' +
+      '服務 <b style="color:var(--teal)">' + totalPeople.toLocaleString() + '</b> 位民眾,' +
+      '當場完成 <b style="color:var(--teal)">' + totalExec.toLocaleString() + '</b> 項健康處方。');
+  put('p2Subline',
+      '其中社區活動 ' + comm.length + ' 場、完成 ' + commExec.toLocaleString() + ' 項(' +
+      totalFull.toLocaleString() + ' 人四類處方全數到齊,佔社區活動參與者 ' + fullRate + '%);' +
+      '長照機構場域 ' + venues.length + ' 處、完成 ' + venueExec.toLocaleString() + ' 項。' +
+      '合計佔全體已執行處方的 ' + share + '%。' +
+      '<br>兩者都採當場報到(不需事前預約),到場即完成執行,免去民眾另約時間分次完成的門檻。' +
+      (missingSlots ? '<br><b style="color:#e8930a">注意:有 ' + missingSlots +
+        ' 個已辦場次尚未同步到場名單,實際成果高於上列數字。</b>' : ''));
+
+  // ── 圖1:各場活動 服務人數 vs 完成處方數 ──
+  destroyChart('p2EventChart');
+  const ctxE = document.getElementById('p2EventChart');
+  if(ctxE){
+    chartInstances.p2EventChart = new Chart(ctxE, {
+      type:'bar',
+      data:{
+        labels: events.map(e => (e.date ? e.date.slice(5).replace('-','/') + ' ' : '') + e.event),
+        datasets:[
+          { label:'服務民眾', data: events.map(e => e.people),
+            backgroundColor: events.map(e => e.kind === 'community' ? '#7c3aed' : '#b39ae8'), borderWidth:0 },
+          { label:'完成處方', data: events.map(e => e.exec),
+            backgroundColor: events.map(e => e.kind === 'community' ? '#2aac8a' : '#8fd4c0'), borderWidth:0 }
+        ]
+      },
+      options:{
+        responsive:true, maintainAspectRatio:false,
+        scales:{ x:{ticks:{font:defaultFont}}, y:{beginAtZero:true, ticks:{font:defaultFont}} },
+        plugins:{
+          legend:{position:'bottom', labels:{font:defaultFont}},
+          datalabels:{ display:true, anchor:'end', align:'top', color:'#4a5568',
+                       font:{family:defaultFont.family, weight:'700', size:11} }
+        }
+      }
+    });
+  }
+
+  // ── 圖2:累積成果(隨活動場次累加) ──
+  destroyChart('p2CumChart');
+  const ctxC = document.getElementById('p2CumChart');
+  if(ctxC){
+    let ce = 0, cp = 0;
+    const cumExec = [], cumPeople = [];
+    events.forEach(e => { ce += e.exec; cp += e.people; cumExec.push(ce); cumPeople.push(cp); });
+    chartInstances.p2CumChart = new Chart(ctxC, {
+      type:'line',
+      data:{
+        labels: events.map(e => (e.date ? e.date.slice(5).replace('-','/') + ' ' : '') + e.event),
+        datasets:[
+          { label:'累積完成處方', data: cumExec, borderColor:'#2aac8a',
+            backgroundColor:'rgba(42,172,138,0.14)', tension:0.3, fill:true, pointRadius:4 },
+          { label:'累積服務民眾', data: cumPeople, borderColor:'#7c3aed',
+            backgroundColor:'rgba(124,58,237,0.10)', tension:0.3, fill:true, pointRadius:4 }
+        ]
+      },
+      options:{
+        responsive:true, maintainAspectRatio:false,
+        scales:{ x:{ticks:{font:defaultFont}}, y:{beginAtZero:true, ticks:{font:defaultFont}} },
+        plugins:{
+          legend:{position:'bottom', labels:{font:defaultFont}},
+          datalabels:{ display:true, align:'top', color:'#4a5568',
+                       font:{family:defaultFont.family, weight:'700', size:11} }
+        }
+      }
+    });
+  }
+
+  renderPlus2EventTable(events);
+  renderPlus2CourseTable(courses);
+}
+
+function renderPlus2EventTable(events){
+  const body = document.getElementById('p2EventBody');
+  if(!body) return;
+  const dateCell = e => (e.date && e.dateTo && e.dateTo !== e.date)
+    ? e.date + ' ~ ' + e.dateTo : (e.date || '—');
+  body.innerHTML = events.map((e,i) => '<tr>' +
+    '<td>' + (i+1) + '</td>' +
+    '<td style="font-weight:700">' + p2Esc(e.event) + '</td>' +
+    '<td>' + (e.kind === 'community'
+      ? '<span style="color:#2aac8a;font-weight:700">社區活動</span>'
+      : '<span style="color:#7c3aed;font-weight:700">長照機構</span>') + '</td>' +
+    '<td>' + p2Esc(dateCell(e)) + '</td>' +
+    '<td>' + p2Esc(e.location || '—') + '</td>' +
+    '<td class="num">' + e.courses + '</td>' +
+    '<td class="num">' + e.slots + '</td>' +
+    '<td class="num">' + e.people + (e.kind === 'venue' ? ' <span style="color:var(--text-muted);font-weight:400">估</span>' : '') + '</td>' +
+    '<td class="num" style="font-weight:800;color:var(--teal)">' + e.exec +
+      (e.missing ? '<br><span style="font-size:0.74rem;font-weight:600;color:#e8930a">' +
+        e.missing + ' 場次未同步</span>' : '') + '</td>' +
+    '<td class="num">' + (e.perPerson ? e.perPerson.toFixed(2) : '—') + '</td>' +
+    '<td class="num">' + (e.kind === 'community' ? e.full + ' 人 (' + e.fullRate + '%)' : '<span style="color:var(--text-muted)">不適用</span>') + '</td>' +
+  '</tr>').join('');
+}
+
+function renderPlus2CourseTable(courses){
+  const body = document.getElementById('p2CourseBody');
+  if(!body) return;
+  if(!Array.isArray(courses)) courses = plus2Aggregate().courses;   // 搜尋框 oninput 走這條
+  const q = (document.getElementById('p2Search')?.value || '').trim().toLowerCase();
+  const rows = q ? courses.filter(c => (c.name + ' ' + c.event).toLowerCase().includes(q)) : courses;
+  body.innerHTML = rows.map((c,i) => '<tr>' +
+    '<td>' + (i+1) + '</td>' +
+    '<td style="font-weight:700">' + p2Esc(c.name) + '</td>' +
+    '<td>' + p2Esc(c.event) + '</td>' +
+    '<td>' + (c.kind === 'community'
+      ? '<span style="color:#2aac8a;font-weight:700">社區活動</span>'
+      : '<span style="color:#7c3aed;font-weight:700">長照機構</span>') + '</td>' +
+    '<td>' + p2Esc((c.date && c.dateTo && c.dateTo !== c.date) ? c.date + ' ~ ' + c.dateTo : (c.date || '—')) + '</td>' +
+    '<td>' + p2Esc(c.location || '—') + '</td>' +
+    '<td class="num">' + c.slots + '</td>' +
+    '<td class="num" style="font-weight:800;color:var(--teal)">' + c.exec +
+      (c.missing ? ' <span style="font-size:0.74rem;font-weight:600;color:#e8930a">(' +
+        c.missing + ' 場次未同步)</span>' : '') + '</td>' +
+  '</tr>').join('');
+  const badge = document.getElementById('p2CountBadge');
+  if(badge) badge.textContent = rows.length + ' 門課程';
+  const emptyEl = document.getElementById('p2CourseEmpty');
+  if(emptyEl) emptyEl.style.display = rows.length ? 'none' : '';
+}
+
 function toggleSection(btn){
   const sec = btn.closest('.chart-section');
   if(!sec) return;
