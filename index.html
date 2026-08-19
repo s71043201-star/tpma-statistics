@@ -407,37 +407,55 @@ body.is-loading .chart-wrap::after {
 
 /* ── 禮券兌換進度（獨立區塊，資料來自每日排程而非即時聚合） ── */
 #voucher-panel {
-  margin: 4px 36px 0; padding: 16px 22px 14px;
+  margin: 8px 36px 0; padding: 22px 28px 20px;
   background: var(--surface); border: 1px solid var(--border);
   border-radius: var(--radius); box-shadow: var(--shadow-sm);
-  border-left: 5px solid var(--teal);
+  border-left: 6px solid var(--teal);
 }
 #voucher-panel.hidden { display: none; }
-.vp-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 12px; }
+.vp-head { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 16px; }
 .vp-title {
-  display: inline-flex; align-items: center; gap: 7px;
-  font-size: 0.95rem; font-weight: 800; color: var(--text);
+  display: inline-flex; align-items: center; gap: 9px;
+  font-size: 1.3rem; font-weight: 800; color: var(--text);
 }
-.vp-title .ic { width: 17px; height: 17px; color: var(--teal); }
+.vp-title .ic { width: 23px; height: 23px; color: var(--teal); }
 .vp-scope {
-  padding: 2px 10px; border-radius: 12px; background: rgba(42,172,138,0.1);
-  color: var(--teal); font-size: 0.74rem; font-weight: 700;
+  padding: 3px 13px; border-radius: 12px; background: rgba(42,172,138,0.1);
+  color: var(--teal); font-size: 1rem; font-weight: 700;
 }
-.vp-time { margin-left: auto; font-size: 0.72rem; color: var(--text-muted); }
-.vp-body { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
-.vp-stat { text-align: center; padding: 8px 4px; border-radius: var(--radius-sm); }
+.vp-time { margin-left: auto; font-size: 0.95rem; color: var(--text-muted); }
+.vp-sync {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 8px 16px; border-radius: var(--radius-sm);
+  border: 1.5px solid var(--border); background: var(--surface); color: var(--teal);
+  font-family: inherit; font-size: 1rem; font-weight: 700; cursor: pointer;
+  white-space: nowrap; transition: all 0.15s;
+}
+.vp-sync:hover:not(:disabled) { background: rgba(42,172,138,0.08); border-color: var(--teal); }
+.vp-sync:disabled { opacity: 0.55; cursor: default; }
+.vp-sync .ic { width: 17px; height: 17px; }
+.vp-sync.spinning .ic { animation: vpSpin 1.1s linear infinite; }
+@keyframes vpSpin { to { transform: rotate(360deg); } }
+.vp-body { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; }
+.vp-stat { text-align: center; padding: 14px 6px; border-radius: var(--radius-sm); }
 .vp-stat.claimed   { background: rgba(42,172,138,0.06); }
 .vp-stat.unclaimed { background: rgba(232,147,10,0.09); }
-.vp-num { font-size: 1.65rem; font-weight: 800; line-height: 1.15; color: var(--text); }
+.vp-num { font-size: 3rem; font-weight: 800; line-height: 1.1; color: var(--text); }
 .vp-stat.claimed   .vp-num { color: var(--teal); }
 .vp-stat.unclaimed .vp-num { color: #c77a06; }
-.vp-lbl { font-size: 0.76rem; font-weight: 600; color: var(--text-muted); margin-top: 3px; }
+.vp-lbl { font-size: 1.1rem; font-weight: 600; color: var(--text-muted); margin-top: 6px; }
 .vp-bar {
-  height: 7px; border-radius: 4px; background: rgba(232,147,10,0.22);
-  overflow: hidden; margin-top: 13px;
+  height: 11px; border-radius: 6px; background: rgba(232,147,10,0.22);
+  overflow: hidden; margin-top: 18px;
 }
-.vp-bar-fill { height: 100%; background: var(--grad-card-2); border-radius: 4px; width: 0; transition: width 0.5s ease; }
-.vp-note { margin-top: 9px; font-size: 0.74rem; color: var(--text-muted); line-height: 1.5; }
+.vp-bar-fill { height: 100%; background: var(--grad-card-2); border-radius: 6px; width: 0; transition: width 0.5s ease; }
+.vp-note { margin-top: 13px; font-size: 1.05rem; color: var(--text-muted); line-height: 1.6; }
+.vc-hint {
+  margin: 2px 0 12px; font-size: 1rem; color: var(--text-muted); line-height: 1.6;
+}
+#tab-voucher #voucher-panel { margin: 0 0 18px; }
+#tab-voucher .clinic-table { font-size: 1rem; }
+#tab-voucher .clinic-table th, #tab-voucher .clinic-table td { padding: 11px 15px; }
 
 /* ── 摘要卡片 ── */
 .summary-grid {
@@ -869,11 +887,14 @@ footer {
   .clinic-sort-bar { padding: 12px 14px 0; }
   #filter-panel { margin: 12px; padding: 12px 14px; }
   #data-tools, #week-note-bar { margin: 10px 12px 0; }
-  #voucher-panel { margin: 0 12px; padding: 13px 15px 12px; }
+  #voucher-panel { margin: 0 12px; padding: 16px 15px 15px; }
   #voucher-panel .vp-body { gap: 8px; }
-  #voucher-panel .vp-num { font-size: 1.3rem; }
-  #voucher-panel .vp-lbl { font-size: 0.68rem; }
-  #voucher-panel .vp-time { margin-left: 0; width: 100%; }
+  #voucher-panel .vp-title { font-size: 1.1rem; }
+  #voucher-panel .vp-scope { font-size: 0.88rem; }
+  #voucher-panel .vp-num { font-size: 1.85rem; }
+  #voucher-panel .vp-lbl { font-size: 0.86rem; }
+  #voucher-panel .vp-note { font-size: 0.94rem; }
+  #voucher-panel .vp-time { margin-left: 0; width: 100%; font-size: 0.84rem; }
   .course-query-box { margin: 12px !important; }
   #prescDayTypeSelector, #prescDayCourseSelector { margin: 0 12px 10px !important; }
   .pdf-check-grid { grid-template-columns: 1fr; }
@@ -965,6 +986,7 @@ footer {
     <button class="tab-btn" onclick="showTab('course',this)"><svg class="ic" viewBox="0 0 24 24"><path d="M22 10v6M2 10l10-5 10 5-10 5z"/><path d="M6 12v5c3 3 9 3 12 0v-5"/></svg><span class="nav-lbl">課程選課</span></button>
     <button class="tab-btn" onclick="showTab('online',this)"><svg class="ic" viewBox="0 0 24 24"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2"/></svg><span class="nav-lbl">線上課程</span></button>
     <button class="tab-btn" onclick="showTab('plus2',this)"><svg class="ic" viewBox="0 0 24 24"><circle cx="12" cy="8" r="6"/><polyline points="8.21 13.89 7 23 12 20 17 23 15.79 13.88"/></svg><span class="nav-lbl">PLUS2 活動</span></button>
+    <button class="tab-btn" onclick="showTab('voucher',this)"><svg class="ic" viewBox="0 0 24 24"><path d="M20 12v9H4v-9M2 7h20v5H2zM12 22V7M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7M12 7h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7"/></svg><span class="nav-lbl">禮券兌換</span></button>
   </nav>
   <div class="sidebar-foot">資料儲存於 Supabase<br>圖表由 Chart.js 製作</div>
 </aside>
@@ -1040,28 +1062,6 @@ footer {
   <div class="card orange"><span class="icon"><svg class="ic" viewBox="0 0 24 24"><line x1="19" y1="5" x2="5" y2="19"/><circle cx="6.5" cy="6.5" r="2.5"/><circle cx="17.5" cy="17.5" r="2.5"/></svg></span><div class="val" id="sumRate">—</div><div class="lbl">整體執行率</div></div>
   <div class="card purple"><span class="icon"><svg class="ic" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg></span><div class="val" id="sumWeeks">—</div><div class="lbl">統計週數</div></div>
   <div class="card violet"><span class="icon"><svg class="ic" viewBox="0 0 24 24"><path d="M22 10v6M2 10l10-5 10 5-10 5z"/><path d="M6 12v5c3 3 9 3 12 0v-5"/></svg></span><div class="val" id="sumEnroll">—</div><div class="lbl">總選課人次</div><div class="delta" id="sumEnrollToday"></div></div>
-</div>
-
-<!-- ═══ 禮券兌換進度（獨立區塊） ═══ -->
-<!-- 資料源與上方摘要卡片不同：點數只能逐人打健康處方 API 查，前端拿不到，
-     由本機排程 scripts/voucher_stats.py 每天算好寫進 prescription_data.voucher_stats。
-     所以這裡標更新時間，避免被誤會是即時數字。 -->
-<div id="voucher-panel" class="hidden">
-  <div class="vp-head">
-    <span class="vp-title">
-      <svg class="ic" viewBox="0 0 24 24"><path d="M20 12v9H4v-9M2 7h20v5H2zM12 22V7M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7M12 7h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7"/></svg>
-      禮券兌換進度
-    </span>
-    <span class="vp-scope" id="vpScope">全部區域</span>
-    <span class="vp-time" id="vpTime"></span>
-  </div>
-  <div class="vp-body">
-    <div class="vp-stat"><div class="vp-num" id="vpDone">—</div><div class="vp-lbl">完成四項處方</div></div>
-    <div class="vp-stat claimed"><div class="vp-num" id="vpClaimed">—</div><div class="vp-lbl">已領禮券</div></div>
-    <div class="vp-stat unclaimed"><div class="vp-num" id="vpUnclaimed">—</div><div class="vp-lbl">尚未領禮券</div></div>
-  </div>
-  <div class="vp-bar" title="已領禮券佔完成四項處方者的比例"><div class="vp-bar-fill" id="vpBarFill"></div></div>
-  <div class="vp-note" id="vpNote"></div>
 </div>
 
 <!-- ═══ 整合篩選面板（區域 / 日期 / 各分頁顯示控制） ═══ -->
@@ -1553,6 +1553,58 @@ footer {
         </table>
       </div>
       <div id="onlineCourseEmpty" style="display:none;padding:24px;text-align:center;color:var(--text-muted)">沒有符合的課程</div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ TAB 禮券兌換 ═══ -->
+<!-- 禮券是「回原開立診所」領取，所以這頁的主角是各診所待發張數：診所要知道自己有幾個
+     民眾做滿四項卻還沒領、該準備多少張。數字由排程 scripts/voucher_stats.py 算好寫進
+     prescription_data.voucher_stats（點數只能逐人打 API 查，前端拿不到），非即時。 -->
+<div id="tab-voucher" class="hidden">
+  <!-- 進度總覽（三個數字 + 兌換率） -->
+  <div id="voucher-panel" class="hidden">
+    <div class="vp-head">
+      <span class="vp-title">
+        <svg class="ic" viewBox="0 0 24 24"><path d="M20 12v9H4v-9M2 7h20v5H2zM12 22V7M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7M12 7h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7"/></svg>
+        禮券兌換進度
+      </span>
+      <span class="vp-scope" id="vpScope">全部區域</span>
+      <span class="vp-time" id="vpTime"></span>
+      <button class="vp-sync" id="vpSyncBtn" type="button" onclick="triggerVoucherSync()"
+              title="重新查一次所有人的點數（約 3~4 分鐘）。平日 09:35 / 15:05 會自動更新">
+        <svg class="ic" viewBox="0 0 24 24"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+        更新
+      </button>
+    </div>
+    <div class="vp-body">
+      <div class="vp-stat"><div class="vp-num" id="vpDone">—</div><div class="vp-lbl">完成四項處方</div></div>
+      <div class="vp-stat claimed"><div class="vp-num" id="vpClaimed">—</div><div class="vp-lbl">已領禮券</div></div>
+      <div class="vp-stat unclaimed"><div class="vp-num" id="vpUnclaimed">—</div><div class="vp-lbl">尚未領禮券</div></div>
+    </div>
+    <div class="vp-bar" title="已領禮券佔完成四項處方者的比例"><div class="vp-bar-fill" id="vpBarFill"></div></div>
+    <div class="vp-note" id="vpNote"></div>
+  </div>
+
+  <div class="chart-section" data-pdf-id="voucher-clinic" data-pdf-label="各診所待發禮券">
+    <div class="chart-header">
+      <h2>各診所待發禮券</h2>
+      <button class="dl-btn" onclick="exportVoucherClinics()">↓ 匯出 Excel</button>
+    </div>
+    <div class="vc-hint" id="vcHint"></div>
+    <div class="clinic-table-wrap">
+      <table class="clinic-table" id="voucherClinicTable">
+        <thead>
+          <tr>
+            <th>診所名稱</th><th>所屬區</th>
+            <th title="該診所開立、且四種處方都已執行完成的民眾數">完成四項</th>
+            <th>已領禮券</th>
+            <th title="完成四項但點數尚未扣 400 的人數 —— 就是要發給這家診所的張數">待發禮券</th>
+            <th>兌換率</th>
+          </tr>
+        </thead>
+        <tbody id="voucherClinicBody"></tbody>
+      </table>
     </div>
   </div>
 </div>
@@ -3528,6 +3580,7 @@ function buildAllCharts(){
   if(currentActiveTab === 'course') buildCourseCharts();
   if(currentActiveTab === 'online') buildOnlineCharts();
   if(currentActiveTab === 'plus2')  buildPlus2Charts();
+  if(currentActiveTab === 'voucher') renderVoucherPanel();
 }
 
 // ══════════════════════════════════════════════
@@ -3731,9 +3784,11 @@ function renderVoucherPanel(){
   document.getElementById('vpUnclaimed').textContent = unclaimed.toLocaleString();
   document.getElementById('vpBarFill').style.width = done4 ? (claimed / done4 * 100).toFixed(1) + '%' : '0%';
 
+  // 只放時間就好 —— 字放大後「每日 09:35 / 15:05 更新」會把整列擠到換行，
+  // 那句說明改掛在「更新」鈕的 tooltip 上。
   const at = s.updated_at ? new Date(s.updated_at) : null;
   document.getElementById('vpTime').textContent =
-    at ? '資料更新：' + at.toLocaleString('zh-TW', {month:'2-digit', day:'2-digit', hour:'2-digit', minute:'2-digit'}) + '（每日 09:35 / 15:05 更新）' : '';
+    at ? '資料更新：' + at.toLocaleString('zh-TW', {month:'2-digit', day:'2-digit', hour:'2-digit', minute:'2-digit'}) : '';
 
   const rate = done4 ? (claimed / done4 * 100).toFixed(1) : '0.0';
   const notes = [`四項處方全部執行完成者共 <b>${done4.toLocaleString()}</b> 人，已領禮券 <b>${rate}%</b>；`
@@ -3741,6 +3796,135 @@ function renderVoucherPanel(){
   if(!reg && s.balance_not_full) notes.push(`其中 ${s.balance_not_full} 人點數餘額已不是 400（另有集點活動加減過），仍以「有無扣 400 點紀錄」認定未領。`);
   if(!reg && s.errors)           notes.push(`另有 ${s.errors} 人查詢點數失敗，未列入統計。`);
   document.getElementById('vpNote').innerHTML = notes.join(' ');
+
+  buildVoucherClinicTable();
+}
+
+// 各診所待發禮券。禮券回原開立診所領，所以歸戶用「該民眾最早那張處方的開立診所」
+// （後端算好放 by_clinic；實測沒有人跨診所開立，歸戶無歧義）。
+function voucherClinicRows(){
+  const s = voucherStats;
+  if(!s || !s.by_clinic) return [];
+  const reg = (currentRegion && currentRegion !== 'all') ? currentRegion : null;
+  // 排序一定要在前端做：後端雖然按待發張數排好才寫入，但 Supabase 的 jsonb 會把物件的
+  // 鍵重新正規化排序（實測變成按鍵長度），存進去的順序拿不回來。
+  return Object.entries(s.by_clinic)
+    .map(([name, v]) => ({name, region: v.region || '未分區',
+                          done4: Number(v.done4)||0, claimed: Number(v.claimed)||0,
+                          unclaimed: Number(v.unclaimed)||0}))
+    .filter(r => !reg || r.region === reg)
+    .sort((a, b) => b.unclaimed - a.unclaimed || b.done4 - a.done4 || a.name.localeCompare(b.name, 'zh-TW'));
+}
+
+function buildVoucherClinicTable(){
+  const body = document.getElementById('voucherClinicBody');
+  if(!body) return;
+  const rows = voucherClinicRows();
+  const hint = document.getElementById('vcHint');
+
+  if(!rows.length){
+    body.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--text-muted);padding:22px">尚無資料</td></tr>';
+    if(hint) hint.textContent = '';
+    return;
+  }
+
+  const totalPending = rows.reduce((n, r) => n + r.unclaimed, 0);
+  const pendingClinics = rows.filter(r => r.unclaimed > 0).length;
+  if(hint){
+    hint.innerHTML = `共 <b>${pendingClinics}</b> 家診所有待發禮券，合計需準備 `
+                   + `<b style="color:#c77a06">${totalPending.toLocaleString()}</b> 張`
+                   + `（面額 400 點，約 ${(totalPending * 400).toLocaleString()} 點）。依待發張數由多到少排列。`;
+  }
+
+  body.innerHTML = rows.map((r, i) => {
+    const rate = r.done4 ? (r.claimed / r.done4 * 100).toFixed(1) : '0.0';
+    const rank = i < 3 && r.unclaimed > 0 ? `<span class="rank-badge r${i+1}">${i+1}</span>` : '';
+    return `<tr>
+      <td>${rank}${p2Esc(r.name)}</td>
+      <td>${p2Esc(r.region)}</td>
+      <td>${r.done4.toLocaleString()}</td>
+      <td>${r.claimed.toLocaleString()}</td>
+      <td><b style="color:${r.unclaimed ? '#c77a06' : 'var(--text-muted)'}">${r.unclaimed.toLocaleString()}</b></td>
+      <td>${rate}%</td>
+    </tr>`;
+  }).join('')
+  + `<tr style="background:rgba(42,172,138,0.06);font-weight:800">
+      <td>合計</td><td>${rows.length} 家</td>
+      <td>${rows.reduce((n,r)=>n+r.done4,0).toLocaleString()}</td>
+      <td>${rows.reduce((n,r)=>n+r.claimed,0).toLocaleString()}</td>
+      <td style="color:#c77a06">${totalPending.toLocaleString()}</td>
+      <td></td>
+    </tr>`;
+}
+
+function exportVoucherClinics(){
+  const rows = voucherClinicRows();
+  if(!rows.length){ alert('尚無資料可匯出'); return; }
+  const aoa = [['診所名稱','所屬區','完成四項','已領禮券','待發禮券','兌換率(%)']];
+  rows.forEach(r => aoa.push([r.name, r.region, r.done4, r.claimed, r.unclaimed,
+                              r.done4 ? Number((r.claimed/r.done4*100).toFixed(1)) : 0]));
+  aoa.push(['合計', rows.length + ' 家', rows.reduce((n,r)=>n+r.done4,0),
+            rows.reduce((n,r)=>n+r.claimed,0), rows.reduce((n,r)=>n+r.unclaimed,0), '']);
+  const wb = XLSX.utils.book_new();
+  const ws = XLSX.utils.aoa_to_sheet(aoa);
+  ws['!cols'] = [{wch:26},{wch:10},{wch:10},{wch:10},{wch:10},{wch:10}];
+  XLSX.utils.book_append_sheet(wb, ws, '各診所待發禮券');
+  const at = voucherStats && voucherStats.updated_at ? new Date(voucherStats.updated_at) : new Date();
+  const stamp = at.getFullYear() + String(at.getMonth()+1).padStart(2,'0') + String(at.getDate()).padStart(2,'0');
+  XLSX.writeFile(wb, `各診所待發禮券_${stamp}.xlsx`);
+}
+
+// 手動觸發禮券統計(佇列模式,與 n8n 的「立即同步」是兩條各自獨立的線)：
+//   按鈕把 voucher_request_at 設成現在 → 本機排程 VoucherStatsCheck 每分鐘 poll，
+//   看到請求比 voucher_last_run_at 新就跑 voucher_stats.py → 期間回寫 voucher_status
+//   讓這裡顯示階段 → done 後重讀雲端。
+// 沒有併進 n8n 是因為光查點數就要 3~4 分鐘(2500+ 人逐人打,後端無批次端點)，
+// 塞進去會撞 n8n 的 300 秒上限，把原本穩定的處方同步一起拖垮。
+let _voucherSyncTimer = null;
+async function triggerVoucherSync(){
+  const btn = document.getElementById('vpSyncBtn');
+  if(!sbClient || !btn || btn.disabled) return;
+
+  const stop = (msg, isError) => {
+    if(_voucherSyncTimer){ clearInterval(_voucherSyncTimer); _voucherSyncTimer = null; }
+    btn.disabled = false;
+    btn.classList.remove('spinning');
+    const note = document.getElementById('vpNote');
+    if(msg && note) note.innerHTML = (isError ? '⚠️ ' : '') + msg;
+  };
+
+  btn.disabled = true;
+  btn.classList.add('spinning');
+  document.getElementById('vpNote').textContent = '已送出請求，等待本機排程接手（最多 1 分鐘）…';
+
+  const { error } = await sbClient.from('prescription_data')
+    .upsert({ id:'main', voucher_request_at: new Date().toISOString() }, { onConflict:'id' });
+  if(error){
+    stop('觸發失敗：' + error.message + '（欄位可能尚未建立，見 supabase_migration.sql）', true);
+    return;
+  }
+
+  let elapsed = 0;
+  _voucherSyncTimer = setInterval(async () => {
+    elapsed += 5;
+    // 排程每分鐘才 poll 一次，加上統計本身 3~4 分鐘，逾時放寬到 12 分鐘
+    if(elapsed > 720){ stop('更新逾時（>12 分鐘），請查 C:\\prescription\\logs\\voucher-stats.log', true); return; }
+    try{
+      const { data } = await sbClient.from('prescription_data')
+        .select('voucher_status, voucher_stats').eq('id','main').single();
+      const st = data && data.voucher_status;
+      if(!st) return;
+      if(st.stage === 'done'){
+        voucherStats = data.voucher_stats || voucherStats;
+        stop(null);
+        renderVoucherPanel();
+        return;
+      }
+      if(st.stage === 'error'){ stop('更新失敗：' + (st.message || '未知錯誤'), true); return; }
+      document.getElementById('vpNote').textContent =
+        (st.message || '處理中…') + `（已等待 ${Math.floor(elapsed/60)} 分 ${elapsed%60} 秒）`;
+    }catch(e){ /* 單次讀取失敗不中斷輪詢 */ }
+  }, 5000);
 }
 
 function setRegionFilter(region, btn){
@@ -4082,16 +4266,17 @@ function rebuildTabCharts(name){
     case 'course':     buildCourseCharts(); break;
     case 'online':     buildOnlineCharts(); break;
     case 'plus2':      buildPlus2Charts(); break;
+    case 'voucher':    renderVoucherPanel(); break;
   }
 }
 function showTab(name, btn){
-  ['weekly','daily','type','typeweekly','clinic','prescday','course','online','plus2'].forEach(t=>document.getElementById('tab-'+t).classList.add('hidden'));
+  ['weekly','daily','type','typeweekly','clinic','prescday','course','online','plus2','voucher'].forEach(t=>document.getElementById('tab-'+t).classList.add('hidden'));
   document.getElementById('tab-'+name).classList.remove('hidden');
   document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
   if(btn) btn.classList.add('active');
   currentActiveTab = name;
   const bar = document.getElementById('dateFilterBar');
-  if(bar) bar.style.display = (name!=='prescday' && name!=='course' && name!=='online' && name!=='plus2') ? 'flex' : 'none';
+  if(bar) bar.style.display = (name!=='prescday' && name!=='course' && name!=='online' && name!=='plus2' && name!=='voucher') ? 'flex' : 'none';
   // PLUS2 只吃 course_slots(沒有診所欄位),區域篩選對它無效 — 藏起來免得以為篩得動
   const regionBar = document.getElementById('region-filter-bar');
   if(regionBar) regionBar.style.display = (name === 'plus2') ? 'none' : '';
