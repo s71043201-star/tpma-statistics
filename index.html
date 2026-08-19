@@ -453,7 +453,8 @@ body.is-loading .chart-wrap::after {
 .vc-hint {
   margin: 2px 0 12px; font-size: 1rem; color: var(--text-muted); line-height: 1.6;
 }
-#tab-voucher #voucher-panel { margin: 0 0 18px; }
+/* 邊界對齊同分頁的 .chart-section(margin: 18px 36px),否則這塊會比下方卡片寬 72px */
+#tab-voucher #voucher-panel { margin: 18px 36px; padding: 24px 26px 22px; }
 #tab-voucher .clinic-table { font-size: 1rem; }
 #tab-voucher .clinic-table th, #tab-voucher .clinic-table td { padding: 11px 15px; }
 
@@ -887,7 +888,8 @@ footer {
   .clinic-sort-bar { padding: 12px 14px 0; }
   #filter-panel { margin: 12px; padding: 12px 14px; }
   #data-tools, #week-note-bar { margin: 10px 12px 0; }
-  #voucher-panel { margin: 0 12px; padding: 16px 15px 15px; }
+  /* 同樣要跟手機版的 .chart-section(margin: 12px)對齊 */
+  #tab-voucher #voucher-panel { margin: 12px; padding: 16px 15px 15px; }
   #voucher-panel .vp-body { gap: 8px; }
   #voucher-panel .vp-title { font-size: 1.1rem; }
   #voucher-panel .vp-scope { font-size: 0.88rem; }
