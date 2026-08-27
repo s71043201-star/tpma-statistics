@@ -1,0 +1,19 @@
+# Claude Code 工作目錄
+# 這裡放過 n8n workflow 的匯出檔（consumer-workflow.json / existing-workflow.json），
+# 內含系統的明文帳號密碼 —— 本 repo 是 public，絕對不能推上去。
+# launch.json 只是 dev server 設定，早已在版控裡，放行。
+.claude/*
+!.claude/launch.json
+
+# 系統
+.DS_Store
+Thumbs.db
+
+# 編輯器
+.vscode/
+.idea/
+
+# 暫存
+*.log
+*.tmp
+node_modules/

@@ -920,6 +920,7 @@ footer {
     <button class="tab-btn" onclick="showTab('clinic',this)"><svg class="ic" viewBox="0 0 24 24"><rect x="4" y="2" width="16" height="20" rx="2"/><path d="M12 6v4"/><path d="M10 8h4"/><path d="M8 22v-4h8v4"/></svg><span class="nav-lbl">診所分析</span></button>
     <button class="tab-btn" onclick="showTab('prescday',this)"><svg class="ic" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/><path d="m9 16 2 2 4-4"/></svg><span class="nav-lbl">處方日執行數</span></button>
     <button class="tab-btn" onclick="showTab('course',this)"><svg class="ic" viewBox="0 0 24 24"><path d="M22 10v6M2 10l10-5 10 5-10 5z"/><path d="M6 12v5c3 3 9 3 12 0v-5"/></svg><span class="nav-lbl">課程選課</span></button>
+    <button class="tab-btn" onclick="showTab('reimburse',this)"><svg class="ic" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg><span class="nav-lbl">核銷產生器</span></button>
   </nav>
   <div class="sidebar-foot">資料儲存於 Supabase<br>圖表由 Chart.js 製作</div>
 </aside>
@@ -1488,6 +1489,60 @@ footer {
 
 </div><!-- /main -->
 
+
+
+<div id="tab-reimburse" class="hidden">
+  <!-- ══ 核銷產生器（本機）══
+       這一區塊只是遙控器：資料抓取、Word/PDF 產出、個資與檔案全部在本機的
+       核銷產生器（127.0.0.1:5173）裡完成，雲端不存任何個資。別人打開這個
+       儀表板時，瀏覽器去連的是「他自己的」localhost，沒有你的產生器就什麼
+       都看不到 —— 這是靠架構隔離，不是靠密碼。 -->
+  <div style="margin:20px 36px 0;padding:16px 20px;background:linear-gradient(135deg,#f7fbf9,#fff);border-radius:14px;border:1px solid var(--border);box-shadow:var(--shadow-sm)">
+    <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap">
+      <span style="font-weight:800;color:var(--teal);font-size:0.95rem">核銷產生器</span>
+      <span id="rbConnDot" style="width:9px;height:9px;border-radius:50%;background:#c8d6d1;flex:none"></span>
+      <span id="rbConnMsg" style="font-size:0.82rem;color:var(--text-muted)">檢查本機產生器…</span>
+      <button onclick="rbCheckStatus(true)" style="padding:4px 12px;border-radius:14px;border:1.5px solid var(--border);background:var(--surface);font-family:inherit;font-size:0.78rem;cursor:pointer">重新檢查</button>
+    </div>
+    <div id="rbOffline" style="display:none;margin-top:10px;padding:12px 14px;background:#fff6f4;border:1px solid #f5c9bd;border-radius:10px;font-size:0.82rem;line-height:1.7">
+      <b style="color:#c0512f">找不到本機的核銷產生器。</b><br>
+      請先開啟產生器（雙擊 <code>啟動.py</code> 或 <code>核銷文件產生器_v40.exe</code>），
+      它會在 <code>127.0.0.1:5173</code> 待命，然後按「重新檢查」。<br>
+      核銷資料與個資都在你自己的電腦上，這個頁面只負責下指令。
+    </div>
+  </div>
+
+  <!-- ── 產出設定 ── -->
+  <div id="rbPanel" style="display:none;margin:16px 36px 0;padding:18px 20px;background:var(--surface);border-radius:14px;border:1px solid var(--border);box-shadow:var(--shadow-sm)">
+    <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;font-size:0.86rem">
+      <span style="font-weight:700;color:var(--text)">核銷月份</span>
+      <select id="rbYear" style="padding:6px 10px;border-radius:6px;border:1.5px solid var(--border);font-family:inherit;font-size:0.84rem;background:var(--surface);color:var(--text)"></select>
+      <span style="color:var(--text-muted)">年</span>
+      <select id="rbMonth" style="padding:6px 10px;border-radius:6px;border:1.5px solid var(--border);font-family:inherit;font-size:0.84rem;background:var(--surface);color:var(--text)"></select>
+      <span style="color:var(--text-muted)">月</span>
+      <span id="rbRange" style="color:var(--text-muted);font-size:0.78rem;margin-left:4px"></span>
+    </div>
+
+    <div style="margin-top:14px;display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+      <button id="rbBtnFetch" onclick="rbRun('fetch')" style="padding:8px 18px;border-radius:20px;border:1.5px solid var(--teal);background:var(--surface);color:var(--teal);font-family:inherit;font-weight:700;font-size:0.85rem;cursor:pointer">只抓資料</button>
+      <button id="rbBtnGen" onclick="rbRun('generate')" style="padding:8px 22px;border-radius:20px;border:none;background:var(--teal);color:#fff;font-family:inherit;font-weight:700;font-size:0.85rem;cursor:pointer;box-shadow:var(--shadow-sm)">一鍵產出核銷文件</button>
+      <span style="color:var(--text-muted);font-size:0.76rem">「只抓資料」會產出兩個 Excel 供核對，不產文件</span>
+    </div>
+
+    <!-- 進度 -->
+    <div id="rbProgWrap" style="display:none;margin-top:16px">
+      <div style="display:flex;justify-content:space-between;font-size:0.8rem;color:var(--text-muted);margin-bottom:5px">
+        <span id="rbProgStatus">準備中…</span><span id="rbProgPct"></span>
+      </div>
+      <div style="height:7px;background:var(--border);border-radius:4px;overflow:hidden">
+        <div id="rbProgBar" style="height:100%;width:0;background:var(--teal);transition:width .25s"></div>
+      </div>
+      <pre id="rbLog" style="margin-top:10px;max-height:220px;overflow:auto;padding:10px 12px;background:#f7fbf9;border:1px solid var(--border);border-radius:8px;font-size:0.74rem;line-height:1.55;white-space:pre-wrap;color:var(--text)"></pre>
+    </div>
+
+    <div id="rbResult" style="display:none;margin-top:14px;padding:12px 14px;border-radius:10px;font-size:0.84rem;line-height:1.7"></div>
+  </div>
+</div>
 <script>
 // ══════════════════════════════════════════════
 //  ★★★ 請填入您的 Supabase 設定 ★★★
@@ -3613,16 +3668,197 @@ function rebuildTabCharts(name){
     case 'clinic':     buildClinicCharts(); break;
     case 'prescday':   buildPrescDayCharts(); break;
     case 'course':     buildCourseCharts(); break;
+    case 'reimburse':  rbInitMonthSelect(); rbCheckStatus(); break;
   }
 }
+// ══════════════════════════════════════════════
+//  核銷產生器（本機遙控）
+// ══════════════════════════════════════════════
+// 這一區只發指令給本機的核銷產生器（127.0.0.1:5173），資料抓取、Word/PDF
+// 產出、個資讀取全在本機完成，雲端不存任何個資 —— 別人開這個儀表板時，他的
+// 瀏覽器連的是他自己的 localhost，看不到也拿不到任何東西。
+const RB_BASE = 'http://127.0.0.1:5173';
+let rbBusy = false;
+let rbEvents = null;
+
+async function rbCall(name, args = [], timeoutMs = 600000) {
+  const ctl = new AbortController();
+  const timer = setTimeout(() => ctl.abort(), timeoutMs);
+  try {
+    const r = await fetch(`${RB_BASE}/api/${name}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ args }),
+      signal: ctl.signal,
+    });
+    const j = await r.json();
+    if (!j.ok) throw new Error(j.err || '產生器回報失敗');
+    return j.result;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+function rbSetConn(state, msg) {
+  const dot = document.getElementById('rbConnDot');
+  const txt = document.getElementById('rbConnMsg');
+  const off = document.getElementById('rbOffline');
+  const panel = document.getElementById('rbPanel');
+  if (!dot) return;
+  const color = { ok: '#2aac8a', warn: '#e8930a', bad: '#c0512f', idle: '#c8d6d1' }[state];
+  dot.style.background = color;
+  txt.textContent = msg;
+  txt.style.color = state === 'ok' ? 'var(--text)' : 'var(--text-muted)';
+  off.style.display = state === 'bad' ? '' : 'none';
+  panel.style.display = (state === 'ok' || state === 'warn') ? '' : 'none';
+}
+
+async function rbCheckStatus(manual) {
+  if (manual) rbSetConn('idle', '檢查中…');
+  let st;
+  try {
+    st = await rbCall('apiStatus', [], 20000);
+  } catch (e) {
+    rbSetConn('bad', '本機產生器未啟動');
+    return false;
+  }
+  if (!st.configured) {
+    rbSetConn('warn', st.msg + '（請在產生器端執行 scripts/set_rx_credentials.py）');
+    return false;
+  }
+  if (!st.ok) { rbSetConn('warn', st.msg); return false; }
+  rbSetConn('ok', '已連線 · ' + st.msg);
+  rbConnectEvents();
+  return true;
+}
+
+// 產生器的進度是 SSE 推播（/api/events），直接接來顯示
+function rbConnectEvents() {
+  if (rbEvents) return;
+  try {
+    rbEvents = new EventSource(`${RB_BASE}/api/events`);
+    rbEvents.addEventListener('log-line', e => rbLog(JSON.parse(e.data)));
+    rbEvents.addEventListener('progress-update', e => {
+      const d = JSON.parse(e.data);
+      const bar = document.getElementById('rbProgBar');
+      const pct = Math.round((d.pct || 0) * 100);
+      if (bar) bar.style.width = pct + '%';
+      const ps = document.getElementById('rbProgStatus');
+      const pp = document.getElementById('rbProgPct');
+      if (ps) ps.textContent = d.status || '';
+      if (pp) pp.textContent = pct ? pct + '%' : '';
+    });
+    rbEvents.onerror = () => { try { rbEvents.close(); } catch (e) {} rbEvents = null; };
+  } catch (e) { rbEvents = null; }
+}
+
+function rbLog(line) {
+  const el = document.getElementById('rbLog');
+  if (!el) return;
+  el.textContent += (el.textContent ? '\n' : '') + line;
+  el.scrollTop = el.scrollHeight;
+}
+
+function rbInitMonthSelect() {
+  const ySel = document.getElementById('rbYear');
+  const mSel = document.getElementById('rbMonth');
+  if (!ySel || ySel.options.length) return;
+  const now = new Date();
+  const rocNow = now.getFullYear() - 1911;
+  for (let y = rocNow + 1; y >= rocNow - 2; y--) {
+    ySel.add(new Option(y, y));
+  }
+  for (let m = 1; m <= 12; m++) {
+    mSel.add(new Option(String(m).padStart(2, '0'), m));
+  }
+  // 預設上個月（核銷通常在次月做）
+  const prev = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+  ySel.value = prev.getFullYear() - 1911;
+  mSel.value = prev.getMonth() + 1;
+  ySel.onchange = mSel.onchange = rbUpdateRange;
+  rbUpdateRange();
+}
+
+function rbUpdateRange() {
+  const y = +document.getElementById('rbYear').value + 1911;
+  const m = +document.getElementById('rbMonth').value;
+  const last = new Date(y, m, 0).getDate();
+  const p = n => String(n).padStart(2, '0');
+  document.getElementById('rbRange').textContent =
+    `（西元 ${y}-${p(m)}-01 ～ ${y}-${p(m)}-${p(last)}）`;
+}
+
+function rbSetBusy(b) {
+  rbBusy = b;
+  ['rbBtnFetch', 'rbBtnGen'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) { el.disabled = b; el.style.opacity = b ? 0.5 : 1; el.style.cursor = b ? 'not-allowed' : 'pointer'; }
+  });
+}
+
+function rbShowResult(kind, html) {
+  const el = document.getElementById('rbResult');
+  if (!el) return;
+  const style = kind === 'ok'
+    ? 'background:#f0faf6;border:1px solid #b6e3d0;color:var(--text)'
+    : 'background:#fff6f4;border:1px solid #f5c9bd;color:#8c3a20';
+  el.style.cssText = 'margin-top:14px;padding:12px 14px;border-radius:10px;font-size:0.84rem;line-height:1.7;' + style;
+  el.innerHTML = html;
+  el.style.display = '';
+}
+
+async function rbRun(mode) {
+  if (rbBusy) return;
+  if (!(await rbCheckStatus())) return;
+  const year = +document.getElementById('rbYear').value;
+  const month = +document.getElementById('rbMonth').value;
+
+  rbSetBusy(true);
+  document.getElementById('rbResult').style.display = 'none';
+  document.getElementById('rbProgWrap').style.display = '';
+  document.getElementById('rbLog').textContent = '';
+  document.getElementById('rbProgBar').style.width = '0';
+  rbLog(`${year}年${String(month).padStart(2, '0')}月 — ${mode === 'fetch' ? '抓取資料' : '產出核銷文件'}`);
+
+  try {
+    const init = await rbCall('getInitialState', [], 20000);
+    if (mode === 'fetch') {
+      const r = await rbCall('fetchMonth', [year, month, init.output]);
+      rbShowResult('ok',
+        `<b>資料已抓下來</b><br>開立：<code>${r.issuance}</code><br>` +
+        `執行：<code>${r.execution}</code><br>` +
+        `可以拿去跟系統手動匯出的比對，確認無誤再按「一鍵產出」。`);
+    } else {
+      await rbCall('generateFromApi', [{
+        year, month,
+        region: 'all',
+        output: init.output,
+        peopleDb: init.peopleDb,
+        regionsDb: init.regionsDb,
+      }]);
+      rbShowResult('ok',
+        `<b>核銷文件已產出</b><br>輸出位置：<code>${init.output}</code><br>` +
+        `抓下來的兩個 Excel 留在該資料夾的 <code>_後端資料</code> 裡，供日後核對。`);
+    }
+    document.getElementById('rbProgBar').style.width = '100%';
+    document.getElementById('rbProgPct').textContent = '100%';
+  } catch (e) {
+    const msg = String(e.message || e);
+    rbShowResult('bad', `<b>失敗</b><br>${msg}<br>` +
+      (msg.includes('abort') ? '（逾時。資料量大時請直接在產生器視窗操作。）' : '詳細訊息見上方記錄與產生器視窗。'));
+  } finally {
+    rbSetBusy(false);
+  }
+}
+
 function showTab(name, btn){
-  ['weekly','daily','type','typeweekly','clinic','prescday','course'].forEach(t=>document.getElementById('tab-'+t).classList.add('hidden'));
+  ['weekly','daily','type','typeweekly','clinic','prescday','course','reimburse'].forEach(t=>{const el=document.getElementById('tab-'+t); if(el) el.classList.add('hidden');});
   document.getElementById('tab-'+name).classList.remove('hidden');
   document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
   if(btn) btn.classList.add('active');
   currentActiveTab = name;
   const bar = document.getElementById('dateFilterBar');
-  if(bar) bar.style.display = (name!=='prescday' && name!=='course') ? 'flex' : 'none';
+  if(bar) bar.style.display = (name!=='prescday' && name!=='course' && name!=='reimburse') ? 'flex' : 'none';
   updateTabControls(name);
   const tabEl = document.getElementById('tab-'+name);
   // 同步(重)建該分頁圖表。刻意「不」用 requestAnimationFrame 延後:
