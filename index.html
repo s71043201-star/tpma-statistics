@@ -1726,6 +1726,68 @@ footer {
       <span id="rbRange" style="color:var(--text-muted);font-size:0.78rem;margin-left:4px"></span>
     </div>
 
+    <!-- ── 產出設定 ──
+         對齊產生器視窗的選項：區域、健管費門檻、診所範圍、文件勾選、主密碼。
+         這些以前只有產生器視窗設得到，從儀表板遙控時會全部吃預設值 ——
+         健管費門檻尤其危險：預設 0 代表「所有診所都算達標」，會全額發 $7,000。 -->
+    <details id="rbSettings" style="margin-top:14px;border:1px solid var(--border);border-radius:10px">
+      <summary style="cursor:pointer;padding:10px 14px;font-size:0.84rem;font-weight:700;color:var(--text);user-select:none">
+        產出設定
+        <span id="rbSetSum" style="font-weight:400;color:var(--text-muted);margin-left:8px;font-size:0.78rem"></span>
+      </summary>
+      <div style="padding:2px 14px 16px;font-size:0.82rem">
+
+        <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:14px">
+          <span style="font-weight:700">產出區域</span>
+          <select id="rbRegion" onchange="rbUpdateSetSum()" style="padding:6px 10px;border-radius:6px;border:1.5px solid var(--border);font-family:inherit;font-size:0.82rem;background:var(--surface);color:var(--text)">
+            <option value="全部">全部（含課程老師）</option>
+            <option value="北投">北投</option>
+            <option value="士林">士林</option>
+            <option value="中山">中山</option>
+          </select>
+          <span style="color:var(--text-muted);font-size:0.76rem">選單一區時不會產出課程老師的處置費</span>
+        </div>
+
+        <div style="margin-bottom:14px">
+          <div style="font-weight:700;margin-bottom:6px">健管費最低份數
+            <span style="font-weight:400;color:var(--text-muted);font-size:0.76rem;margin-left:6px">填 0 ＝ 不過濾、全部視為達標</span>
+          </div>
+          <div id="rbMinWrap" style="display:flex;gap:14px;flex-wrap:wrap"></div>
+          <div style="color:var(--text-muted);font-size:0.75rem;margin-top:6px">
+            未達門檻的診所，領據「是否達標」欄會寫「否」、金額為 $0。
+          </div>
+        </div>
+
+        <div style="margin-bottom:14px">
+          <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:6px">
+            <span style="font-weight:700">產出診所</span>
+            <span id="rbClinicSum" style="color:var(--text-muted);font-size:0.76rem"></span>
+            <button onclick="rbClinicAll(true)" style="padding:3px 10px;border-radius:14px;border:1px solid var(--border);background:var(--surface);color:var(--text);font-family:inherit;font-size:0.74rem;cursor:pointer">全選</button>
+            <button onclick="rbClinicAll(false)" style="padding:3px 10px;border-radius:14px;border:1px solid var(--border);background:var(--surface);color:var(--text);font-family:inherit;font-size:0.74rem;cursor:pointer">全不選</button>
+          </div>
+          <div id="rbClinicWrap" style="max-height:240px;overflow:auto;border:1px solid var(--border);border-radius:8px;padding:10px 12px;color:var(--text-muted)">連線後載入…</div>
+        </div>
+
+        <div style="margin-bottom:14px">
+          <div style="font-weight:700;margin-bottom:6px">產出文件</div>
+          <div id="rbDocWrap" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:12px"></div>
+        </div>
+
+        <div>
+          <div style="font-weight:700;margin-bottom:6px">🔒 PDF 共用主密碼
+            <span style="font-weight:400;color:var(--text-muted);font-size:0.76rem;margin-left:6px">選填</span>
+          </div>
+          <input type="password" id="rbMasterPw" placeholder="留空 ＝ 不設共用密碼" autocomplete="off"
+                 style="width:100%;max-width:320px;padding:8px 11px;border:1.5px solid var(--border);border-radius:8px;font-family:inherit;font-size:0.82rem;background:var(--surface);color:var(--text)" />
+          <div style="color:var(--text-muted);font-size:0.75rem;margin-top:6px">
+            合併 PDF 一律用本人身分證字號加密；另外填了共用密碼後，你也能用這組密碼開啟所有人的 PDF（核對用）。
+            身分證空白者不加密，會在 receipt 資料夾留「未加密清單.txt」。
+          </div>
+        </div>
+
+      </div>
+    </details>
+
     <div style="margin-top:14px;display:flex;gap:10px;flex-wrap:wrap;align-items:center">
       <button id="rbBtnFetch" onclick="rbRun('fetch')" style="padding:8px 18px;border-radius:20px;border:1.5px solid var(--teal);background:var(--surface);color:var(--teal);font-family:inherit;font-weight:700;font-size:0.85rem;cursor:pointer">只抓資料</button>
       <button id="rbBtnGen" onclick="rbRun('generate')" style="padding:8px 22px;border-radius:20px;border:none;background:var(--teal);color:#fff;font-family:inherit;font-weight:700;font-size:0.85rem;cursor:pointer;box-shadow:var(--shadow-sm)">一鍵產出核銷文件</button>
@@ -4385,6 +4447,11 @@ async function rbCheckStatus(manual) {
   if (!st.ok) { rbSetConn('warn', st.msg); return false; }
   rbSetConn('ok', '已連線 · ' + st.msg);
   rbConnectEvents();
+  rbBuildSettings();
+  try {
+    const init = await rbCall('getInitialState', [], 20000);
+    rbLoadClinics(init.regionsDb);
+  } catch (e) { /* 清單載不到不擋產出，等同不過濾 */ }
   return true;
 }
 
@@ -4413,6 +4480,148 @@ function rbLog(line) {
   if (!el) return;
   el.textContent += (el.textContent ? '\n' : '') + line;
   el.scrollTop = el.scrollHeight;
+}
+
+// ── 產出設定 ──
+// 這幾組選項對齊產生器視窗（web_ui/app.jsx）：漏送任何一項，產生器端
+// 會用預設值，其中健管費門檻預設 0 等於全部視為達標。
+const RB_REGIONS = ['北投', '士林', '中山'];
+const RB_DOC_GROUPS = [
+  ['醫師（處方費／執行費）', [
+    ['gen_doctor_presc_detail', '處方費 民眾明細表'],
+    ['gen_doctor_exec_detail', '處方執行費 民眾明細表'],
+    ['gen_doctor_receipt', '處方費＋執行費 領據'],
+    ['gen_doctor_summary', '彙整總表 + Excel 統計檔'],
+  ]],
+  ['診所（健康管理費）', [
+    ['gen_health_detail', '健康管理費 民眾明細表'],
+    ['gen_health_receipt', '健康管理費 領據'],
+    ['gen_health_summary', '健管費合併總表 + 個別 Excel'],
+  ]],
+  ['課程老師（處方處置費）', [
+    ['gen_treatment_detail', '處方處置費 民眾明細表'],
+    ['gen_treatment_receipt', '處方處置費 領據'],
+    ['gen_treatment_summary', '處方處置費合併總表'],
+  ]],
+  ['匯款', [
+    ['gen_bank_transfer', '富邦整批轉帳／匯款上傳檔'],
+  ]],
+];
+
+let rbSettingsBuilt = false;
+let rbClinicsLoaded = false;
+
+function rbBuildSettings() {
+  if (rbSettingsBuilt) return;
+  rbSettingsBuilt = true;
+
+  const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+
+  document.getElementById('rbMinWrap').innerHTML = RB_REGIONS.map(r =>
+    `<label style="display:flex;align-items:center;gap:6px">
+       <span style="min-width:34px">${r}</span>
+       <input type="number" min="0" step="4" value="0" id="rbMin_${r}" onchange="rbUpdateSetSum()"
+              style="width:78px;padding:5px 8px;border:1.5px solid var(--border);border-radius:6px;font-family:inherit;font-size:0.82rem;background:var(--surface);color:var(--text)" />
+       <span style="color:var(--text-muted);font-size:0.76rem">份</span>
+     </label>`).join('');
+
+  document.getElementById('rbDocWrap').innerHTML = RB_DOC_GROUPS.map(([title, items]) =>
+    `<div style="border:1px solid var(--border);border-radius:8px;padding:10px 12px">
+       <div style="font-weight:700;font-size:0.79rem;margin-bottom:6px">${esc(title)}</div>
+       ${items.map(([k, name]) =>
+         `<label style="display:flex;align-items:center;gap:7px;padding:2px 0;font-size:0.79rem;cursor:pointer">
+            <input type="checkbox" id="rb_${k}" checked onchange="rbUpdateSetSum()" style="cursor:pointer" />
+            <span>${esc(name)}</span>
+          </label>`).join('')}
+     </div>`).join('');
+
+  rbUpdateSetSum();
+}
+
+// 診所清單向產生器要（loadClinics 讀本機的診所分區檔），雲端不存這份名單
+async function rbLoadClinics(regionsDb) {
+  if (rbClinicsLoaded) return;
+  const wrap = document.getElementById('rbClinicWrap');
+  try {
+    const r = await rbCall('loadClinics', [regionsDb || '', ''], 30000);
+    const groups = (r && r.groups) || [];
+    if (!groups.length) { wrap.textContent = '分區檔沒有讀到診所（產出時等同不過濾）'; return; }
+    const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+    wrap.innerHTML = groups.map(([region, clinics]) =>
+      `<div style="margin-bottom:10px">
+         <div style="font-weight:700;font-size:0.79rem;color:var(--text);margin-bottom:4px">${esc(region)}
+           <span style="font-weight:400;color:var(--text-muted)">（${clinics.length}）</span></div>
+         <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:2px 10px">
+           ${clinics.map(c =>
+             `<label style="display:flex;align-items:center;gap:6px;font-size:0.78rem;color:var(--text);cursor:pointer">
+                <input type="checkbox" class="rb-clinic" value="${esc(c)}" checked onchange="rbUpdateSetSum()" style="cursor:pointer" />
+                <span>${esc(c)}</span>
+              </label>`).join('')}
+         </div>
+       </div>`).join('');
+    rbClinicsLoaded = true;
+  } catch (e) {
+    wrap.textContent = '診所清單載入失敗：' + (e.message || e) + '（產出時等同不過濾）';
+  }
+  rbUpdateSetSum();
+}
+
+function rbClinicAll(on) {
+  document.querySelectorAll('.rb-clinic').forEach(b => { b.checked = on; });
+  rbUpdateSetSum();
+}
+
+function rbUpdateSetSum() {
+  const boxes = [...document.querySelectorAll('.rb-clinic')];
+  const picked = boxes.filter(b => b.checked).length;
+  const cs = document.getElementById('rbClinicSum');
+  if (cs) cs.textContent = boxes.length
+    ? (picked === boxes.length ? `全部 ${boxes.length} 間` : `已選 ${picked} / ${boxes.length} 間`)
+    : '';
+
+  const docs = [...document.querySelectorAll('#rbDocWrap input[type=checkbox]')];
+  const docOn = docs.filter(b => b.checked).length;
+  const region = (document.getElementById('rbRegion') || {}).value || '全部';
+  const mins = RB_REGIONS.map(r => {
+    const el = document.getElementById('rbMin_' + r);
+    return el ? (parseInt(el.value, 10) || 0) : 0;
+  });
+  const minTxt = mins.every(v => v === 0) ? '門檻 0（全部達標）'
+    : '門檻 ' + RB_REGIONS.map((r, i) => `${r} ${mins[i]}`).join('／');
+  const sum = document.getElementById('rbSetSum');
+  if (sum) sum.textContent = `${region}．${minTxt}．文件 ${docOn}/${docs.length}` +
+    (boxes.length && picked < boxes.length ? `．診所 ${picked}/${boxes.length}` : '');
+}
+
+// 組出 generateFromApi 要的完整設定（缺項會讓產生器吃預設值）
+function rbCollectSettings() {
+  const flags = {};
+  RB_DOC_GROUPS.forEach(([, items]) => items.forEach(([k]) => {
+    const el = document.getElementById('rb_' + k);
+    flags[k] = el ? el.checked : true;
+  }));
+
+  const minByRegion = {};
+  RB_REGIONS.forEach(r => {
+    const el = document.getElementById('rbMin_' + r);
+    minByRegion[r] = el ? (parseInt(el.value, 10) || 0) : 0;
+  });
+
+  // 全勾（或清單沒載到）＝ null，代表不過濾；產生器對 null 與空陣列的處理不同
+  let selectedClinics = null;
+  const boxes = [...document.querySelectorAll('.rb-clinic')];
+  if (boxes.length && boxes.some(b => !b.checked)) {
+    selectedClinics = boxes.filter(b => b.checked).map(b => b.value);
+  }
+
+  const pw = document.getElementById('rbMasterPw');
+  return {
+    region: (document.getElementById('rbRegion') || {}).value || '全部',
+    minByRegion,
+    selectedClinics,
+    masterPassword: pw ? pw.value : '',
+    ...flags,
+  };
 }
 
 function rbInitMonthSelect() {
@@ -4469,6 +4678,21 @@ async function rbRun(mode) {
   const year = +document.getElementById('rbYear').value;
   const month = +document.getElementById('rbMonth').value;
 
+  if (mode === 'generate') {
+    const boxes = [...document.querySelectorAll('.rb-clinic')];
+    if (boxes.length && !boxes.some(b => b.checked)) {
+      rbShowResult('bad', '<b>沒有選任何診所</b><br>請在「產出設定 → 產出診所」至少勾一間，或按「全選」。');
+      document.getElementById('rbSettings').open = true;
+      return;
+    }
+    const docs = [...document.querySelectorAll('#rbDocWrap input[type=checkbox]')];
+    if (docs.length && !docs.some(b => b.checked)) {
+      rbShowResult('bad', '<b>沒有選任何文件</b><br>請在「產出設定 → 產出文件」至少勾一項。');
+      document.getElementById('rbSettings').open = true;
+      return;
+    }
+  }
+
   rbSetBusy(true);
   document.getElementById('rbResult').style.display = 'none';
   document.getElementById('rbProgWrap').style.display = '';
@@ -4485,12 +4709,13 @@ async function rbRun(mode) {
         `執行：<code>${r.execution}</code><br>` +
         `可以拿去跟系統手動匯出的比對，確認無誤再按「一鍵產出」。`);
     } else {
+      const cfg = rbCollectSettings();
       await rbCall('generateFromApi', [{
         year, month,
-        region: 'all',
         output: init.output,
         peopleDb: init.peopleDb,
         regionsDb: init.regionsDb,
+        ...cfg,
       }]);
       rbShowResult('ok',
         `<b>核銷文件已產出</b><br>輸出位置：<code>${init.output}</code><br>` +
