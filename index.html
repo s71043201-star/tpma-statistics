@@ -4399,9 +4399,12 @@ const RB_BASE = 'http://127.0.0.1:5173';
 let rbBusy = false;
 let rbEvents = null;
 
-async function rbCall(name, args = [], timeoutMs = 600000) {
+// timeoutMs 傳 0 ＝ 不設上限。抓資料與產出都可能跑很久（近兩萬筆、
+// 幾百份 Word→PDF），設上限只會在中途砍掉連線；產生器端不會因此停手，
+// 檔案照樣產完，反而讓人以為失敗了。狀態檢查類才需要快速失敗。
+async function rbCall(name, args = [], timeoutMs = 0) {
   const ctl = new AbortController();
-  const timer = setTimeout(() => ctl.abort(), timeoutMs);
+  const timer = timeoutMs ? setTimeout(() => ctl.abort(), timeoutMs) : null;
   try {
     const r = await fetch(`${RB_BASE}/api/${name}`, {
       method: 'POST',
@@ -4413,7 +4416,7 @@ async function rbCall(name, args = [], timeoutMs = 600000) {
     if (!j.ok) throw new Error(j.err || '產生器回報失敗');
     return j.result;
   } finally {
-    clearTimeout(timer);
+    if (timer) clearTimeout(timer);
   }
 }
 
@@ -4726,7 +4729,9 @@ async function rbRun(mode) {
   } catch (e) {
     const msg = String(e.message || e);
     rbShowResult('bad', `<b>失敗</b><br>${msg}<br>` +
-      (msg.includes('abort') ? '（逾時。資料量大時請直接在產生器視窗操作。）' : '詳細訊息見上方記錄與產生器視窗。'));
+      (msg.includes('abort') || msg.includes('Failed to fetch')
+        ? '（與產生器的連線中斷。產生器端多半還在繼續跑 —— 看它的視窗，或直接去輸出資料夾確認。）'
+        : '詳細訊息見上方記錄與產生器視窗。'));
   } finally {
     rbSetBusy(false);
   }
