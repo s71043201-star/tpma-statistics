@@ -2027,6 +2027,40 @@ let rawRows = []; // 原始 row 資料，供日期篩選用
 // 測試資料:開立診所為 ITRI(工研院自測),不列入任何統計
 const TEST_CLINICS = ['ITRI'];
 const stripTestRows = rows => (rows || []).filter(r => !TEST_CLINICS.includes(r.clinic));
+
+// ══════════════════════════════════════════════
+//  診所更名／遷址對照
+//  健康處方管理系統沒有「診所改名」功能,已開立的處方也無法回溯改開立診所,
+//  所以在儀表板端依「開立日期」把來源資料的舊名字換成新名字。
+//  以後同步進來的新資料會自動套用,不用每次手動改。
+//    from  : 來源資料(健康處方系統)裡的診所名
+//    to    : 統計要顯示的名字
+//    since : 生效日(含)。開立日期 >= since 才換名,之前的維持舊名分開統計;
+//            留空 = 不分日期,整間診所的歷史全部併到新名字。
+//  若來源系統日後真的建了新診所、改用新名字開立,就把對應那條規則刪掉,
+//  否則「↓ Excel」會拿舊名字去查而抓不到新開立的紀錄。
+const CLINIC_RENAMES = [
+  // 2026-08-10 遷址更名:洪耳鼻喉科診所 → 仁禾診所
+  { from: '洪耳鼻喉科診所', to: '仁禾診所', since: '2026-08-10' },
+];
+function renameClinic(name, prescDate){
+  const key = (name || '').toString().trim();
+  if(!key) return name;
+  const rule = CLINIC_RENAMES.find(x => x.from === key && (!x.since || (prescDate || '') >= x.since));
+  return rule ? rule.to : name;
+}
+const applyClinicRenames = rows => (rows || []).map(r => {
+  const to = renameClinic(r.clinic, r.prescDate);
+  return to === r.clinic ? r : { ...r, clinic: to };
+});
+// rawRows 的唯一入口:去掉測試資料 + 套用更名(雲端同步與 Excel 上傳都走這裡)
+const normalizeRawRows = rows => applyClinicRenames(stripTestRows(rows));
+// 顯示名 → 來源名(反查)。診所紀錄下載要用來源名去打 API,新名字在來源系統查不到。
+function sourceClinicName(displayName){
+  const key = (displayName || '').toString().trim();
+  const rule = CLINIC_RENAMES.find(x => x.to === key);
+  return rule ? rule.from : displayName;
+}
 let courseSlots = []; // 課程時段資料(從 admin/slots/summary 來)
 let courseSlotStats = null; // 課程總計
 let pinnedDates = new Set(); // 處方日等需置頂的日期(雲端同步)
@@ -2065,7 +2099,7 @@ async function loadFromCloud(auto) {
       setCloudStatus('error', '❌ 讀取失敗：' + (error && error.message || '資料表尚無資料，請先上傳 Excel'));
       return;
     }
-    rawRows = stripTestRows(data.raw_rows);
+    rawRows = normalizeRawRows(data.raw_rows);
     if(rawRows.length){
       // 有 raw_rows 就以它為單一資料來源,即時重算所有聚合
       const agg = aggregateRawRows(rawRows);
@@ -2351,7 +2385,11 @@ function xyScales(isH=false){
 function getRegionOfClinic(name){
   if(!name) return '未分區';
   const key = name.toString().trim();
-  return clinicRegionMap[key] || '未分區';
+  if(clinicRegionMap[key]) return clinicRegionMap[key];
+  // 更名後的新名字還沒加進分區 Excel 時,先沿用舊名字的區,免得整間變「未分區」
+  const src = sourceClinicName(key);
+  if(src !== key && clinicRegionMap[src]) return clinicRegionMap[src];
+  return '未分區';
 }
 
 // ══════════════════════════════════════════════
@@ -3138,7 +3176,8 @@ async function requestClinicExport(clinicName, btn) {
   try {
     const { data, error } = await sbClient
       .from('clinic_export_requests')
-      .insert({ clinic_name: clinicName, password: pwd, status: 'pending' })
+      // 更名過的診所要用來源系統的舊名字查,新名字在健康處方系統裡查不到
+      .insert({ clinic_name: sourceClinicName(clinicName), password: pwd, status: 'pending' })
       .select('id').single();
     if (error || !data) throw new Error(error && error.message || '請確認 clinic_export_requests 表已建立');
     requestId = data.id;
@@ -3218,7 +3257,9 @@ async function requestBulkClinicExport(btn) {
   try {
     const { data, error } = await sbClient
       .from('clinic_export_requests')
-      .insert(targets.map(t => ({ clinic_name: t.診所名稱, password: pwd, status: 'pending' })))
+      // 換成來源名並去重:更名前後的兩列會指到來源系統的同一間診所
+      .insert([...new Set(targets.map(t => sourceClinicName(t.診所名稱)))]
+                .map(name => ({ clinic_name: name, password: pwd, status: 'pending' })))
       .select('id, clinic_name');
     if (error || !data) throw new Error(error && error.message || '請確認 clinic_export_requests 表已建立');
     rows = data;
@@ -3810,7 +3851,7 @@ async function handleRegionFile(file){
 function getUnassignedClinics(){
   const source = clinicStats.length ? clinicStats.map(c=>c.診所名稱) : [];
   const set = new Set();
-  source.forEach(n=>{ const k=(n||'').toString().trim(); if(k && !clinicRegionMap[k]) set.add(k); });
+  source.forEach(n=>{ const k=(n||'').toString().trim(); if(k && getRegionOfClinic(k)==='未分區') set.add(k); });
   return [...set];
 }
 
@@ -3947,10 +3988,20 @@ function voucherClinicRows(){
   const reg = (currentRegion && currentRegion !== 'all') ? currentRegion : null;
   // 排序一定要在前端做：後端雖然按待發張數排好才寫入，但 Supabase 的 jsonb 會把物件的
   // 鍵重新正規化排序（實測變成按鍵長度），存進去的順序拿不回來。
-  return Object.entries(s.by_clinic)
-    .map(([name, v]) => ({name, region: v.region || '未分區',
-                          done4: Number(v.done4)||0, claimed: Number(v.claimed)||0,
-                          unclaimed: Number(v.unclaimed)||0}))
+  // 更名／遷址的診所:禮券是回實體診所領的,後端算出來的 by_clinic 沒有日期可切,
+  // 所以整間(含更名前那段)併到新名字,才不會叫民眾跑去已經不在的舊址。
+  const merged = {};
+  Object.entries(s.by_clinic).forEach(([name, v]) => {
+    const rule = CLINIC_RENAMES.find(x => x.from === (name || '').toString().trim());
+    const key  = rule ? rule.to : name;
+    const m = merged[key] || (merged[key] = {name: key, region: '', done4: 0, claimed: 0, unclaimed: 0});
+    const rg = rule ? getRegionOfClinic(key) : (v.region || '未分區');
+    if(!m.region || m.region === '未分區') m.region = rg;
+    m.done4     += Number(v.done4)||0;
+    m.claimed   += Number(v.claimed)||0;
+    m.unclaimed += Number(v.unclaimed)||0;
+  });
+  return Object.values(merged)
     .filter(r => !reg || r.region === reg)
     .sort((a, b) => b.unclaimed - a.unclaimed || b.done4 - a.done4 || a.name.localeCompare(b.name, 'zh-TW'));
 }
@@ -4317,7 +4368,7 @@ function parseExcel(file){
           const enrolled=!!(colEnroll&&row[colEnroll]&&row[colEnroll].toString().trim().toUpperCase()==='V');
           parsed.push({prescDate:pd.toISOString().slice(0,10),execDate:edDate?edDate.toISOString().slice(0,10):null,type,clinic,ex,enrolled});
         });
-        rawRows=stripTestRows(parsed);
+        rawRows=normalizeRawRows(parsed);
         updateDateFilterRange();
         resolve(aggregateRawRows(rawRows));
       }catch(err){reject('解析失敗：'+err.message);}
