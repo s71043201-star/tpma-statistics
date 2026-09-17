@@ -852,6 +852,23 @@ body.is-loading .chart-wrap::after {
 #week-note-bar strong { color: #5a4d08; }
 .week-note-icon { flex-shrink: 0; display: inline-flex; }
 
+/* ── 開立數里程碑警示列(單次) ── */
+#presc-alert-bar {
+  margin: 12px 36px 0;
+  background: #fff4f1; border: 1px solid #f0b3a6; border-radius: 10px;
+  padding: 10px 16px; font-size: 0.86rem; color: #8c2f1c;
+  display: none; align-items: center; gap: 9px; font-weight: 600;
+  box-shadow: 0 2px 10px rgba(198,64,40,0.10);
+}
+#presc-alert-bar.show { display: flex; }
+#presc-alert-bar strong { color: #b3301a; }
+#presc-alert-bar .pa-close {
+  margin-left: auto; flex-shrink: 0; cursor: pointer;
+  background: none; border: none; color: #b3301a;
+  font-size: 1rem; line-height: 1; padding: 2px 7px; border-radius: 6px;
+}
+#presc-alert-bar .pa-close:hover { background: #f7d8d0; }
+
 /* ── Footer ── */
 footer {
   text-align: center; padding: 22px; font-size: 0.77rem;
@@ -887,7 +904,7 @@ footer {
   .chart-type-bar, .period-bar { padding: 10px 14px 0; gap: 7px; }
   .clinic-sort-bar { padding: 12px 14px 0; }
   #filter-panel { margin: 12px; padding: 12px 14px; }
-  #data-tools, #week-note-bar { margin: 10px 12px 0; }
+  #data-tools, #week-note-bar, #presc-alert-bar { margin: 10px 12px 0; }
   /* 同樣要跟手機版的 .chart-section(margin: 12px)對齊 */
   #tab-voucher #voucher-panel { margin: 12px; padding: 16px 15px 15px; }
   #voucher-panel .vp-body { gap: 8px; }
@@ -1056,6 +1073,13 @@ footer {
 <div id="week-note-bar">
   <span class="week-note-icon"><svg class="ic" viewBox="0 0 24 24" style="width:15px;height:15px"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg></span>
   <span>週次定義：每週<strong>週六</strong>起算至<strong>下週五</strong>結束（例：2026W12 = 03/21～03/27）</span>
+</div>
+
+<!-- 開立數里程碑警示（單次；總開立數超過門檻才出現） -->
+<div id="presc-alert-bar">
+  <span class="week-note-icon"><svg class="ic" viewBox="0 0 24 24" style="width:16px;height:16px"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0Z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg></span>
+  <span id="presc-alert-text"></span>
+  <button class="pa-close" onclick="dismissPrescribeAlert()" title="關閉這則警示">✕</button>
 </div>
 
 <!-- 摘要卡片（5 張） -->
@@ -2029,6 +2053,56 @@ const TEST_CLINICS = ['ITRI'];
 const stripTestRows = rows => (rows || []).filter(r => !TEST_CLINICS.includes(r.clinic));
 
 // ══════════════════════════════════════════════
+//  開立數里程碑警示(單次)
+//  總開立數一超過門檻就跳一次系統警示 + 頁面上方紅色警示列,
+//  之後同一台瀏覽器不再重複提醒(狀態存 localStorage)。
+//  ・門檻算的是「全部資料」的總開立數,不受區域/日期篩選影響,
+//    而且跟總開立數卡片同口徑(已排除 ITRI 測試處方)。
+//  ・要換門檻:改 PRESCRIBE_ALERT_THRESHOLD 即可,key 會跟著變,
+//    等於自動重新武裝一次。
+//  ・要手動重發:瀏覽器 console 打 resetPrescribeAlert()。
+// ══════════════════════════════════════════════
+const PRESCRIBE_ALERT_THRESHOLD = 65000;
+const PRESCRIBE_ALERT_KEY = 'prescribeAlertFired_' + PRESCRIBE_ALERT_THRESHOLD;
+
+let _allPrescTotal = 0, _allPrescTotalFor = -1;  // 依 rawRows 筆數快取,避免每次 updateSummary 重算
+function getUnfilteredPrescribeTotal(fallback){
+  if(!rawRows.length) return fallback;                  // 無 raw_rows 時只能拿聚合值頂著
+  if(_allPrescTotalFor === rawRows.length) return _allPrescTotal;
+  _allPrescTotal = rawRows.reduce((s,r) => s + (r.prescDate && isoWeekLabel(new Date(r.prescDate)) ? 1 : 0), 0);
+  _allPrescTotalFor = rawRows.length;
+  return _allPrescTotal;
+}
+
+function checkPrescribeAlert(fallbackTotal){
+  let fired = false;
+  try { fired = !!localStorage.getItem(PRESCRIBE_ALERT_KEY); } catch(e){}
+  if(fired) return;                                     // 已經警示過就不再吵
+  const total = getUnfilteredPrescribeTotal(fallbackTotal);
+  if(!(total > PRESCRIBE_ALERT_THRESHOLD)) return;
+  try { localStorage.setItem(PRESCRIBE_ALERT_KEY, new Date().toISOString()); } catch(e){}
+  const msg = `總開立數已達 ${total.toLocaleString()} 筆，超過設定門檻 ${PRESCRIBE_ALERT_THRESHOLD.toLocaleString()} 筆。`;
+  const bar = document.getElementById('presc-alert-bar');
+  const txt = document.getElementById('presc-alert-text');
+  if(txt) txt.innerHTML = `<strong>開立數警示</strong>　${msg}（此警示只發一次）`;
+  if(bar) bar.classList.add('show');
+  // 延後跳視窗,先讓卡片/圖表畫完再擋畫面
+  setTimeout(() => alert('⚠️ 開立數警示\n\n' + msg + '\n\n此為單次警示,關掉後不會再提醒。'), 0);
+}
+
+function dismissPrescribeAlert(){
+  const bar = document.getElementById('presc-alert-bar');
+  if(bar) bar.classList.remove('show');
+}
+
+// 手動重新武裝(console 用):清掉紀錄後下次重新整理會再警示一次
+function resetPrescribeAlert(){
+  try { localStorage.removeItem(PRESCRIBE_ALERT_KEY); } catch(e){}
+  dismissPrescribeAlert();
+  console.log('開立數警示已重設,門檻 ' + PRESCRIBE_ALERT_THRESHOLD.toLocaleString() + ',重新整理後會再判斷一次');
+}
+
+// ══════════════════════════════════════════════
 //  診所更名／遷址對照
 //  健康處方管理系統沒有「診所改名」功能,已開立的處方也無法回溯改開立診所,
 //  所以在儀表板端依「開立日期」把來源資料的舊名字換成新名字。
@@ -2469,6 +2543,9 @@ function updateSummary(){
   setDelta('sumTotalToday',  todayPresc);
   setDelta('sumExecToday',   todayExec);
   setDelta('sumEnrollToday', todayEnroll);
+
+  // 開立數單次里程碑警示(用全量資料判斷,不受篩選影響)
+  checkPrescribeAlert(total);
 
   // 執行數拆成實體 / 線上。線上課(YouTube 影片課)沒有場次,靠 raw_row 的 oc 認列。
   // 這裡要用「跟 weeklyData 同一組篩選後的 rawRows」,否則區域/日期篩選一套上,
