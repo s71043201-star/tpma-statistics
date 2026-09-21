@@ -2129,6 +2129,49 @@ const applyClinicRenames = rows => (rows || []).map(r => {
 });
 // rawRows 的唯一入口:去掉測試資料 + 套用更名(雲端同步與 Excel 上傳都走這裡)
 const normalizeRawRows = rows => applyClinicRenames(stripTestRows(rows));
+
+// ── raw_rows 分片 ──────────────────────────────
+// 整包 raw_rows 塞進 id='main' 單列 jsonb,4.5 萬筆就是 7MB 以上,一次 upsert 會撞上
+// Postgres statement timeout(57014),同步時好時壞。改成拆成多列寫入,讀取時再拼回來。
+// 分片列的 id 是 main:rows:000、main:rows:001…(補零才能靠字串排序拿到正確順序)。
+// 實測:1 萬筆(1.47MB)單次 upsert 要 6.3 秒,離 timeout 太近;5 千筆約 0.74MB 才有安全邊際。
+const RAW_CHUNK_PREFIX = 'main:rows:';
+const RAW_CHUNK_SIZE   = 5000;
+const rawChunkId = i => RAW_CHUNK_PREFIX + String(i).padStart(3, '0');
+
+// 讀回所有分片並拼接。沒有分片(舊格式或還沒同步過)時回空陣列,由呼叫端 fallback 到 main.raw_rows。
+async function loadRawRowChunks() {
+  const { data, error } = await sbClient
+    .from('prescription_data')
+    .select('id,raw_rows')
+    .like('id', RAW_CHUNK_PREFIX + '%')
+    .order('id');
+  if (error) { console.warn('loadRawRowChunks error:', error); return []; }
+  return (data || []).flatMap(c => c.raw_rows || []);
+}
+
+// 分片寫入,並把這次用不到的舊分片清成空陣列(anon 不一定有 DELETE 權限,清空最保險)。
+async function saveRawRowChunks(rows, uploadedAt) {
+  const list = rows || [];
+  const n = Math.ceil(list.length / RAW_CHUNK_SIZE);
+  for (let i = 0; i < n; i++) {
+    const { error } = await sbClient.from('prescription_data').upsert({
+      id: rawChunkId(i),
+      raw_rows: list.slice(i * RAW_CHUNK_SIZE, (i + 1) * RAW_CHUNK_SIZE),
+      uploaded_at: uploadedAt,
+    });
+    if (error) { console.warn('saveRawRowChunks error:', error); return false; }
+  }
+  const { data: existing } = await sbClient
+    .from('prescription_data').select('id').like('id', RAW_CHUNK_PREFIX + '%');
+  for (const e of (existing || [])) {
+    const idx = parseInt(e.id.slice(RAW_CHUNK_PREFIX.length), 10);
+    if (Number.isFinite(idx) && idx >= n) {
+      await sbClient.from('prescription_data').upsert({ id: e.id, raw_rows: [], uploaded_at: uploadedAt });
+    }
+  }
+  return true;
+}
 // 顯示名 → 來源名(反查)。診所紀錄下載要用來源名去打 API,新名字在來源系統查不到。
 function sourceClinicName(displayName){
   const key = (displayName || '').toString().trim();
@@ -2173,7 +2216,9 @@ async function loadFromCloud(auto) {
       setCloudStatus('error', '❌ 讀取失敗：' + (error && error.message || '資料表尚無資料，請先上傳 Excel'));
       return;
     }
-    rawRows = normalizeRawRows(data.raw_rows);
+    // 先讀分片;讀不到才回頭用 main.raw_rows(舊格式,或 n8n 還沒切換到分片寫入)
+    const chunkedRows = await loadRawRowChunks();
+    rawRows = normalizeRawRows(chunkedRows.length ? chunkedRows : data.raw_rows);
     if(rawRows.length){
       // 有 raw_rows 就以它為單一資料來源,即時重算所有聚合
       const agg = aggregateRawRows(rawRows);
@@ -2346,10 +2391,12 @@ async function saveToCloud(payload) {
     file_name:       payload.fileName,
     uploaded_at:     new Date().toISOString()
   };
-  if (payload.rawRows) row.raw_rows = payload.rawRows;
+  // raw_rows 改走分片(理由見 saveRawRowChunks),main 這列不再扛整包
+  if (payload.rawRows) row.raw_rows = [];
   const { error } = await sbClient.from('prescription_data').upsert(row);
-  if (error) console.warn('saveToCloud error:', error);
-  return !error;
+  if (error) { console.warn('saveToCloud error:', error); return false; }
+  if (payload.rawRows) return await saveRawRowChunks(payload.rawRows, row.uploaded_at);
+  return true;
 }
 
 // ══════════════════════════════════════════════
