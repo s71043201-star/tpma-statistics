@@ -4031,8 +4031,12 @@ function renderVoucherPanel(){
 
   // 區域篩選:'all' 用總計,否則取 by_region 該區(沒有該區資料就當 0)
   const reg = (currentRegion && currentRegion !== 'all') ? currentRegion : null;
-  const d = reg ? ((s.by_region || {})[reg] || {done4:0, claimed:0, unclaimed:0}) : s;
+  const d = reg ? ((s.by_region || {})[reg] || {done4:0, claimed:0, unclaimed:0, unknown:0}) : s;
   const done4 = Number(d.done4) || 0, claimed = Number(d.claimed) || 0, unclaimed = Number(d.unclaimed) || 0;
+  // 點數查不到的人:done4 照算(那是處方紀錄算出來的),但沒辦法判定領沒領。
+  // 舊快照沒有 unknown 欄位,那時候這些人是被整個丟掉的,用 errors 當替代顯示。
+  const unknown = ('unknown' in d) ? (Number(d.unknown) || 0)
+                                   : (reg ? 0 : Number(s.errors) || 0);
 
   panel.classList.remove('hidden');
   document.getElementById('vpScope').textContent = reg || '全部區域';
@@ -4051,7 +4055,9 @@ function renderVoucherPanel(){
   const notes = [`四項處方全部執行完成者共 <b>${done4.toLocaleString()}</b> 人，已領禮券 <b>${rate}%</b>；`
                + `尚有 <b style="color:#c77a06">${unclaimed.toLocaleString()}</b> 人可領未領。`];
   if(!reg && s.balance_not_full) notes.push(`其中 ${s.balance_not_full} 人點數餘額已不是 400（另有集點活動加減過），仍以「有無扣 400 點紀錄」認定未領。`);
-  if(!reg && s.errors)           notes.push(`另有 ${s.errors} 人查詢點數失敗，未列入統計。`);
+  if(unknown) notes.push(`<b style="color:#c0392b">⚠ 另有 ${unknown.toLocaleString()} 人點數查詢失敗</b>，`
+                       + `已計入「完成四項」，但無法判定領過沒有，<b>未計入已領／待發</b>——`
+                       + `待發張數會偏低，請按「更新」重跑，或查 C:/prescription/logs/voucher-stats.log。`);
   document.getElementById('vpNote').innerHTML = notes.join(' ');
 
   buildVoucherClinicTable();
@@ -4071,12 +4077,13 @@ function voucherClinicRows(){
   Object.entries(s.by_clinic).forEach(([name, v]) => {
     const rule = CLINIC_RENAMES.find(x => x.from === (name || '').toString().trim());
     const key  = rule ? rule.to : name;
-    const m = merged[key] || (merged[key] = {name: key, region: '', done4: 0, claimed: 0, unclaimed: 0});
+    const m = merged[key] || (merged[key] = {name: key, region: '', done4: 0, claimed: 0, unclaimed: 0, unknown: 0});
     const rg = rule ? getRegionOfClinic(key) : (v.region || '未分區');
     if(!m.region || m.region === '未分區') m.region = rg;
     m.done4     += Number(v.done4)||0;
     m.claimed   += Number(v.claimed)||0;
     m.unclaimed += Number(v.unclaimed)||0;
+    m.unknown   += Number(v.unknown)||0;
   });
   return Object.values(merged)
     .filter(r => !reg || r.region === reg)
@@ -4096,11 +4103,14 @@ function buildVoucherClinicTable(){
   }
 
   const totalPending = rows.reduce((n, r) => n + r.unclaimed, 0);
+  const totalUnknown = rows.reduce((n, r) => n + (r.unknown || 0), 0);
   const pendingClinics = rows.filter(r => r.unclaimed > 0).length;
   if(hint){
     hint.innerHTML = `共 <b>${pendingClinics}</b> 家診所有待發禮券，合計需準備 `
                    + `<b style="color:#c77a06">${totalPending.toLocaleString()}</b> 張`
-                   + `（面額 400 點，約 ${(totalPending * 400).toLocaleString()} 點）。依待發張數由多到少排列。`;
+                   + `（面額 400 點，約 ${(totalPending * 400).toLocaleString()} 點）。依待發張數由多到少排列。`
+                   + (totalUnknown ? `<br><b style="color:#c0392b">⚠ 另有 ${totalUnknown.toLocaleString()} `
+                        + `人點數查詢失敗（表中以 ⚠ 標示），狀態不明未計入待發，實際需求可能更多。</b>` : '');
   }
 
   body.innerHTML = rows.map((r, i) => {
@@ -4111,7 +4121,8 @@ function buildVoucherClinicTable(){
       <td>${p2Esc(r.region)}</td>
       <td>${r.done4.toLocaleString()}</td>
       <td>${r.claimed.toLocaleString()}</td>
-      <td><b style="color:${r.unclaimed ? '#c77a06' : 'var(--text-muted)'}">${r.unclaimed.toLocaleString()}</b></td>
+      <td><b style="color:${r.unclaimed ? '#c77a06' : 'var(--text-muted)'}">${r.unclaimed.toLocaleString()}</b>${
+        r.unknown ? `<span style="color:#c0392b;font-weight:700;margin-left:5px" title="另有 ${r.unknown} 人點數查詢失敗，狀態不明，未計入待發">⚠${r.unknown}</span>` : ''}</td>
       <td>${rate}%</td>
     </tr>`;
   }).join('')
@@ -4127,14 +4138,15 @@ function buildVoucherClinicTable(){
 function exportVoucherClinics(){
   const rows = voucherClinicRows();
   if(!rows.length){ alert('尚無資料可匯出'); return; }
-  const aoa = [['診所名稱','所屬區','完成四項','已領禮券','待發禮券','兌換率(%)']];
-  rows.forEach(r => aoa.push([r.name, r.region, r.done4, r.claimed, r.unclaimed,
+  const aoa = [['診所名稱','所屬區','完成四項','已領禮券','待發禮券','狀態不明','兌換率(%)']];
+  rows.forEach(r => aoa.push([r.name, r.region, r.done4, r.claimed, r.unclaimed, r.unknown || 0,
                               r.done4 ? Number((r.claimed/r.done4*100).toFixed(1)) : 0]));
   aoa.push(['合計', rows.length + ' 家', rows.reduce((n,r)=>n+r.done4,0),
-            rows.reduce((n,r)=>n+r.claimed,0), rows.reduce((n,r)=>n+r.unclaimed,0), '']);
+            rows.reduce((n,r)=>n+r.claimed,0), rows.reduce((n,r)=>n+r.unclaimed,0),
+            rows.reduce((n,r)=>n+(r.unknown||0),0), '']);
   const wb = XLSX.utils.book_new();
   const ws = XLSX.utils.aoa_to_sheet(aoa);
-  ws['!cols'] = [{wch:26},{wch:10},{wch:10},{wch:10},{wch:10},{wch:10}];
+  ws['!cols'] = [{wch:26},{wch:10},{wch:10},{wch:10},{wch:10},{wch:10},{wch:10}];
   XLSX.utils.book_append_sheet(wb, ws, '各診所待發禮券');
   const at = voucherStats && voucherStats.updated_at ? new Date(voucherStats.updated_at) : new Date();
   const stamp = at.getFullYear() + String(at.getMonth()+1).padStart(2,'0') + String(at.getDate()).padStart(2,'0');
