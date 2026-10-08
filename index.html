@@ -2048,8 +2048,8 @@ let currentRegion   = 'all'; // 'all'|'北投區'|'士林區'|'中山區'
 let weeklyData = [], typeStats = [], typeWeeklyRaw = [], clinicStats = [];
 let monthlyData = [], typeMonthlyRaw = [];
 let rawRows = []; // 原始 row 資料，供日期篩選用
-// 測試資料:開立診所為 ITRI(工研院自測),不列入任何統計
-const TEST_CLINICS = ['ITRI'];
+// 測試資料:開立診所為 ITRI、itri7(工研院自測),不列入任何統計
+const TEST_CLINICS = ['ITRI', 'itri7'];
 const stripTestRows = rows => (rows || []).filter(r => !TEST_CLINICS.includes(r.clinic));
 
 // ══════════════════════════════════════════════
@@ -2057,7 +2057,7 @@ const stripTestRows = rows => (rows || []).filter(r => !TEST_CLINICS.includes(r.
 //  總開立數一超過門檻就跳一次系統警示 + 頁面上方紅色警示列,
 //  之後同一台瀏覽器不再重複提醒(狀態存 localStorage)。
 //  ・門檻算的是「全部資料」的總開立數,不受區域/日期篩選影響,
-//    而且跟總開立數卡片同口徑(已排除 ITRI 測試處方)。
+//    而且跟總開立數卡片同口徑(已排除 ITRI、itri7 測試處方)。
 //  ・要換門檻:改 PRESCRIBE_ALERT_THRESHOLD 即可,key 會跟著變,
 //    等於自動重新武裝一次。
 //  ・要手動重發:瀏覽器 console 打 resetPrescribeAlert()。
