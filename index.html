@@ -2139,15 +2139,116 @@ const RAW_CHUNK_PREFIX = 'main:rows:';
 const RAW_CHUNK_SIZE   = 5000;
 const rawChunkId = i => RAW_CHUNK_PREFIX + String(i).padStart(3, '0');
 
-// 讀回所有分片並拼接。沒有分片(舊格式或還沒同步過)時回空陣列,由呼叫端 fallback 到 main.raw_rows。
-async function loadRawRowChunks() {
-  const { data, error } = await sbClient
-    .from('prescription_data')
-    .select('id,raw_rows')
-    .like('id', RAW_CHUNK_PREFIX + '%')
-    .order('id');
-  if (error) { console.warn('loadRawRowChunks error:', error); return []; }
-  return (data || []).flatMap(c => c.raw_rows || []);
+// 讀回所有分片並拼接。沒有分片(舊格式或還沒同步過)時回空陣列,由呼叫端 fallback 到 main.raw_rows;
+// 讀取失敗回 null(呼叫端改用快取或 fallback,但不能把這份不完整的結果寫進快取)。
+// 一片一片讀:13 片一次撈要 5~8 秒,n8n 同時在寫分片時會撞 statement timeout(57014,實測 2026-10-16)。
+async function loadRawRowChunks(ids) {
+  if (!ids) {
+    const { data, error } = await sbClient.from('prescription_data')
+      .select('id').like('id', RAW_CHUNK_PREFIX + '%').order('id');
+    if (error) { console.warn('loadRawRowChunks error:', error); return null; }
+    ids = (data || []).map(r => r.id);
+  }
+  ids = ids.filter(id => id.startsWith(RAW_CHUNK_PREFIX)).sort();
+  const parts = new Array(ids.length);
+  let next = 0, failed = false;
+  const worker = async () => {
+    while (!failed && next < ids.length) {
+      const i = next++;
+      for (let attempt = 0; ; attempt++) {
+        const { data, error } = await sbClient.from('prescription_data')
+          .select('raw_rows').eq('id', ids[i]).single();
+        if (!error) { parts[i] = (data && data.raw_rows) || []; break; }
+        if (attempt >= 1) { console.warn('loadRawRowChunks error:', ids[i], error); failed = true; return; }
+      }
+    }
+  };
+  await Promise.all([worker(), worker(), worker()]);
+  return failed ? null : parts.flat();
+}
+
+// ── 雲端讀取省流量 ──────────────────────────────
+// Supabase 免費方案 egress 每月 5GB。整包讀一次 = 分片 raw_rows 約 13MB + main.course_slots 約 2.2MB,
+// 以前每次載入都 select('*'),開著的分頁每 5 分鐘再整包重抓一次,2026-09 週期因此超額到 164%。
+// n8n / Excel 上傳每次都把 main 與所有分片的 uploaded_at 一起更新,所以先只查這幾列的時間戳
+// 當「版本簽章」:沒變就沿用記憶體或 IndexedDB 裡的上一份,不重下大包。
+// HEAVY = 跟著同步一起變的欄位(簽章沒變就不重抓);LIGHT = 其他程式各自寫、不會動到 uploaded_at 的小欄位,
+// 每次都讀(合計約 50KB)。
+const MAIN_HEAVY_COLS = ['uploaded_at','date_range','file_name','course_slots','course_slot_stats',
+                         'weekly_data','type_stats','type_weekly_raw','clinic_stats'];
+const MAIN_LIGHT_COLS = ['clinic_region_map','latest_weekly_report','weekly_report_alert',
+                         'voucher_stats','clinic_notes','pinned_dates'];
+const CLOUD_CACHE_VERSION = 1;
+let _cloudCache = null;      // { v, sig, main, rows } 上一次完整下載的結果
+let _lastLightJson = null;   // 上一次 LIGHT 欄位內容,用來判斷背景更新要不要重畫
+const _missingMainCols = new Set(); // 資料庫還沒建的欄位(如 weekly_report_alert),記住免得每次都先撞 400
+
+// 指名欄位查 main 這列。欄位不存在時 PostgREST 會整個回 42703,這裡把那欄拿掉再試,
+// 行為等同以前 select('*') 時「沒有那欄就是 undefined」。
+async function selectMainCols(cols) {
+  for (;;) {
+    const list = cols.filter(c => !_missingMainCols.has(c));
+    const { data, error } = await sbClient.from('prescription_data')
+      .select(list.join(',')).eq('id','main').single();
+    const m = error && error.code === '42703' && /column (?:\w+\.)?(\w+) does not exist/.exec(error.message || '');
+    if (m && list.includes(m[1])) { _missingMainCols.add(m[1]); continue; }
+    return { data, error };
+  }
+}
+
+// 版本簽章:main + 所有分片的 id@uploaded_at(只有十幾列 × 兩個小欄位,約 1KB)。
+// 回 { sig, ids };讀不到回 null = 不用快取。
+async function fetchCloudSignature() {
+  const { data, error } = await sbClient.from('prescription_data')
+    .select('id,uploaded_at').like('id', 'main%').order('id');
+  if (error || !data || !data.length) return null;
+  return { sig: data.map(r => r.id + '@' + (r.uploaded_at || '')).join('|'), ids: data.map(r => r.id) };
+}
+
+// IndexedDB 快取(跨重新整理/重開分頁沿用)。任何一步失敗都當沒有快取,絕不擋住正常載入。
+const CLOUD_IDB = 'tpma-cloud-cache';
+function cloudIdbOpen() {
+  return new Promise((resolve, reject) => {
+    const req = indexedDB.open(CLOUD_IDB, 1);
+    req.onupgradeneeded = () => req.result.createObjectStore('kv');
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  });
+}
+async function cloudIdbGet(key) {
+  try {
+    const db = await cloudIdbOpen();
+    return await new Promise(resolve => {
+      const q = db.transaction('kv').objectStore('kv').get(key);
+      q.onsuccess = () => resolve(q.result || null);
+      q.onerror = () => resolve(null);
+    });
+  } catch (e) { return null; }
+}
+async function cloudIdbPut(key, val) {
+  try {
+    const db = await cloudIdbOpen();
+    await new Promise(resolve => {
+      const t = db.transaction('kv', 'readwrite');
+      t.objectStore('kv').put(val, key);
+      t.oncomplete = t.onerror = t.onabort = () => resolve();
+    });
+  } catch (e) { /* 存不了就算了,下次照樣從雲端讀 */ }
+}
+
+// 完整下載 HEAVY 欄位 + raw_rows。complete=false 表示有一段沒讀到,不可寫進快取。
+async function fetchCloudHeavy(chunkIds) {
+  const { data, error } = await selectMainCols(MAIN_HEAVY_COLS);
+  if (error || !data) return { error: error || { message: '資料表尚無資料，請先上傳 Excel' } };
+  // 先讀分片;讀不到才回頭用 main.raw_rows(舊格式,或 n8n 還沒切換到分片寫入)
+  let rows = await loadRawRowChunks(chunkIds);
+  let complete = rows !== null;
+  if (!rows || !rows.length) {
+    const { data: legacy, error: legacyErr } = await selectMainCols(['raw_rows']);
+    if (legacyErr) complete = false;
+    rows = (legacy && legacy.raw_rows) || [];
+  }
+  return { main: data, rows, complete };
 }
 
 // 分片寫入,並把這次用不到的舊分片清成空陣列(anon 不一定有 DELETE 權限,清空最保險)。
@@ -2210,15 +2311,45 @@ async function loadFromCloud(auto) {
   }
   setCloudStatus('loading', '正在從雲端讀取最新資料…');
   try {
-    const { data, error } = await sbClient
-      .from('prescription_data').select('*').eq('id','main').single();
-    if (error || !data) {
-      setCloudStatus('error', '❌ 讀取失敗：' + (error && error.message || '資料表尚無資料，請先上傳 Excel'));
+    // 1) 先比版本簽章,沒變就用記憶體 / IndexedDB 裡的上一份(省掉約 15MB 下載,見 MAIN_HEAVY_COLS 說明)
+    const sigInfo = await fetchCloudSignature();
+    const sig = sigInfo && sigInfo.sig;
+    let stored = _cloudCache;
+    if (!stored) {
+      const c = await cloudIdbGet('main');
+      if (c && c.v === CLOUD_CACHE_VERSION && Array.isArray(c.rows)) stored = c;
+    }
+    let heavy = (sig && stored && stored.sig === sig) ? stored : null;
+    const fromCache = !!heavy;
+    if (!heavy) {
+      const res = await fetchCloudHeavy(sigInfo && sigInfo.ids);
+      if (res.error && !stored) {
+        setCloudStatus('error', '❌ 讀取失敗：' + (res.error.message || '資料表尚無資料，請先上傳 Excel'));
+        return;
+      }
+      if (!res.error && (res.complete || !stored)) {
+        heavy = { v: CLOUD_CACHE_VERSION, sig, main: res.main, rows: res.rows };
+        if (sig && res.complete) cloudIdbPut('main', heavy);
+      } else {
+        // 這次沒讀完整(多半是 n8n 正在寫分片撞 statement timeout):先顯示上一份,
+        // 簽章不記成新的,下次自動更新會再試
+        heavy = stored;
+        console.warn('雲端資料讀取不完整,暫用上一份快取', res.error || '');
+      }
+    }
+    _cloudCache = heavy;
+    // 2) 小欄位每次都讀(週報、禮券、備註、分區、置頂各自有程式在寫,不會動到 uploaded_at)
+    const { data: light } = await selectMainCols(MAIN_LIGHT_COLS);
+    const lightJson = JSON.stringify(light || {});
+    // 背景自動更新、而且什麼都沒變:不重算也不重畫,只更新狀態列
+    if (auto && fromCache && lightJson === _lastLightJson) {
+      const at0 = heavy.main.uploaded_at ? new Date(heavy.main.uploaded_at).toLocaleString('zh-TW') : '—';
+      setCloudStatus('', `✦ 已載入最新資料　來源：${heavy.main.file_name || '—'}　上傳時間：${at0}`);
       return;
     }
-    // 先讀分片;讀不到才回頭用 main.raw_rows(舊格式,或 n8n 還沒切換到分片寫入)
-    const chunkedRows = await loadRawRowChunks();
-    rawRows = normalizeRawRows(chunkedRows.length ? chunkedRows : data.raw_rows);
+    _lastLightJson = lightJson;
+    const data = Object.assign({}, heavy.main, light || {});
+    rawRows = normalizeRawRows(heavy.rows);
     if(rawRows.length){
       // 有 raw_rows 就以它為單一資料來源,即時重算所有聚合
       const agg = aggregateRawRows(rawRows);
@@ -4236,12 +4367,15 @@ async function triggerVoucherSync(){
     // 排程每分鐘才 poll 一次，加上統計本身 3~4 分鐘，逾時放寬到 12 分鐘
     if(elapsed > 720){ stop('更新逾時（>12 分鐘），請查 C:\\prescription\\logs\\voucher-stats.log', true); return; }
     try{
+      // 每 5 秒只看進度欄位,完成後才讀一次 voucher_stats
       const { data } = await sbClient.from('prescription_data')
-        .select('voucher_status, voucher_stats').eq('id','main').single();
+        .select('voucher_status').eq('id','main').single();
       const st = data && data.voucher_status;
       if(!st) return;
       if(st.stage === 'done'){
-        voucherStats = data.voucher_stats || voucherStats;
+        const { data: vs } = await sbClient.from('prescription_data')
+          .select('voucher_stats').eq('id','main').single();
+        voucherStats = (vs && vs.voucher_stats) || voucherStats;
         stop(null);
         renderVoucherPanel();
         return;
@@ -6051,8 +6185,8 @@ async function saveNotesAndRegen(){
   let elapsed = 0;
   _regenPollTimer = setInterval(async () => {
     elapsed += 15;
-    const { data, error } = await sbClient.from('prescription_data')
-      .select('*').eq('id','main').single();
+    // 只拿判斷進度要的欄位;select('*') 會連 2MB 的 course_slots 每 15 秒抓一次
+    const { data, error } = await selectMainCols(['regen_status','latest_weekly_report','weekly_report_alert']);
     if(error){ status.textContent = `⚠️ 讀取狀態失敗(${elapsed}s):${error.message}`; return; }
 
     const st = (data.regen_status && typeof data.regen_status === 'object') ? data.regen_status : null;
@@ -7282,8 +7416,10 @@ incrementViewCount();
 document.getElementById('dateFilterBar').style.display = 'flex';
 if(prescDayDatasets.length){ renderPrescDayList(); buildPrescDayCharts(); buildPrescDayCourseCharts(); }
 
-// ── 自動同步雲端資料(n8n 每 5 分鐘更新 Supabase) ──
-setInterval(() => loadFromCloud(true), 5 * 60 * 1000);
+// ── 自動同步雲端資料 ──
+// 每 5 分鐘先比版本簽章(約 1KB),資料沒變不會重下大包。分頁在背景時不更新,
+// 切回來時由下面的 visibilitychange 補抓一次 —— 背景掛一整天的分頁不再持續耗 egress。
+setInterval(() => { if (document.visibilityState === 'visible') loadFromCloud(true); }, 5 * 60 * 1000);
 let lastVisibleReload = Date.now();
 document.addEventListener('visibilitychange', () => {
   if(document.visibilityState === 'visible' && Date.now() - lastVisibleReload > 30 * 1000){

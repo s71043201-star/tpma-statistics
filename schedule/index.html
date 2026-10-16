@@ -977,8 +977,10 @@ async function init(){
 
   try{
     sbClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-    const { data, error } = await sbClient.from('prescription_data').select('*')
-      .order('uploaded_at',{ascending:false}).limit(1).maybeSingle();
+    // 指定 id='main' 並只拿用得到的欄位。以前用「uploaded_at 最新的一列」,
+    // 但同表還有每 5 分鐘更新的 live:issues 與 raw_rows 分片,會抓錯列;select('*') 也白白多下載。
+    const { data, error } = await sbClient.from('prescription_data')
+      .select('course_slots,clinic_region_map,rx_days').eq('id','main').maybeSingle();
     if(error) throw error;
     allSlots = Array.isArray(data && data.course_slots) ? data.course_slots : [];
     clinicRegionMap = (data && data.clinic_region_map && typeof data.clinic_region_map==='object') ? data.clinic_region_map : {};
