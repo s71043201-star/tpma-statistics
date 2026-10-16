@@ -2466,11 +2466,12 @@ async function triggerManualSync() {
   let elapsed = 0;
   _manualSyncTimer = setInterval(async () => {
     elapsed += 3;
-    if (elapsed > 900) {
+    // n8n task timeout 是 1800 秒;排程與手動同步會排隊(concurrency=1),前面有一支在跑就要多等一輪
+    if (elapsed > 1800) {
       clearInterval(_manualSyncTimer); _manualSyncTimer = null;
       btn.disabled = false;
       btn.textContent = origLabel;
-      setCloudStatus('error', '⚠️ 同步逾時(>15 分鐘),請查 n8n executions');
+      setCloudStatus('error', '⚠️ 同步逾時(>30 分鐘),請查 n8n executions');
       return;
     }
     try {
