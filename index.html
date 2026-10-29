@@ -2053,17 +2053,18 @@ const TEST_CLINICS = ['ITRI'];
 const stripTestRows = rows => (rows || []).filter(r => !TEST_CLINICS.includes(r.clinic));
 
 // ══════════════════════════════════════════════
-//  開立數里程碑警示(單次)
-//  總開立數一超過門檻就跳一次系統警示 + 頁面上方紅色警示列,
-//  之後同一台瀏覽器不再重複提醒(狀態存 localStorage)。
+//  開立數里程碑警示(每個門檻各一次)
+//  總開立數一達到門檻就跳一次系統警示 + 頁面上方紅色警示列,
+//  之後同一台瀏覽器不再重複提醒(狀態存 localStorage,每個門檻各一個 key)。
+//  一次跨過多個門檻只跳最高那個。
 //  ・門檻算的是「全部資料」的總開立數,不受區域/日期篩選影響,
 //    而且跟總開立數卡片同口徑(已排除 ITRI 測試處方)。
-//  ・要換門檻:改 PRESCRIBE_ALERT_THRESHOLD 即可,key 會跟著變,
-//    等於自動重新武裝一次。
+//  ・要換門檻:改 PRESCRIBE_ALERT_THRESHOLDS 即可,key 會跟著變,
+//    等於自動重新武裝一次。Slack 那邊的同組門檻在 clinic_quota_alert.py 的 TOTAL_THRESHOLDS。
 //  ・要手動重發:瀏覽器 console 打 resetPrescribeAlert()。
 // ══════════════════════════════════════════════
-const PRESCRIBE_ALERT_THRESHOLD = 65000;
-const PRESCRIBE_ALERT_KEY = 'prescribeAlertFired_' + PRESCRIBE_ALERT_THRESHOLD;
+const PRESCRIBE_ALERT_THRESHOLDS = [86500, 87000];
+const prescribeAlertKey = th => 'prescribeAlertFired_' + th;
 
 let _allPrescTotal = 0, _allPrescTotalFor = -1;  // 依 rawRows 筆數快取,避免每次 updateSummary 重算
 function getUnfilteredPrescribeTotal(fallback){
@@ -2075,19 +2076,21 @@ function getUnfilteredPrescribeTotal(fallback){
 }
 
 function checkPrescribeAlert(fallbackTotal){
-  let fired = false;
-  try { fired = !!localStorage.getItem(PRESCRIBE_ALERT_KEY); } catch(e){}
-  if(fired) return;                                     // 已經警示過就不再吵
+  const isFired = th => { try { return !!localStorage.getItem(prescribeAlertKey(th)); } catch(e){ return false; } };
+  const pending = PRESCRIBE_ALERT_THRESHOLDS.filter(th => !isFired(th));
+  if(!pending.length) return;                           // 每個門檻都警示過就不再吵
   const total = getUnfilteredPrescribeTotal(fallbackTotal);
-  if(!(total > PRESCRIBE_ALERT_THRESHOLD)) return;
-  try { localStorage.setItem(PRESCRIBE_ALERT_KEY, new Date().toISOString()); } catch(e){}
-  const msg = `總開立數已達 ${total.toLocaleString()} 筆，超過設定門檻 ${PRESCRIBE_ALERT_THRESHOLD.toLocaleString()} 筆。`;
+  const hit = pending.filter(th => total >= th);
+  if(!hit.length) return;
+  const now = new Date().toISOString();
+  hit.forEach(th => { try { localStorage.setItem(prescribeAlertKey(th), now); } catch(e){} });
+  const msg = `總開立數已達 ${total.toLocaleString()} 筆，達到設定門檻 ${Math.max(...hit).toLocaleString()} 筆。`;
   const bar = document.getElementById('presc-alert-bar');
   const txt = document.getElementById('presc-alert-text');
-  if(txt) txt.innerHTML = `<strong>開立數警示</strong>　${msg}（此警示只發一次）`;
+  if(txt) txt.innerHTML = `<strong>開立數警示</strong>　${msg}（每個門檻只發一次）`;
   if(bar) bar.classList.add('show');
   // 延後跳視窗,先讓卡片/圖表畫完再擋畫面
-  setTimeout(() => alert('⚠️ 開立數警示\n\n' + msg + '\n\n此為單次警示,關掉後不會再提醒。'), 0);
+  setTimeout(() => alert('⚠️ 開立數警示\n\n' + msg + '\n\n此門檻只警示一次,關掉後不會再提醒。'), 0);
 }
 
 function dismissPrescribeAlert(){
@@ -2097,9 +2100,9 @@ function dismissPrescribeAlert(){
 
 // 手動重新武裝(console 用):清掉紀錄後下次重新整理會再警示一次
 function resetPrescribeAlert(){
-  try { localStorage.removeItem(PRESCRIBE_ALERT_KEY); } catch(e){}
+  PRESCRIBE_ALERT_THRESHOLDS.forEach(th => { try { localStorage.removeItem(prescribeAlertKey(th)); } catch(e){} });
   dismissPrescribeAlert();
-  console.log('開立數警示已重設,門檻 ' + PRESCRIBE_ALERT_THRESHOLD.toLocaleString() + ',重新整理後會再判斷一次');
+  console.log('開立數警示已重設,門檻 ' + PRESCRIBE_ALERT_THRESHOLDS.map(th => th.toLocaleString()).join('、') + ',重新整理後會再判斷一次');
 }
 
 // ══════════════════════════════════════════════
