@@ -1037,6 +1037,7 @@ footer {
     <button id="weeklyHistoryBtn" class="act-btn" onclick="openWeeklyHistory()" title="下載歷史週報與各週延伸分析" style="display:none">歷史週報</button>
     <button id="weeklyAlertBtn" class="act-btn" onclick="showWeeklyAlert()" title="上次週報產出有提醒事項" style="display:none;border-color:#c2410c;color:#c2410c">⚠ 產出提醒</button>
     <button id="pdf-export-btn" onclick="openPdfModal()" title="勾選想要的圖表，每張圖表獨立一頁，合併下載"><svg class="ic" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>匯出 PDF</button>
+    <button id="adminBtn" class="act-btn" onclick="openAdminLogin()" title="編輯備註、診所分區、匯出診所名單等功能需要管理員登入">管理員登入</button>
     <div id="view-counter"></div>
   </div>
 </div>
@@ -1988,6 +1989,82 @@ if (isConfigured) {
   document.getElementById("setup-banner").style.display = "none";
 }
 
+// ══════════════════════════════════════════════
+//  管理員登入（RLS：anon key 只能讀；改資料要用 Supabase Auth 登入、且在 dashboard_admins 名單內）
+//  「立即同步」與瀏覽次數不需要登入
+// ══════════════════════════════════════════════
+let adminSession = null;
+let adminName = '';
+let adminOk = false;
+let adminPending = null; // 登入成功後要接著做的事
+async function refreshAdmin() {
+  if (!sbClient) return;
+  const { data } = await sbClient.auth.getSession();
+  adminSession = data.session;
+  adminName = '';
+  adminOk = false;
+  if (adminSession) {
+    const { data: me, error } = await sbClient.from('dashboard_admins').select('name').eq('email', adminSession.user.email).maybeSingle();
+    // 名單表還沒建（RLS SQL 尚未套用）時查詢會出錯：先放行，真正的權限由資料庫 RLS 決定
+    adminOk = !!me || !!error;
+    adminName = (me && me.name) || adminSession.user.email;
+  }
+  const b = document.getElementById('adminBtn');
+  if (b) {
+    b.textContent = adminSession ? `✓ ${adminName}` : '管理員登入';
+    b.title = adminSession ? '已登入，可以編輯與匯出；按一下登出' : '編輯備註、診所分區、匯出診所名單等功能需要管理員登入';
+  }
+}
+function adminModal() {
+  let m = document.getElementById('admin-modal');
+  if (m) return m;
+  m = document.createElement('div');
+  m.id = 'admin-modal';
+  m.style.cssText = 'position:fixed;inset:0;background:rgba(15,38,31,.35);display:none;align-items:center;justify-content:center;z-index:9999';
+  m.innerHTML = `<form id="admin-form" style="background:#fff;border-radius:14px;padding:22px 24px;width:min(360px,92vw);box-shadow:0 10px 30px rgba(0,0,0,.18);display:flex;flex-direction:column;gap:10px;font-size:14px">
+    <strong style="font-size:16px">管理員登入</strong>
+    <span id="admin-why" style="color:#56716a"></span>
+    <input id="admin-email" type="email" placeholder="Email" autocomplete="username" required style="padding:8px 10px;border:1px solid #cfe0db;border-radius:8px">
+    <input id="admin-pass" type="password" placeholder="密碼" autocomplete="current-password" required style="padding:8px 10px;border:1px solid #cfe0db;border-radius:8px">
+    <span id="admin-err" style="color:#c2410c;min-height:1em"></span>
+    <div style="display:flex;gap:8px;justify-content:flex-end"><button type="button" class="act-btn" id="admin-cancel">取消</button><button type="submit" class="act-btn cyan">登入</button></div></form>`;
+  document.body.appendChild(m);
+  m.querySelector('#admin-cancel').onclick = () => { m.style.display = 'none'; adminPending = null; };
+  m.querySelector('#admin-form').onsubmit = async (e) => {
+    e.preventDefault();
+    const err = m.querySelector('#admin-err');
+    err.textContent = '登入中…';
+    const { error } = await sbClient.auth.signInWithPassword({ email: m.querySelector('#admin-email').value.trim(), password: m.querySelector('#admin-pass').value });
+    if (error) { err.textContent = '帳號或密碼錯誤'; return; }
+    await refreshAdmin();
+    if (!adminOk) { err.textContent = '這個帳號不在管理員名單內，請聯絡逸'; await sbClient.auth.signOut(); await refreshAdmin(); return; }
+    m.style.display = 'none';
+    const next = adminPending; adminPending = null;
+    if (next) next();
+  };
+  return m;
+}
+function openAdminLogin(why, next) {
+  if (!sbClient) return;
+  if (adminSession && !why) { sbClient.auth.signOut().then(refreshAdmin); return; }
+  const m = adminModal();
+  m.querySelector('#admin-why').textContent = why ? `「${why}」需要管理員登入。` : '登入後可以編輯備註、診所分區、釘選日期，以及匯出診所名單。';
+  m.querySelector('#admin-err').textContent = '';
+  adminPending = next || null;
+  m.style.display = 'flex';
+  m.querySelector('#admin-email').focus();
+}
+// 寫入前呼叫：已登入回 true；沒登入就跳登入視窗、登入後自動重做 next，這次回 false
+function requireAdmin(why, next) {
+  if (adminSession && adminOk) return true;
+  openAdminLogin(why, next);
+  return false;
+}
+if (sbClient) {
+  sbClient.auth.onAuthStateChange(() => refreshAdmin());
+  refreshAdmin();
+}
+
 // Chart.js 統一視覺主題 + 生長動畫（PDF 匯出/自動同步時暫時關閉）
 if (typeof Chart !== 'undefined') {
   Chart.defaults.animation = { duration: 700, easing: 'easeOutQuart' };
@@ -2516,6 +2593,7 @@ async function triggerManualSync() {
 // ══════════════════════════════════════════════
 async function saveToCloud(payload) {
   if (!sbClient) return false;
+  if (!requireAdmin('上傳資料到雲端')) return false;
   const row = {
     id:              'main',
     weekly_data:     payload.weeklyData,
@@ -3422,6 +3500,7 @@ function _downloadB64Xlsx(b64, filename) {
 
 async function requestClinicExport(clinicName, btn) {
   if (!sbClient) { alert('Supabase 未設定，無法下載'); return; }
+  if (!requireAdmin('下載診所民眾名單', () => requestClinicExport(clinicName, btn))) return;
   if (!clinicName) return;
   if (btn && btn.disabled) return;
 
@@ -3492,6 +3571,7 @@ function _b64ToU8(b64) {
 // 一鍵下載：所有執行率低於門檻的診所 → 各自佇列拓取 → 全數完成後打包成一個 ZIP
 async function requestBulkClinicExport(btn) {
   if (!sbClient) { alert('Supabase 未設定，無法下載'); return; }
+  if (!requireAdmin('批次下載診所民眾名單', () => requestBulkClinicExport(btn))) return;
   if (typeof JSZip === 'undefined') { alert('打包元件（JSZip）未載入，請重新整理頁面'); return; }
   if (btn && btn.disabled) return;
 
@@ -4033,6 +4113,7 @@ function loadRegionMap(){
   updateRegionSummaryBadge();
 }
 async function saveRegionMap(){
+  if (!requireAdmin('儲存診所分區', () => saveRegionMap())) return;
   localStorage.setItem('clinicRegionMap', JSON.stringify(clinicRegionMap));
   updateRegionSummaryBadge();
   if(sbClient){
@@ -4345,6 +4426,7 @@ let _voucherSyncTimer = null;
 async function triggerVoucherSync(){
   const btn = document.getElementById('vpSyncBtn');
   if(!sbClient || !btn || btn.disabled) return;
+  if(!requireAdmin('重新計算禮券統計', () => triggerVoucherSync())) return;
 
   const stop = (msg, isError) => {
     if(_voucherSyncTimer){ clearInterval(_voucherSyncTimer); _voucherSyncTimer = null; }
@@ -6113,6 +6195,7 @@ function collectNotesFromForm(){
   return out;
 }
 async function _saveNotes(alsoRegen){
+  if (!requireAdmin('儲存診所備註', () => _saveNotes(alsoRegen))) return;
   const status = document.getElementById('notes-modal-status');
   status.textContent = '⏳ 寫入 Google Sheet…';
   const notes = collectNotesFromForm();
@@ -6348,6 +6431,7 @@ async function showWeeklyAnalysis(date){
 }
 async function togglePinDate(date, evt){
   if(evt) evt.stopPropagation();
+  if(!requireAdmin('釘選日期', () => togglePinDate(date))) return;
   if(pinnedDates.has(date)) pinnedDates.delete(date); else pinnedDates.add(date);
   const arr = [...pinnedDates];
   try{ localStorage.setItem('pinnedDates', JSON.stringify(arr)); }catch(e){}
