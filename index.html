@@ -1617,7 +1617,10 @@ footer {
   <div class="chart-section" data-pdf-id="voucher-clinic" data-pdf-label="各診所待發禮券">
     <div class="chart-header">
       <h2>各診所待發禮券</h2>
-      <button class="dl-btn" onclick="exportVoucherClinics()">↓ 匯出 Excel</button>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button class="dl-btn" title="下載所有診所的待兌換禮券民眾名單（每家一個 Excel＋總表），打包成 ZIP。約需 1~2 分鐘" onclick="requestVoucherListAll(this)">↓ 全部名單 ZIP</button>
+        <button class="dl-btn" onclick="exportVoucherClinics()">↓ 匯出 Excel</button>
+      </div>
     </div>
     <div class="vc-hint" id="vcHint"></div>
     <div class="clinic-table-wrap">
@@ -1629,6 +1632,7 @@ footer {
             <th>已領禮券</th>
             <th title="完成四項但點數尚未扣 400 的人數 —— 就是要發給這家診所的張數">待發禮券</th>
             <th>兌換率</th>
+            <th title="下載該診所「完成四項、尚未兌換禮券」民眾名單（姓名、身分證、電話、各處方執行日）">民眾名單</th>
           </tr>
         </thead>
         <tbody id="voucherClinicBody"></tbody>
@@ -3526,7 +3530,8 @@ function _downloadB64Xlsx(b64, filename) {
   const bin = atob(b64);
   const u8 = new Uint8Array(bin.length);
   for (let i = 0; i < bin.length; i++) u8[i] = bin.charCodeAt(i);
-  const blob = new Blob([u8], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+  const isZip = /\.zip$/i.test(filename || '');
+  const blob = new Blob([u8], { type: isZip ? 'application/zip' : 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url; a.download = filename || '診所處方紀錄.xlsx';
@@ -3534,9 +3539,11 @@ function _downloadB64Xlsx(b64, filename) {
   setTimeout(() => { URL.revokeObjectURL(url); a.remove(); }, 100);
 }
 
-async function requestClinicExport(clinicName, btn) {
+// queueName:寫進佇列的 clinic_name;不給就用來源系統的診所名(診所處方紀錄)。
+// 待發禮券名單用 'voucher:' + JSON(見 C:/prescription/scripts/clinic_export_poll.py _process_voucher)。
+async function requestClinicExport(clinicName, btn, queueName) {
   if (!sbClient) { alert('Supabase 未設定，無法下載'); return; }
-  if (!requireAdmin('下載診所民眾名單', () => requestClinicExport(clinicName, btn))) return;
+  if (!requireAdmin('下載診所民眾名單', () => requestClinicExport(clinicName, btn, queueName))) return;
   if (!clinicName) return;
   if (btn && btn.disabled) return;
 
@@ -3551,7 +3558,7 @@ async function requestClinicExport(clinicName, btn) {
     const { data, error } = await sbClient
       .from('clinic_export_requests')
       // 更名過的診所要用來源系統的舊名字查,新名字在健康處方系統裡查不到
-      .insert({ clinic_name: sourceClinicName(clinicName), password: pwd, status: 'pending' })
+      .insert({ clinic_name: queueName || sourceClinicName(clinicName), password: pwd, status: 'pending' })
       .select('id').single();
     if (error || !data) throw new Error(error && error.message || '請確認 clinic_export_requests 表已建立');
     requestId = data.id;
@@ -3564,10 +3571,12 @@ async function requestClinicExport(clinicName, btn) {
   let elapsed = 0;
   const timer = setInterval(async () => {
     elapsed += 3;
-    if (elapsed > 300) {
+    // 禮券名單要抓整本點數帳本，主機上實測全部打包約 3.5 分鐘，給 10 分鐘
+    const limit = queueName ? 600 : 300;
+    if (elapsed > limit) {
       clearInterval(timer);
       if (btn) { btn.disabled = false; btn.textContent = orig; }
-      alert('⚠️ 下載逾時（>5 分鐘）。請確認本機「ClinicExportPoll」工作排程器任務有在執行。');
+      alert(`⚠️ 下載逾時（>${limit / 60} 分鐘）。請確認主機「ClinicExportPoll」工作排程器任務有在執行。`);
       return;
     }
     try {
@@ -3579,7 +3588,7 @@ async function requestClinicExport(clinicName, btn) {
       if (data.status === 'done') {
         clearInterval(timer);
         if (data.result_b64) _downloadB64Xlsx(data.result_b64, data.result_filename);
-        if (btn) { btn.textContent = `✓ ${data.row_count || 0} 筆`; }
+        if (btn) { btn.textContent = `✓ ${data.row_count || 0} ${queueName ? '人' : '筆'}`; }
         // 下載後立即刪除該 row,縮短個資暴露窗口
         try { await sbClient.from('clinic_export_requests').delete().eq('id', requestId); } catch (e) {}
         setTimeout(() => { if (btn) { btn.disabled = false; btn.textContent = orig; } }, 2500);
@@ -4396,7 +4405,7 @@ function buildVoucherClinicTable(){
   const hint = document.getElementById('vcHint');
 
   if(!rows.length){
-    body.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--text-muted);padding:22px">尚無資料</td></tr>';
+    body.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--text-muted);padding:22px">尚無資料</td></tr>';
     if(hint) hint.textContent = '';
     return;
   }
@@ -4423,6 +4432,8 @@ function buildVoucherClinicTable(){
       <td><b style="color:${r.unclaimed ? '#c77a06' : 'var(--text-muted)'}">${r.unclaimed.toLocaleString()}</b>${
         r.unknown ? `<span style="color:#c0392b;font-weight:700;margin-left:5px" title="另有 ${r.unknown} 人點數查詢失敗，狀態不明，未計入待發">⚠${r.unknown}</span>` : ''}</td>
       <td>${rate}%</td>
+      <td>${r.unclaimed > 0
+        ? `<button class="clinic-dl-btn" data-vc="${i}" title="下載「${p2Esc(r.name)}」完成四項、尚未兌換禮券民眾名單">↓ 名單</button>` : ''}</td>
     </tr>`;
   }).join('')
   + `<tr style="background:rgba(42,172,138,0.06);font-weight:800">
@@ -4430,8 +4441,24 @@ function buildVoucherClinicTable(){
       <td>${rows.reduce((n,r)=>n+r.done4,0).toLocaleString()}</td>
       <td>${rows.reduce((n,r)=>n+r.claimed,0).toLocaleString()}</td>
       <td style="color:#c77a06">${totalPending.toLocaleString()}</td>
-      <td></td>
+      <td></td><td></td>
     </tr>`;
+  body.querySelectorAll('button[data-vc]').forEach(b => {
+    const r = rows[+b.dataset.vc];
+    b.addEventListener('click', e => requestVoucherList(r.name, e.currentTarget));
+  });
+}
+
+// 待發禮券民眾名單(含身分證/電話)走與「診所處方紀錄」同一條佇列:本機 clinic_export_poll.py
+// 抓後台點數帳本 → 產 Excel。更名診所把新舊名一起送,後端以「最早處方的開立診所」歸戶。
+function requestVoucherList(displayName, btn){
+  const names = [displayName, ...CLINIC_RENAMES.filter(x => x.to === displayName).map(x => x.from)];
+  requestClinicExport(displayName, btn, 'voucher:' + JSON.stringify({ display: displayName, names }));
+}
+function requestVoucherListAll(btn){
+  const renames = {};
+  CLINIC_RENAMES.forEach(x => { renames[x.from] = x.to; });
+  requestClinicExport('全部診所', btn, 'voucher:' + JSON.stringify({ all: true, renames }));
 }
 
 function exportVoucherClinics(){
