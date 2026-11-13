@@ -2222,7 +2222,7 @@ const rawChunkId = i => RAW_CHUNK_PREFIX + String(i).padStart(3, '0');
 // 讀回所有分片並拼接。沒有分片(舊格式或還沒同步過)時回空陣列,由呼叫端 fallback 到 main.raw_rows;
 // 讀取失敗回 null(呼叫端改用快取或 fallback,但不能把這份不完整的結果寫進快取)。
 // 一片一片讀:13 片一次撈要 5~8 秒,n8n 同時在寫分片時會撞 statement timeout(57014,實測 2026-10-16)。
-async function loadRawRowChunks(ids) {
+async function loadRawRowChunks(ids, asMap) {
   if (!ids) {
     const { data, error } = await sbClient.from('prescription_data')
       .select('id').like('id', RAW_CHUNK_PREFIX + '%').order('id');
@@ -2244,7 +2244,9 @@ async function loadRawRowChunks(ids) {
     }
   };
   await Promise.all([worker(), worker(), worker()]);
-  return failed ? null : parts.flat();
+  if (failed) return null;
+  if (asMap) { const m = {}; ids.forEach((id, i) => { m[id] = parts[i]; }); return m; }
+  return parts.flat();
 }
 
 // ── 雲端讀取省流量 ──────────────────────────────
@@ -2258,7 +2260,7 @@ const MAIN_HEAVY_COLS = ['uploaded_at','date_range','file_name','course_slots','
                          'weekly_data','type_stats','type_weekly_raw','clinic_stats'];
 const MAIN_LIGHT_COLS = ['clinic_region_map','latest_weekly_report','weekly_report_alert',
                          'voucher_stats','clinic_notes','pinned_dates'];
-const CLOUD_CACHE_VERSION = 1;
+const CLOUD_CACHE_VERSION = 2; // v2:分片逐片快取(chunks),見 fetchCloudHeavy
 let _cloudCache = null;      // { v, sig, main, rows } 上一次完整下載的結果
 let _lastLightJson = null;   // 上一次 LIGHT 欄位內容,用來判斷背景更新要不要重畫
 const _missingMainCols = new Set(); // 資料庫還沒建的欄位(如 weekly_report_alert),記住免得每次都先撞 400
@@ -2282,7 +2284,9 @@ async function fetchCloudSignature() {
   const { data, error } = await sbClient.from('prescription_data')
     .select('id,uploaded_at').like('id', 'main%').order('id');
   if (error || !data || !data.length) return null;
-  return { sig: data.map(r => r.id + '@' + (r.uploaded_at || '')).join('|'), ids: data.map(r => r.id) };
+  const at = {};
+  data.forEach(r => { at[r.id] = r.uploaded_at || ''; });
+  return { sig: data.map(r => r.id + '@' + (r.uploaded_at || '')).join('|'), ids: data.map(r => r.id), at };
 }
 
 // IndexedDB 快取(跨重新整理/重開分頁沿用)。任何一步失敗都當沒有快取,絕不擋住正常載入。
@@ -2317,18 +2321,46 @@ async function cloudIdbPut(key, val) {
 }
 
 // 完整下載 HEAVY 欄位 + raw_rows。complete=false 表示有一段沒讀到,不可寫進快取。
-async function fetchCloudHeavy(chunkIds) {
-  const { data, error } = await selectMainCols(MAIN_HEAVY_COLS);
-  if (error || !data) return { error: error || { message: '資料表尚無資料，請先上傳 Excel' } };
-  // 先讀分片;讀不到才回頭用 main.raw_rows(舊格式,或 n8n 還沒切換到分片寫入)
-  let rows = await loadRawRowChunks(chunkIds);
-  let complete = rows !== null;
-  if (!rows || !rows.length) {
+// 增量下載(2026-11-13):Disk IO 預算被耗盡、整台 504/522 之後改的。
+// 資料庫有 trigger(skip_unchanged_raw_chunk)讓內容沒變的分片保留舊的 uploaded_at,
+// 所以這裡逐片比對時間戳,只重抓有變的分片;main 的 HEAVY 欄位也只在 main.uploaded_at 變了才重抓。
+async function fetchCloudHeavy(sigInfo, stored) {
+  const at = (sigInfo && sigInfo.at) || {};
+  const prev = (stored && stored.chunks) || {};
+  let main = null;
+  if (stored && stored.main && at.main && stored.mainAt === at.main) {
+    main = stored.main;
+  } else {
+    const { data, error } = await selectMainCols(MAIN_HEAVY_COLS);
+    if (error || !data) return { error: error || { message: '資料表尚無資料，請先上傳 Excel' } };
+    main = data;
+  }
+  const ids = ((sigInfo && sigInfo.ids) || []).filter(id => id.startsWith(RAW_CHUNK_PREFIX)).sort();
+  const chunks = {};
+  const need = [];
+  for (const id of ids) {
+    if (prev[id] && at[id] && prev[id].at === at[id]) chunks[id] = prev[id];
+    else need.push(id);
+  }
+  let complete = true;
+  if (!sigInfo) {
+    // 拿不到簽章:退回舊行為,整包讀
+    const all = await loadRawRowChunks(null, true);
+    if (all === null) complete = false;
+    else Object.keys(all).forEach(id => { chunks[id] = { at: '', rows: all[id] }; });
+  } else if (need.length) {
+    const got = await loadRawRowChunks(need, true);
+    if (got === null) complete = false;
+    else need.forEach(id => { chunks[id] = { at: at[id] || '', rows: got[id] }; });
+  }
+  let rows = Object.keys(chunks).sort().flatMap(id => chunks[id].rows || []);
+  if (!rows.length && complete) {
+    // 先讀分片;讀不到才回頭用 main.raw_rows(舊格式)
     const { data: legacy, error: legacyErr } = await selectMainCols(['raw_rows']);
     if (legacyErr) complete = false;
     rows = (legacy && legacy.raw_rows) || [];
   }
-  return { main: data, rows, complete };
+  return { main, mainAt: at.main || '', chunks, rows, complete, fetched: need.length };
 }
 
 // 分片寫入,並把這次用不到的舊分片清成空陣列(anon 不一定有 DELETE 權限,清空最保險)。
@@ -2397,19 +2429,23 @@ async function loadFromCloud(auto) {
     let stored = _cloudCache;
     if (!stored) {
       const c = await cloudIdbGet('main');
-      if (c && c.v === CLOUD_CACHE_VERSION && Array.isArray(c.rows)) stored = c;
+      if (c && c.v === CLOUD_CACHE_VERSION && c.chunks) {
+        c.rows = Object.keys(c.chunks).sort().flatMap(id => c.chunks[id].rows || []);
+        stored = c;
+      }
     }
     let heavy = (sig && stored && stored.sig === sig) ? stored : null;
     const fromCache = !!heavy;
     if (!heavy) {
-      const res = await fetchCloudHeavy(sigInfo && sigInfo.ids);
+      const res = await fetchCloudHeavy(sigInfo, stored);
       if (res.error && !stored) {
         setCloudStatus('error', '❌ 讀取失敗：' + (res.error.message || '資料表尚無資料，請先上傳 Excel'));
         return;
       }
       if (!res.error && (res.complete || !stored)) {
-        heavy = { v: CLOUD_CACHE_VERSION, sig, main: res.main, rows: res.rows };
-        if (sig && res.complete) cloudIdbPut('main', heavy);
+        heavy = { v: CLOUD_CACHE_VERSION, sig, main: res.main, mainAt: res.mainAt, chunks: res.chunks, rows: res.rows };
+        // IndexedDB 只存 chunks(rows 載入時再拼),避免同一份資料存兩次
+        if (sig && res.complete) cloudIdbPut('main', { v: heavy.v, sig, main: heavy.main, mainAt: heavy.mainAt, chunks: heavy.chunks });
       } else {
         // 這次沒讀完整(多半是 n8n 正在寫分片撞 statement timeout):先顯示上一份,
         // 簽章不記成新的,下次自動更新會再試
