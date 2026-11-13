@@ -3543,12 +3543,15 @@ function _downloadB64Xlsx(b64, filename) {
 // 待發禮券名單用 'voucher:' + JSON(見 C:/prescription/scripts/clinic_export_poll.py _process_voucher)。
 async function requestClinicExport(clinicName, btn, queueName) {
   if (!sbClient) { alert('Supabase 未設定，無法下載'); return; }
-  if (!requireAdmin('下載診所民眾名單', () => requestClinicExport(clinicName, btn, queueName))) return;
+  // 待發禮券名單(voucher:)依使用者決定不設權限:免管理員登入、免下載密碼
+  // (RLS 只對 voucher: 請求開放 anon,見 sql/2026-11-13_voucher_list_anon.sql)
+  const open = !!queueName && queueName.startsWith('voucher:');
+  if (!open && !requireAdmin('下載診所民眾名單', () => requestClinicExport(clinicName, btn, queueName))) return;
   if (!clinicName) return;
   if (btn && btn.disabled) return;
 
-  const pwd = await ensureExportPassword();
-  if (pwd === null) return;  // 使用者取消
+  const pwd = open ? null : await ensureExportPassword();
+  if (!open && pwd === null) return;  // 使用者取消
 
   const orig = btn ? btn.textContent : '';
   if (btn) { btn.disabled = true; btn.textContent = '送出中…'; }
