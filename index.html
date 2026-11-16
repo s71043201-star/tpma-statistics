@@ -3571,10 +3571,13 @@ async function requestClinicExport(clinicName, btn, queueName) {
     return;
   }
 
-  let elapsed = 0;
+  // 主機現在幾秒內就會回來(08–20 點每 4 秒查一次佇列、點數帳本走本機快取),前端也查勤一點
+  const t0 = Date.now();
+  let busy = false;
   const timer = setInterval(async () => {
-    elapsed += 3;
-    // 禮券名單要抓整本點數帳本，主機上實測全部打包約 3.5 分鐘，給 10 分鐘
+    if (busy) return;   // 上一次查詢還沒回來就不疊加,免得同一份檔案被下載兩次
+    const elapsed = Math.round((Date.now() - t0) / 1000);
+    // 禮券名單平常幾秒就好;剛好撞上主機重建帳本快取(一天兩次)時要等 1~2 分鐘,上限仍給 10 分鐘
     const limit = queueName ? 600 : 300;
     if (elapsed > limit) {
       clearInterval(timer);
@@ -3582,6 +3585,7 @@ async function requestClinicExport(clinicName, btn, queueName) {
       alert(`⚠️ 下載逾時（>${limit / 60} 分鐘）。請確認主機「ClinicExportPoll」工作排程器任務有在執行。`);
       return;
     }
+    busy = true;
     try {
       const { data } = await sbClient
         .from('clinic_export_requests')
@@ -3606,7 +3610,8 @@ async function requestClinicExport(clinicName, btn, queueName) {
         btn.textContent = data.status === 'running' ? `抓取中…${elapsed}s` : `等待中…${elapsed}s`;
       }
     } catch (e) { /* 連線抖動下次再試 */ }
-  }, 3000);
+    finally { busy = false; }
+  }, 1500);
 }
 
 function _b64ToU8(b64) {
