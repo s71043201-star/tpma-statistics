@@ -3491,17 +3491,16 @@ function exportClinicTable() {
 // ══════════════════════════════════════════════
 //  診所開立數／執行率排名表 PDF(canvas 繪表 → jsPDF 嵌圖,避開中文字型問題)
 // ══════════════════════════════════════════════
-function exportClinicRankPdf(btn) {
-  if (!clinicStats.length) { alert('尚無診所資料'); return; }
-  if (!window.jspdf) { alert('PDF 元件尚未載入，請稍後再試'); return; }
+// 繪製排名表頁面(canvas 陣列)。metrics:'pres'=開立數排名、'rate'=執行率排名
+// 版面尺寸可調:單獨下載用 A4 直式,「匯出 PDF」用橫式內容區。
+function buildClinicRankPages({ metrics = ['pres','rate'], W = 1240, H = 1754, M = 70, ROW_H = 40, titlePrefix = '' } = {}) {
   const rows = getClinicStatsWithZeros().map(r => ({
     name: r.診所名稱, pres: r.開立數 || 0, exec: r.執行數 || 0,
     rate: (r.開立數 || 0) > 0 ? (r.執行數 || 0) / r.開立數 * 100 : 0
   }));
-  // 同值同名次(1,2,2,4)
+  // 同值同名次(1,2,2,4);執行率以顯示到小數一位的值判斷,避免浮點誤差拆名次
   const ranked = (key, tie) => {
     const arr = [...rows].sort((a,b) => (b[key]-a[key]) || (b[tie]-a[tie]) || a.name.localeCompare(b.name,'zh-TW'));
-    // 執行率以顯示到小數一位的值判斷同名次,避免浮點誤差把 80.0% 拆成兩個名次
     const kv = r => key === 'rate' ? r.rate.toFixed(1) : r[key];
     let prev = null, rank = 0;
     return arr.map((r,i) => { if (kv(r) !== prev) { rank = i+1; prev = kv(r); } return {...r, rank}; });
@@ -3511,14 +3510,13 @@ function exportClinicRankPdf(btn) {
   const from = document.getElementById('filterFrom')?.value || '', to = document.getElementById('filterTo')?.value || '';
   const scope = [currentRegion === 'all' ? '全部區域' : currentRegion,
                  (from || to) ? `期間 ${from || '開辦'} ～ ${to || '今'}` : '開辦以來累積'].join('｜');
-  const now = new Date();
-  const stamp = now.toLocaleString('zh-TW', {year:'numeric', month:'2-digit', day:'2-digit', hour:'2-digit', minute:'2-digit', hour12:false});
-
-  // A4 直式,1240×1754 px ≈ 150 dpi
-  const W = 1240, H = 1754, M = 70, FONT = `'Noto Sans TC','Microsoft JhengHei',sans-serif`;
-  const ROW_H = 40, HEAD_H = 46;
-  const cols = [ {t:'排名',w:90,a:'center'}, {t:'診所名稱',w:520,a:'left'}, {t:'開立筆數',w:180,a:'right'},
+  const stamp = new Date().toLocaleString('zh-TW', {year:'numeric', month:'2-digit', day:'2-digit', hour:'2-digit', minute:'2-digit', hour12:false});
+  const FONT = `'Noto Sans TC','Microsoft JhengHei',sans-serif`, HEAD_H = ROW_H + 6;
+  // 欄寬依版面寬度等比放大
+  const base = [ {t:'排名',w:90,a:'center'}, {t:'診所名稱',w:520,a:'left'}, {t:'開立筆數',w:180,a:'right'},
                  {t:'執行筆數',w:180,a:'right'}, {t:'執行率',w:130,a:'right'} ];
+  const k = (W - 2*M) / base.reduce((s,c)=>s+c.w,0);
+  const cols = base.map(c => ({...c, w: c.w * k}));
   const pages = [];
   const section = (title, key, data) => {
     let i = 0, part = 0;
@@ -3527,28 +3525,23 @@ function exportClinicRankPdf(btn) {
       const ctx = c.getContext('2d');
       ctx.fillStyle = '#fff'; ctx.fillRect(0,0,W,H);
       let y = M;
-      // 標題
       const g = ctx.createLinearGradient(0,y,0,y+40); g.addColorStop(0,'#8fba2e'); g.addColorStop(.5,'#2aac8a'); g.addColorStop(1,'#1a9fbe');
       ctx.fillStyle = g; ctx.fillRect(M, y, 6, 40);
       ctx.fillStyle = '#1a2e28'; ctx.font = `bold 38px ${FONT}`; ctx.textBaseline = 'middle'; ctx.textAlign = 'left';
-      ctx.fillText(title + (part ? '（續）' : ''), M + 20, y + 20);
+      ctx.fillText(titlePrefix + title + (part ? '（續）' : ''), M + 20, y + 20);
       y += 62;
       ctx.font = `20px ${FONT}`; ctx.fillStyle = '#5a6e66';
-      ctx.fillText(`${scope}｜共 ${data.length} 家診所｜總開立 ${totPres.toLocaleString()}、總執行 ${totExec.toLocaleString()}（${totRate}%）`, M, y);
+      ctx.fillText(`${scope}｜共 ${data.length} 家診所｜總開立 ${totPres.toLocaleString()}、總執行 ${totExec.toLocaleString()}（${totRate}%）｜產出時間：${stamp}`, M, y, W - 2*M);
       y += 30;
-      ctx.fillText(`產出時間：${stamp}`, M, y);
-      y += 26;
-      // 表頭
       const drawRow = (vals, yy, opt) => {
         let x = M;
         if (opt.bg) { ctx.fillStyle = opt.bg; ctx.fillRect(M, yy, W-2*M, opt.h); }
         cols.forEach((col, ci) => {
-          const v = vals[ci];
           ctx.font = `${opt.bold || (ci === opt.hiCol) ? 'bold ' : ''}${opt.size}px ${FONT}`;
           ctx.fillStyle = ci === opt.hiCol ? opt.hiColor : opt.color;
           ctx.textAlign = col.a;
           const tx = col.a === 'left' ? x + 14 : col.a === 'right' ? x + col.w - 14 : x + col.w/2;
-          ctx.fillText(v, tx, yy + opt.h/2, col.w - 24);
+          ctx.fillText(vals[ci], tx, yy + opt.h/2, col.w - 24);
           x += col.w;
         });
         ctx.strokeStyle = '#d6ede5'; ctx.lineWidth = 1; ctx.beginPath();
@@ -3557,20 +3550,30 @@ function exportClinicRankPdf(btn) {
       const hiCol = key === 'pres' ? 2 : 4;
       drawRow(cols.map(c=>c.t), y, {h:HEAD_H, size:21, bold:true, color:'#1b7a62', bg:'#e6f6f0', hiCol:-1});
       y += HEAD_H;
-      const maxRows = Math.floor((H - M - 40 - y) / ROW_H);
-      data.slice(i, i + maxRows).forEach((r, k) => {
+      let maxRows = Math.max(1, Math.floor((H - M - y) / ROW_H));
+      // 只差幾列就能一頁放完時,壓縮列高避免出現只有一兩列的續頁
+      let rowH = ROW_H;
+      const left = data.length - i;
+      if (left > maxRows && left <= Math.ceil(maxRows * 1.25)) { rowH = (H - M - y) / left; maxRows = left; }
+      data.slice(i, i + maxRows).forEach((r, j) => {
         const medal = r.rank === 1 ? '#fef08a' : r.rank === 2 ? '#e2e8f0' : r.rank === 3 ? '#fed7aa' : null;
         drawRow([String(r.rank), r.name, r.pres.toLocaleString(), r.exec.toLocaleString(), r.rate.toFixed(1) + '%'], y,
-          {h:ROW_H, size:20, color:'#1a2e28', bg: medal || ((i+k) % 2 ? '#f7fcf9' : null), hiCol, hiColor: key === 'pres' ? '#1b7a62' : '#c77a06'});
-        y += ROW_H;
+          {h:rowH, size: rowH < ROW_H ? Math.max(15, Math.round(20 * rowH / ROW_H)) : 20, color:'#1a2e28', bg: medal || ((i+j) % 2 ? '#f7fcf9' : null), hiCol, hiColor: key === 'pres' ? '#1b7a62' : '#c77a06'});
+        y += rowH;
       });
       i += maxRows; part++;
       pages.push(c);
     }
   };
-  section('診所開立數排名', 'pres', ranked('pres', 'exec'));
-  section('診所執行率排名', 'rate', ranked('rate', 'pres'));
+  if (metrics.includes('pres')) section('診所開立數排名', 'pres', ranked('pres', 'exec'));
+  if (metrics.includes('rate')) section('診所執行率排名', 'rate', ranked('rate', 'pres'));
+  return pages;
+}
 
+function exportClinicRankPdf(btn) {
+  if (!clinicStats.length) { alert('尚無診所資料'); return; }
+  if (!window.jspdf) { alert('PDF 元件尚未載入，請稍後再試'); return; }
+  const pages = buildClinicRankPages();
   const { jsPDF } = window.jspdf;
   const pdf = new jsPDF({ orientation:'portrait', unit:'mm', format:'a4' });
   pages.forEach((c, idx) => {
@@ -3578,6 +3581,7 @@ function exportClinicRankPdf(btn) {
     pdf.addImage(c.toDataURL('image/jpeg', 0.92), 'JPEG', 0, 0, 210, 297);
     pdf.setFontSize(9); pdf.setTextColor(150); pdf.text(`${idx+1} / ${pages.length}`, 105, 290, {align:'center'});
   });
+  const now = new Date();
   const ymd = `${now.getFullYear()}${String(now.getMonth()+1).padStart(2,'0')}${String(now.getDate()).padStart(2,'0')}`;
   const reg = currentRegion === 'all' ? '' : '_' + currentRegion;
   pdf.save(`診所開立執行率排名${reg}_${ymd}.pdf`);
@@ -6835,6 +6839,8 @@ const PDF_CHART_GROUPS = [
       { id: 'clinic-bar',        label: '各診所開立數 vs 執行筆數' },
       { id: 'clinic-rate',       label: '各診所選課或執行比率（%）' },
       { id: 'clinic-exec-rate',  label: '各診所執行率（%）' },
+      { id: 'clinic-rank-pres',  label: '診所開立數排名（表格）' },
+      { id: 'clinic-rank-rate',  label: '診所執行率排名（表格）' },
     ]
   },
   {
@@ -7100,7 +7106,11 @@ async function startPdfExport() {
       'clinic-enroll': { tab:'tab-clinic', clinicContent:true },
       'clinic-bar':    { tab:'tab-clinic', clinicContent:true },
       'clinic-rate':   { tab:'tab-clinic', clinicContent:true },
+      'clinic-exec-rate': { tab:'tab-clinic', clinicContent:true },
     };
+
+    // 排名表(非圖表):id → 排名指標
+    const CLINIC_RANK_METRIC = { 'clinic-rank-pres': 'pres', 'clinic-rank-rate': 'rate' };
 
     // 依序處理每張勾選的圖表
     const allChartIds = PDF_CHART_GROUPS.flatMap(g => g.charts.map(c => c.id)).filter(id => pdfChecked.has(id));
@@ -7122,6 +7132,15 @@ async function startPdfExport() {
 
       let lastCtxKey = null;
       for (const chartId of allChartIds) {
+        if (CLINIC_RANK_METRIC[chartId]) {
+          if (!clinicStats.length) continue;
+          // 尺寸對齊下方橫式內容區(273×169mm),表格頁直接當成圖片放進去
+          buildClinicRankPages({ metrics:[CLINIC_RANK_METRIC[chartId]], W:1754, H:1086, M:50, ROW_H:34,
+                                 titlePrefix: multiRegion ? `[${regionLabel}] ` : '' })
+            .forEach(c => selectedSections.push({ prebuilt: true, imgDataUrl: c.toDataURL('image/jpeg', 0.93),
+                                                  w: c.width, h: c.height, title: chartId, id: chartId, region }));
+          continue;
+        }
         const ctx = CHART_CONTEXT[chartId];
         if (!ctx) continue;
         const ctxKey = ctx.tab + (ctx.subViews && ctx.subViews[0] || '');
@@ -7138,8 +7157,9 @@ async function startPdfExport() {
             (function(el){if(el)el.classList.remove('hidden')})(document.getElementById('clinic-content'));
           }
           if (ctx.rebuildFn) ctx.rebuildFn();
+          // 在隱藏分頁建立的圖表 canvas 為 0×0(例如剛開頁沒進過診所分析就匯出),顯示後要重新量尺寸
           Object.values(chartInstances).forEach(c => {
-            try { c.update('none'); } catch(e) {}
+            try { c.resize(); c.update('none'); } catch(e) {}
           });
           await new Promise(r => setTimeout(r, 400));
           lastCtxKey = ctxKey;
@@ -7194,6 +7214,11 @@ async function startPdfExport() {
     const images = [];
     for (let i = 0; i < selectedSections.length; i++) {
       const { imgDataUrl, title } = selectedSections[i];
+      if (selectedSections[i].prebuilt) {   // 排名表頁:已含標題,不再合成
+        const { w, h } = selectedSections[i];
+        images.push({ dataUrl: imgDataUrl, w, h, title });
+        continue;
+      }
       progressMsg.textContent = `處理圖表 ${i+1} / ${selectedSections.length}`;
       progressSub.textContent = title;
       progressBar.style.width = ((i / selectedSections.length) * 70) + '%';
