@@ -2145,7 +2145,7 @@ const stripTestRows = rows => (rows || []).filter(r => !TEST_CLINICS.includes(r.
 //    等於自動重新武裝一次。Slack 那邊的同組門檻在 clinic_quota_alert.py 的 TOTAL_THRESHOLDS。
 //  ・要手動重發:瀏覽器 console 打 resetPrescribeAlert()。
 // ══════════════════════════════════════════════
-const PRESCRIBE_ALERT_THRESHOLDS = [86500, 87000];
+const PRESCRIBE_ALERT_THRESHOLDS = [90200, 90700];
 const prescribeAlertKey = th => 'prescribeAlertFired_' + th;
 
 let _allPrescTotal = 0, _allPrescTotalFor = -1;  // 依 rawRows 筆數快取,避免每次 updateSummary 重算
