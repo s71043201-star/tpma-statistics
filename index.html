@@ -1633,7 +1633,7 @@ footer {
             <th>已領禮券</th>
             <th title="完成四項但點數尚未扣 400 的人數 —— 就是要發給這家診所的張數">待發禮券</th>
             <th>兌換率</th>
-            <th title="下載該診所「完成四項、尚未兌換禮券」民眾名單（姓名、身分證、電話、各處方執行日）">民眾名單</th>
+            <th title="下載該診所「完成四項、尚未兌換禮券」民眾名單（姓名、身分證、電話、各處方執行日）。名單為下載當下的即時資料，人數可能與表格快照不同">民眾名單</th>
           </tr>
         </thead>
         <tbody id="voucherClinicBody"></tbody>
@@ -4502,6 +4502,11 @@ function voucherClinicRows(){
     .sort((a, b) => b.unclaimed - a.unclaimed || b.done4 - a.done4 || a.name.localeCompare(b.name, 'zh-TW'));
 }
 
+function vcSnapshotTime(){
+  const at = voucherStats && voucherStats.updated_at ? new Date(voucherStats.updated_at) : null;
+  return at ? at.toLocaleString('zh-TW', {month:'2-digit', day:'2-digit', hour:'2-digit', minute:'2-digit'}) : '排程';
+}
+
 function buildVoucherClinicTable(){
   const body = document.getElementById('voucherClinicBody');
   if(!body) return;
@@ -4521,6 +4526,9 @@ function buildVoucherClinicTable(){
     hint.innerHTML = `共 <b>${pendingClinics}</b> 家診所有待發禮券，合計需準備 `
                    + `<b style="color:#c77a06">${totalPending.toLocaleString()}</b> 張`
                    + `（面額 400 點，約 ${(totalPending * 400).toLocaleString()} 點）。依待發張數由多到少排列。`
+                   // 表格是排程快照、名單是下載當下讀帳本:快照後有人來領,名單就會比表格少(2026-11-19 健康101 19 張 vs 名單 18 人)
+                   + `<br><span style="color:var(--text-muted)">※ 表格為 ${vcSnapshotTime()} 的統計快照；「↓ 名單」是下載當下的即時資料，`
+                   + `快照後已領走的人不會列入，所以名單人數可能比表格少（或有人剛做完四項而多），以名單為準。</span>`
                    + (totalUnknown ? `<br><b style="color:#c0392b">⚠ 另有 ${totalUnknown.toLocaleString()} `
                         + `人點數查詢失敗（表中以 ⚠ 標示），狀態不明未計入待發，實際需求可能更多。</b>` : '');
   }
