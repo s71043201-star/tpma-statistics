@@ -1396,7 +1396,7 @@ footer {
     <div class="card blue">  <span class="icon"><svg class="ic" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg></span><div class="val" id="csTotalSlots">—</div><div class="lbl">總場次</div></div>
     <div class="card green"> <span class="icon"><svg class="ic" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></span><div class="val" id="csTotalEnroll">—</div><div class="lbl">總報名人次</div></div>
     <div class="card orange"><span class="icon"><svg class="ic" viewBox="0 0 24 24"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/><polyline points="17 11 19 13 23 9"/></svg></span><div class="val" id="csTotalAttend">—</div><div class="lbl" title="已預約簽到 + 現場加入(未預約當場報到)的總人次">總出席人次</div></div>
-    <div class="card purple"><span class="icon"><svg class="ic" viewBox="0 0 24 24"><line x1="19" y1="5" x2="5" y2="19"/><circle cx="6.5" cy="6.5" r="2.5"/><circle cx="17.5" cy="17.5" r="2.5"/></svg></span><div class="val" id="csAttendRate">—</div><div class="lbl" title="總出席人次 ÷ 總報名人次。分子含現場加入,分母不含,故可能超過 100%(單日課表的出席率則只算預約者,兩者口徑不同)">出席率</div></div>
+    <div class="card purple"><span class="icon"><svg class="ic" viewBox="0 0 24 24"><line x1="19" y1="5" x2="5" y2="19"/><circle cx="6.5" cy="6.5" r="2.5"/><circle cx="17.5" cy="17.5" r="2.5"/></svg></span><div class="val" id="csAttendRate">—</div><div class="lbl" title="總出席人次 ÷ 總報名人次。分子含現場加入(處方日活動多為未預約當場報到),分母只有預約,故會超過 100%。後端彙總不分預約/現場,無法算全期的預約出席率;單日課表的「預約出席率」才是只算預約者">出席人次 ÷ 報名</div><div class="delta">含現場加入，可超過 100%</div></div>
     <div class="card violet"><span class="icon"><svg class="ic" viewBox="0 0 24 24"><path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z"/></svg></span><div class="val" id="csFullSlots">—</div><div class="lbl">滿座場次</div></div>
   </div>
 
@@ -2268,7 +2268,20 @@ const MAIN_LIGHT_COLS = ['clinic_region_map','latest_weekly_report','weekly_repo
 const CLOUD_CACHE_VERSION = 2; // v2:分片逐片快取(chunks),見 fetchCloudHeavy
 let _cloudCache = null;      // { v, sig, main, rows } 上一次完整下載的結果
 let _lastLightJson = null;   // 上一次 LIGHT 欄位內容,用來判斷背景更新要不要重畫
-const _missingMainCols = new Set(); // 資料庫還沒建的欄位(如 weekly_report_alert),記住免得每次都先撞 400
+// 資料庫還沒建的欄位(如 weekly_report_alert),記住免得每次都先撞 400。
+// 存 localStorage 跨重新整理沿用,但 24 小時後重新探測一次,之後真的建了欄位也會自動讀到。
+const MISSING_COLS_KEY = 'tpma-missing-main-cols';
+const MISSING_COLS_TTL = 24 * 3600 * 1000;
+const _missingMainCols = (() => {
+  try {
+    const s = JSON.parse(localStorage.getItem(MISSING_COLS_KEY) || 'null');
+    if (s && Array.isArray(s.cols) && Date.now() - s.at < MISSING_COLS_TTL) return new Set(s.cols);
+  } catch (e) {}
+  return new Set();
+})();
+function _saveMissingMainCols() {
+  try { localStorage.setItem(MISSING_COLS_KEY, JSON.stringify({ at: Date.now(), cols: [..._missingMainCols] })); } catch (e) {}
+}
 
 // 指名欄位查 main 這列。欄位不存在時 PostgREST 會整個回 42703,這裡把那欄拿掉再試,
 // 行為等同以前 select('*') 時「沒有那欄就是 undefined」。
@@ -2278,7 +2291,7 @@ async function selectMainCols(cols) {
     const { data, error } = await sbClient.from('prescription_data')
       .select(list.join(',')).eq('id','main').single();
     const m = error && error.code === '42703' && /column (?:\w+\.)?(\w+) does not exist/.exec(error.message || '');
-    if (m && list.includes(m[1])) { _missingMainCols.add(m[1]); continue; }
+    if (m && list.includes(m[1])) { _missingMainCols.add(m[1]); _saveMissingMainCols(); continue; }
     return { data, error };
   }
 }
@@ -5774,7 +5787,7 @@ function renderDaySchedule(){
     <span>總容量 <b>${sumCap.toLocaleString()}</b></span>
     <span>報名率 <b>${sumCap > 0 ? Math.round(sumBk/sumCap*100) : 0}%</b></span>
     <span>滿座率 <b>${slots.length > 0 ? Math.round(fullCnt/slots.length*100) : 0}%</b></span>
-    <span title="已預約簽到 ${sumCkBooked} ÷ 報名 ${sumBk}(不含現場加入)">出席率 <b>${sumBk > 0 ? Math.round(sumCkBooked/sumBk*100) : 0}%</b></span>
+    <span title="已預約簽到 ${sumCkBooked} ÷ 報名 ${sumBk}(不含現場加入)">預約出席率 <b>${sumBk > 0 ? Math.round(sumCkBooked/sumBk*100) : 0}%</b></span>
   </div>`;
   // 同時段卡片固定順序:運動 → 營養 → 情緒調適 → 社會 → 其他
   const TYPE_ORDER = { exercise:0, nutrition:1, mental:2, social:3 };
