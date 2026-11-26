@@ -1601,7 +1601,7 @@ footer {
       <span class="vp-scope" id="vpScope">全部區域</span>
       <span class="vp-time" id="vpTime"></span>
       <button class="vp-sync" id="vpSyncBtn" type="button" onclick="triggerVoucherSync()"
-              title="重新查一次所有人的點數（約 3~4 分鐘）。平日 09:35 / 15:05 會自動更新">
+              title="重新查一次所有人的點數（約 15 分鐘）。平日 09:35 / 15:05 會自動更新">
         <svg class="ic" viewBox="0 0 24 24"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
         更新
       </button>
@@ -4608,7 +4608,7 @@ function exportVoucherClinics(){
 //   按鈕把 voucher_request_at 設成現在 → 本機排程 VoucherStatsCheck 每分鐘 poll，
 //   看到請求比 voucher_last_run_at 新就跑 voucher_stats.py → 期間回寫 voucher_status
 //   讓這裡顯示階段 → done 後重讀雲端。
-// 沒有併進 n8n 是因為光查點數就要 3~4 分鐘(2500+ 人逐人打,後端無批次端點)，
+// 沒有併進 n8n 是因為整輪要約 15 分鐘(讀 9 萬筆處方 + 1.8 萬人逐人查點數,後端無批次端點)，
 // 塞進去會撞 n8n 的 300 秒上限，把原本穩定的處方同步一起拖垮。
 let _voucherSyncTimer = null;
 async function triggerVoucherSync(){
@@ -4628,8 +4628,12 @@ async function triggerVoucherSync(){
   btn.classList.add('spinning');
   document.getElementById('vpNote').textContent = '已送出請求，等待本機排程接手（最多 1 分鐘）…';
 
+  // 只認請求送出「之後」才寫的 done/error:voucher_status 會留著上一輪的 done,
+  // 不比時間的話第一次輪詢就會把舊資料當成更新完成。留 60 秒容忍本機與雲端時鐘誤差。
+  const reqAt = new Date();
+  const reqAtMs = reqAt.getTime() - 60000;
   const { error } = await sbClient.from('prescription_data')
-    .upsert({ id:'main', voucher_request_at: new Date().toISOString() }, { onConflict:'id' });
+    .upsert({ id:'main', voucher_request_at: reqAt.toISOString() }, { onConflict:'id' });
   if(error){
     stop('觸發失敗：' + error.message + '（欄位可能尚未建立，見 supabase_migration.sql）', true);
     return;
@@ -4638,14 +4642,20 @@ async function triggerVoucherSync(){
   let elapsed = 0;
   _voucherSyncTimer = setInterval(async () => {
     elapsed += 5;
-    // 排程每分鐘才 poll 一次，加上統計本身 3~4 分鐘，逾時放寬到 12 分鐘
-    if(elapsed > 720){ stop('更新逾時（>12 分鐘），請查 C:\\prescription\\logs\\voucher-stats.log', true); return; }
+    // 統計整輪約 15 分鐘;若剛好撞上定時那輪,本機會讓給它,最慢要等它跑完 → 逾時給 30 分鐘
+    if(elapsed > 1800){ stop('更新逾時（>30 分鐘），請查 C:\\prescription\\logs\\voucher-stats.log', true); return; }
     try{
       // 每 5 秒只看進度欄位,完成後才讀一次 voucher_stats
       const { data } = await sbClient.from('prescription_data')
         .select('voucher_status').eq('id','main').single();
       const st = data && data.voucher_status;
       if(!st) return;
+      const fresh = st.at && new Date(st.at).getTime() >= reqAtMs;
+      if((st.stage === 'done' || st.stage === 'error') && !fresh){
+        document.getElementById('vpNote').textContent =
+          `已送出請求，等待本機排程接手…（已等待 ${Math.floor(elapsed/60)} 分 ${elapsed%60} 秒）`;
+        return;
+      }
       if(st.stage === 'done'){
         const { data: vs } = await sbClient.from('prescription_data')
           .select('voucher_stats').eq('id','main').single();
